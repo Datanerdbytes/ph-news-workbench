@@ -1,0 +1,524 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  CalendarDays,
+  ChartColumn,
+  ChevronRight,
+  ChevronsUpDown,
+  FileText,
+  Inbox,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Plus,
+  Rss,
+  Settings,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "cn";
+import { FacebookMark } from "@/components/facebook-mark";
+import { useFacebookConnection } from "@/components/facebook-connection";
+import { authClient } from "@/lib/auth-client";
+
+type NavItem = {
+  href?: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+};
+
+const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: "Workspace",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/", label: "Inbox", icon: Inbox, exact: true },
+      { href: "/status", label: "Drafts", icon: FileText },
+      { href: "/calendar", label: "Calendar", icon: CalendarDays },
+    ],
+  },
+  {
+    title: "Grow",
+    items: [
+      { href: "/analytics", label: "Analytics", icon: ChartColumn },
+      { href: "/accounts", label: "Accounts", icon: Users },
+    ],
+  },
+  {
+    title: "Manage",
+    items: [
+      { label: "Sources", icon: Rss },
+      { href: "/team", label: "Team", icon: UserPlus },
+      { href: "/settings", label: "Settings", icon: Settings },
+    ],
+  },
+];
+
+function isActivePath(pathname: string, item: NavItem) {
+  if (!item.href) return false;
+  if (item.exact) return pathname === item.href;
+  if (item.href === "/status")
+    return pathname.startsWith("/status") || pathname.startsWith("/drafts");
+  return pathname.startsWith(item.href);
+}
+
+function pageLabel(pathname: string) {
+  if (pathname === "/") return "Inbox";
+  if (pathname.startsWith("/dashboard")) return "Dashboard";
+  if (pathname.startsWith("/status") || pathname.startsWith("/drafts"))
+    return "Drafts";
+  if (pathname.startsWith("/accounts")) return "Accounts";
+  if (pathname.startsWith("/analytics")) return "Analytics";
+  if (pathname.startsWith("/team")) return "Team";
+  if (pathname.startsWith("/settings")) return "Settings";
+  if (pathname.startsWith("/calendar")) return "Calendar";
+  return "Workspace";
+}
+
+function initials(value: string) {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "PH";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+export function AppFrame({
+  children,
+  fill = false,
+}: {
+  children: React.ReactNode;
+  fill?: boolean;
+}) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [navOpen, setNavOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [workspace, setWorkspace] = useState<{
+    name: string;
+    role: string;
+    memberCount: number;
+  } | null>(null);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const { data: session } = authClient.useSession();
+  const connection = useFacebookConnection();
+
+  const workspaceName =
+    workspace?.name ?? connection.page?.name ?? "News Workbench";
+  const userName = session?.user?.name ?? "Owner account";
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/workspace", { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setWorkspace(data);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    setNavOpen(false);
+    setAccountOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!accountRef.current?.contains(event.target as Node)) {
+        setAccountOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAccountOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [accountOpen]);
+
+  async function signOut() {
+    await authClient.signOut();
+    router.replace("/login");
+    router.refresh();
+  }
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNavOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [navOpen]);
+
+  return (
+    <div
+      className={cn(
+        "bg-background",
+        fill ? "fixed inset-0 overflow-clip" : "min-h-dvh"
+      )}
+    >
+      <div
+        className={cn(
+          "lg:grid lg:grid-cols-[250px_minmax(0,1fr)]",
+          fill ? "h-full" : "min-h-dvh"
+        )}
+      >
+        <aside
+          className={cn(
+            "fixed inset-y-0 left-0 z-50 flex w-[264px] flex-col gap-4 border-r border-border bg-card p-3 transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-auto lg:translate-x-0 lg:shadow-none",
+            navOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+          )}
+          aria-label="Workspace navigation"
+        >
+          <div className="flex items-center gap-2.5 rounded-[10px] border border-border bg-surface-2 px-2.5 py-2">
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink font-heading text-sm font-semibold text-paper">
+              {initials(workspaceName)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12.5px] font-semibold leading-tight">
+                {workspaceName}
+              </p>
+              <p className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">
+                {workspace?.role === "editor"
+                  ? "Editor workspace"
+                  : "Owner workspace"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNavOpen(false)}
+              aria-label="Close navigation"
+              className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+          </div>
+
+          <Link
+            href="/"
+            className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-brand text-[12.5px] font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-[#8a4b0f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          >
+            <Plus className="size-4" aria-hidden />
+            New post
+          </Link>
+
+          <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-1">
+            {NAV_GROUPS.map((group) => (
+              <div key={group.title} className="flex flex-col gap-0.5">
+                <p className="px-2.5 pb-1.5 text-[9.5px] font-bold uppercase tracking-[0.14em] text-faint">
+                  {group.title}
+                </p>
+                {group.items.map((item) => {
+                  const active = isActivePath(pathname, item);
+                  const Icon = item.icon;
+
+                  if (!item.href) {
+                    return (
+                      <span
+                        key={item.label}
+                        aria-disabled
+                        title="Coming soon"
+                        className="flex cursor-not-allowed items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-[12.5px] font-medium text-muted-foreground/70"
+                      >
+                        <Icon
+                          className="size-4 shrink-0 text-faint"
+                          aria-hidden
+                        />
+                        {item.label}
+                        <span className="ml-auto rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-faint">
+                          Soon
+                        </span>
+                      </span>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                        active
+                          ? "bg-brand-soft font-semibold text-[#8a4b0f] shadow-[inset_2px_0_0_var(--brand)]"
+                          : "text-secondary-foreground hover:bg-surface-3 hover:text-foreground"
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "size-4 shrink-0",
+                          active ? "text-brand" : "text-muted-foreground"
+                        )}
+                        aria-hidden
+                      />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+
+          <div className="flex flex-col gap-2.5">
+            <Link
+              href="/accounts"
+              className="rounded-lg border border-border bg-surface-2 px-3 py-2.5 transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              <p className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-faint">
+                Publishing
+              </p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <FacebookMark className="size-5" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-semibold leading-tight">
+                    {connection.loading
+                      ? "Checking…"
+                      : connection.connected
+                        ? connection.page?.name
+                        : connection.configured
+                          ? "Connect a Page"
+                          : "Setup needed"}
+                  </p>
+                  <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        connection.loading
+                          ? "animate-pulse bg-muted-foreground/50"
+                          : connection.connected
+                            ? "bg-success"
+                            : connection.configured
+                              ? "bg-warning"
+                              : "bg-faint"
+                      )}
+                      aria-hidden
+                    />
+                    {connection.loading
+                      ? "Facebook Page"
+                      : connection.connected
+                        ? "Connected"
+                        : "Not connected"}
+                  </p>
+                </div>
+                <ChevronRight className="size-3.5 text-faint" aria-hidden />
+              </div>
+            </Link>
+
+            <div ref={accountRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setAccountOpen((open) => !open)}
+                aria-expanded={accountOpen}
+                aria-haspopup="menu"
+                className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              >
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-3 text-[10.5px] font-bold text-secondary-foreground">
+                  {initials(userName)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11.5px] font-semibold leading-tight">
+                    {userName}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Owner</p>
+                </div>
+                <ChevronsUpDown
+                  className="size-3.5 shrink-0 text-faint"
+                  aria-hidden
+                />
+              </button>
+
+              {accountOpen && (
+                <div
+                  role="menu"
+                  className="absolute inset-x-0 bottom-[calc(100%+6px)] z-50 rounded-lg border border-border bg-card p-1 shadow-lg"
+                >
+                  <p className="truncate px-2 py-1.5 text-[10px] text-muted-foreground">
+                    {session?.user?.email ?? "Owner account"}
+                  </p>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void signOut()}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[11.5px] font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  >
+                    <LogOut className="size-3.5" aria-hidden />
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
+
+        {navOpen && (
+          <button
+            type="button"
+            aria-label="Close navigation"
+            onClick={() => setNavOpen(false)}
+            className="fixed inset-0 z-40 bg-ink/40 lg:hidden"
+          />
+        )}
+
+        <div className="flex min-h-0 min-w-0 flex-col lg:h-full">
+          <header className="sticky top-0 z-30 flex h-[58px] shrink-0 items-center gap-3 border-b border-border bg-card/90 px-4 backdrop-blur-md sm:px-6">
+            <button
+              type="button"
+              onClick={() => setNavOpen(true)}
+              aria-label="Open navigation"
+              className="grid size-8 place-items-center rounded-[7px] border border-border bg-card text-secondary-foreground hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
+            >
+              <Menu className="size-4" aria-hidden />
+            </button>
+
+            <div className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted-foreground">
+              <span className="hidden truncate sm:inline">{workspaceName}</span>
+              <ChevronRight
+                className="hidden size-3 text-faint sm:block"
+                aria-hidden
+              />
+              <strong className="truncate font-semibold text-foreground">
+                {pageLabel(pathname)}
+              </strong>
+            </div>
+
+            <div className="ml-auto flex items-center gap-2">
+              <FacebookStatusChip />
+              <FacebookMobileChip />
+            </div>
+          </header>
+
+          <main
+            className={cn(
+              "flex min-h-0 flex-1 flex-col",
+              fill && "overflow-clip"
+            )}
+          >
+            {children}
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function facebookStatus(connection: ReturnType<typeof useFacebookConnection>) {
+  if (connection.loading) {
+    return {
+      label: "Checking…",
+      dot: "animate-pulse bg-muted-foreground/50",
+    };
+  }
+  if (connection.unreachable) {
+    return { label: "Status unavailable", dot: "bg-muted-foreground/40" };
+  }
+  if (connection.connected) {
+    return {
+      label: connection.page?.name ?? "Connected",
+      dot: "bg-success",
+    };
+  }
+  if (!connection.configured) {
+    return { label: "Setup needed", dot: "bg-faint" };
+  }
+  return { label: "Not connected", dot: "bg-warning" };
+}
+
+function FacebookStatusChip() {
+  const connection = useFacebookConnection();
+  const status = facebookStatus(connection);
+
+  return (
+    <div className="hidden items-center gap-2 rounded-full border border-border bg-card py-0.5 pl-0.5 pr-0.5 sm:flex">
+      <FacebookMark className="size-6" />
+      <div className="hidden min-w-0 leading-none md:block">
+        <p className="text-[10.5px] font-semibold">Facebook</p>
+        <p className="mt-0.5 flex items-center gap-1 text-[9.5px] text-muted-foreground">
+          <span
+            className={cn("size-1.5 shrink-0 rounded-full", status.dot)}
+            aria-hidden
+          />
+          <span className="max-w-[130px] truncate">{status.label}</span>
+        </p>
+      </div>
+
+      {connection.connected ? (
+        <button
+          type="button"
+          onClick={() => void connection.disconnect()}
+          disabled={connection.refreshing}
+          className="rounded-full border border-border bg-background px-2.5 py-1 text-[10.5px] font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
+        >
+          {connection.refreshing ? "…" : "Disconnect"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={connection.connect}
+          disabled={connection.loading}
+          className="rounded-full bg-ink px-2.5 py-1 text-[10.5px] font-semibold text-paper transition-colors hover:bg-ink/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
+        >
+          Connect
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FacebookMobileChip() {
+  const connection = useFacebookConnection();
+  const status = facebookStatus(connection);
+
+  function handleClick() {
+    if (connection.connected) {
+      toast(`${connection.page?.name ?? "Facebook Page"} connected`, {
+        description: "Facebook Page connection",
+        action: {
+          label: "Disconnect",
+          onClick: () => {
+            void connection.disconnect();
+          },
+        },
+      });
+      return;
+    }
+
+    connection.connect();
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      aria-label={
+        connection.connected
+          ? "Manage Facebook Page connection"
+          : "Connect Facebook Page"
+      }
+      className="relative grid size-8 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:hidden"
+    >
+      <FacebookMark className="size-5" />
+      <span
+        className={cn(
+          "absolute right-1 top-1 size-1.5 rounded-full ring-2 ring-card",
+          status.dot
+        )}
+        aria-hidden
+      />
+    </button>
+  );
+}

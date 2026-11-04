@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>News Workbench — SaaS redesign preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --canvas: #f5f7f9;
+    --surface: #ffffff;
+    --surface-2: #f9fafb;
+    --surface-3: #f1f3f6;
+    --ink: #161b23;
+    --ink-2: #39424f;
+    --muted: #6b7482;
+    --faint: #98a1ae;
+    --line: #e3e7ec;
+    --line-strong: #d2d8e0;
+    --brand: #a85f18;
+    --brand-strong: #8a4b0f;
+    --brand-soft: #fbf0e2;
+    --brand-ring: rgba(168, 95, 24, 0.22);
+    --success: #0d7355;
+    --success-soft: #e7f5ef;
+    --info: #1f5fbf;
+    --info-soft: #eaf1fc;
+    --warning: #9a5a00;
+    --warning-soft: #fdf3e0;
+    --danger: #b3261e;
+    --danger-soft: #fceceb;
+    --fb: #1877f2;
+    --fb-soft: #eaf2ff;
+    --ig: #d62976;
+    --ig-soft: #fdf0f6;
+    --yt: #d93025;
+    --yt-soft: #fdeceb;
+    --tk: #14181d;
+    --li: #0a66c2;
+    --radius: 10px;
+    --radius-sm: 7px;
+    --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+    --shadow-sm: 0 2px 6px -2px rgba(16, 24, 40, 0.08);
+    --shadow-md: 0 18px 40px -24px rgba(16, 24, 40, 0.28);
+    --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --serif: "Newsreader", ui-serif, Georgia, serif;
+    --sidebar: 250px;
+    --topbar: 58px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--canvas);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3, h4, p { margin: 0; }
+  ul { margin: 0; padding: 0; list-style: none; }
+  :focus-visible { outline: 2px solid var(--brand-ring); outline-offset: 2px; }
+  .icon { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .icon-sm { width: 15px; height: 15px; }
+  .icon-lg { width: 22px; height: 22px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* ---------- preview chrome (not part of the product) ---------- */
+  .preview-bar {
+    position: fixed; inset: 0 0 auto 0; z-index: 200;
+    display: flex; align-items: center; gap: 14px;
+    height: 52px; padding: 0 16px; overflow-x: auto; white-space: nowrap;
+    background: #11161d; color: #cfd6df;
+    border-bottom: 1px solid #222a35;
+  }
+  .preview-bar .pb-brand { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #fff; letter-spacing: 0.01em; }
+  .preview-bar .pb-brand span.tag { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #f0b27a; border: 1px solid rgba(240, 178, 122, 0.35); padding: 3px 6px; border-radius: 999px; }
+  .pb-group { display: flex; align-items: center; gap: 4px; padding: 3px; background: #1a222c; border: 1px solid #28323e; border-radius: 8px; }
+  .pb-label { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #7f8b99; margin-right: 2px; }
+  .pb-btn { border: 0; background: transparent; color: #aeb8c4; font-size: 11px; font-weight: 600; padding: 6px 9px; border-radius: 6px; white-space: nowrap; }
+  .pb-btn:hover { color: #fff; background: rgba(255,255,255,0.06); }
+  .pb-btn[aria-pressed="true"] { color: #11161d; background: #f4f6f8; }
+  .pb-spacer { flex: 1; }
+  .pb-note { font-size: 10px; color: #7f8b99; white-space: nowrap; }
+
+  /* ---------- shell ---------- */
+  .app { display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); min-height: 100vh; padding-top: 52px; }
+  .sidebar {
+    position: sticky; top: 52px; height: calc(100vh - 52px);
+    display: flex; flex-direction: column; gap: 18px;
+    padding: 16px 12px 14px;
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    overflow: auto;
+  }
+  .workspace {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border: 1px solid var(--line);
+    border-radius: var(--radius); background: var(--surface-2);
+  }
+  .ws-mark {
+    display: grid; place-items: center; width: 32px; height: 32px; flex: none;
+    border-radius: 8px; background: #20303f; color: #fff;
+    font-family: var(--serif); font-size: 16px; font-weight: 600;
+  }
+  .ws-copy { min-width: 0; flex: 1; }
+  .ws-copy strong { display: block; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ws-copy span { display: block; font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .workspace > .icon { color: var(--faint); width: 14px; height: 14px; }
+  .icon-btn.nav-close { display: none; margin-left: auto; }
+
+  .new-post {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    height: 36px; border: 1px solid var(--brand); border-radius: 8px;
+    background: var(--brand); color: #fff; font-size: 12.5px; font-weight: 600;
+    box-shadow: 0 1px 2px rgba(138, 75, 15, 0.28);
+  }
+  .new-post:hover { background: var(--brand-strong); }
+
+  .nav-group { display: flex; flex-direction: column; gap: 2px; }
+  .nav-title { padding: 0 10px 6px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 10px; border-radius: 7px;
+    font-size: 12.5px; font-weight: 500; color: var(--ink-2);
+  }
+  .nav-item:hover { background: var(--surface-3); color: var(--ink); }
+  .nav-item[aria-current="page"] { background: var(--brand-soft); color: var(--brand-strong); font-weight: 600; box-shadow: inset 2px 0 0 var(--brand); }
+  .nav-item .icon { width: 16px; height: 16px; color: var(--muted); }
+  .nav-item[aria-current="page"] .icon { color: var(--brand); }
+  .nav-badge { margin-left: auto; min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--surface-3); color: var(--muted); font-size: 10px; font-weight: 700; text-align: center; }
+  .nav-item[aria-current="page"] .nav-badge { background: rgba(168, 95, 24, 0.14); color: var(--brand-strong); }
+  .nav-badge.alert { background: var(--warning-soft); color: var(--warning); }
+
+  .sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+  .usage { padding: 10px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); }
+  .usage-row { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); }
+  .usage-row strong { color: var(--ink-2); font-weight: 600; }
+  .meter { height: 4px; margin-top: 7px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 68%; border-radius: inherit; background: var(--brand); }
+  .user { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; }
+  .user:hover { background: var(--surface-3); }
+  .avatar { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 50%; background: #dce3ea; color: #33414f; font-size: 10.5px; font-weight: 700; }
+  .avatar.sm { width: 24px; height: 24px; font-size: 9px; }
+  .avatar.lg { width: 34px; height: 34px; font-size: 12px; }
+  .user-copy { min-width: 0; flex: 1; }
+  .user-copy strong { display: block; font-size: 11.5px; font-weight: 600; }
+  .user-copy span { display: block; font-size: 10px; color: var(--muted); }
+
+  .main { min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    position: sticky; top: 52px; z-index: 40; height: var(--topbar);
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 26px; background: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(10px);
+  }
+  .crumbs { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); min-width: 0; }
+  .crumbs strong { color: var(--ink); font-weight: 600; }
+  .crumbs .icon { width: 12px; height: 12px; color: var(--faint); }
+  .topbar-search {
+    margin-left: auto; display: flex; align-items: center; gap: 8px;
+    width: 230px; height: 32px; padding: 0 10px;
+    border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2);
+    color: var(--muted); font-size: 11.5px;
+  }
+  .topbar-search kbd { margin-left: auto; font-family: var(--font); font-size: 9.5px; font-weight: 600; color: var(--faint); border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 4px; background: var(--surface); }
+  .icon-btn { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink-2); position: relative; }
+  .icon-btn:hover { background: var(--surface-3); }
+  .icon-btn .dot { position: absolute; top: 6px; right: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 2px var(--surface); }
+  .menu-btn { display: none; }
+
+  .topnav { display: none; }
+  .content { width: 100%; max-width: 1420px; margin: 0 auto; padding: 24px 26px 56px; }
+  .view[hidden] { display: none; }
+
+  /* ---------- shared bits ---------- */
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 20px; }
+  .eyebrow { font-size: 9.5px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--brand); }
+  .page-title { margin-top: 5px; font-family: var(--serif); font-size: 31px; line-height: 1.08; letter-spacing: -0.018em; font-weight: 500; }
+  .page-sub { margin-top: 6px; max-width: 560px; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+  .head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 34px; padding: 0 12px; border-radius: 7px;
+    border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2);
+    font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: var(--shadow-xs);
+  }
+  .btn:hover { background: var(--surface-3); color: var(--ink); }
+  .btn .icon { width: 15px; height: 15px; }
+  .btn-primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .btn-primary:hover { background: #0d1218; color: #fff; }
+  .btn-brand { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn-brand:hover { background: var(--brand-strong); color: #fff; }
+  .btn-ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); }
+  .btn-ghost:hover { background: var(--surface-3); color: var(--ink); }
+  .btn-sm { height: 29px; padding: 0 9px; font-size: 11px; border-radius: 6px; }
+  .btn:disabled { opacity: 0.5; pointer-events: none; }
+
+  .card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-xs); min-width: 0; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .card-title { font-size: 12.5px; font-weight: 600; }
+  .card-sub { margin-top: 2px; font-size: 10.5px; color: var(--muted); font-weight: 400; }
+  .card-body { padding: 16px; }
+  .link { font-size: 11px; font-weight: 600; color: var(--brand); display: inline-flex; align-items: center; gap: 3px; }
+  .link .icon { width: 13px; height: 13px; }
+
+  .seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; }
+  .seg button { border: 0; background: transparent; padding: 4px 9px; border-radius: 5px; font-size: 10.5px; font-weight: 600; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-xs); }
+
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+  .pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.85; }
+  .pill-published { background: var(--success-soft); color: var(--success); }
+  .pill-scheduled { background: var(--info-soft); color: var(--info); }
+  .pill-failed { background: var(--danger-soft); color: var(--danger); }
+  .pill-draft { background: var(--surface-3); color: var(--muted); }
+  .pill-pending { background: var(--warning-soft); color: var(--warning); }
+  .pill-brand { background: var(--brand-soft); color: var(--brand-strong); }
+  .pill-plain::before { display: none; }
+
+  .account-dot { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--fb); color: #fff; font-size: 12px; font-weight: 700; font-family: Georgia, serif; line-height: 1; }
+  .account-cell { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+
+  .plat { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px; color: #fff; }
+  .plat .icon { width: 18px; height: 18px; stroke-width: 1.9; }
+  .plat.fb { background: var(--fb); font-family: Georgia, serif; font-size: 19px; font-weight: 700; line-height: 1; }
+  .plat.ig { background: linear-gradient(135deg, #f9ce34 0%, #ee2a7b 55%, #6228d7 100%); }
+  .plat.yt { background: var(--yt); }
+  .plat.tk { background: var(--tk); }
+  .plat.li { background: var(--li); }
+  .plat.x { background: var(--tk); }
+  .plat.off { background: var(--surface-3); color: var(--faint); box-shadow: inset 0 0 0 1px var(--line); }
+  .plat.sm { width: 20px; height: 20px; border-radius: 5px; font-size: 12px; }
+  .plat.sm .icon { width: 12px; height: 12px; stroke-width: 2; }
+
+  /* ---------- dashboard ---------- */
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .kpi { padding: 14px 15px; position: relative; overflow: hidden; }
+  .kpi-label { display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; font-weight: 600; color: var(--muted); }
+  .kpi-label .icon { width: 15px; height: 15px; color: var(--faint); }
+  .kpi-value { margin-top: 8px; font-family: var(--serif); font-size: 27px; line-height: 1; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; }
+  .kpi-foot { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 10px; color: var(--muted); }
+  .delta { display: inline-flex; align-items: center; gap: 2px; font-weight: 600; color: var(--success); }
+  .delta .icon { width: 12px; height: 12px; }
+  .delta.down { color: var(--danger); }
+  .mini-chart { position: absolute; right: 10px; bottom: 10px; width: 64px; height: 26px; opacity: 0.7; }
+  .mini-chart path { fill: none; stroke: var(--brand); stroke-width: 1.5; }
+
+  .dash-grid { display: grid; grid-template-columns: minmax(0, 1.85fr) minmax(290px, 1fr); gap: 14px; align-items: start; }
+  .stack { display: grid; gap: 14px; min-width: 0; }
+  .dash-grid > *, .analytics-grid > * { min-width: 0; }
+  .chart-card .card-body { padding: 14px 16px 12px; }
+  .chart-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .legend { display: flex; align-items: center; gap: 12px; font-size: 10.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 8px; height: 8px; border-radius: 2px; }
+  .chart { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; }
+  .chart-y { display: flex; flex-direction: column; justify-content: space-between; height: 208px; padding-bottom: 2px; font-size: 9px; color: var(--faint); text-align: right; font-variant-numeric: tabular-nums; }
+  .chart-area { position: relative; height: 208px; border-radius: 4px; background-image: linear-gradient(to bottom, var(--line) 1px, transparent 1px); background-size: 100% 52px; background-position: 0 0; }
+  .chart-area svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .chart-x { display: flex; justify-content: space-between; margin: 8px 0 0 42px; font-size: 9px; color: var(--faint); }
+  .chart-note { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--muted); }
+  .chart-note .icon { width: 13px; height: 13px; color: var(--success); }
+
+  .upcoming { display: grid; gap: 0; }
+  .up-item { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+  .up-item:last-child { border-bottom: 0; }
+  .up-time { font-size: 10.5px; font-weight: 600; color: var(--ink-2); padding-top: 2px; font-variant-numeric: tabular-nums; }
+  .up-time span { display: block; font-size: 9px; font-weight: 500; color: var(--faint); margin-top: 2px; }
+  .up-copy { min-width: 0; }
+  .up-copy p { font-size: 11.5px; font-weight: 550; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .up-meta { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 9.5px; color: var(--muted); }
+  .up-meta .account-dot { width: 15px; height: 15px; font-size: 9px; border-radius: 4px; }
+
+  .health { display: grid; gap: 0; }
+  .health-row { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+  .health-row:last-child { border-bottom: 0; }
+  .health-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+  .health-icon .icon { width: 15px; height: 15px; }
+  .health-copy { min-width: 0; flex: 1; }
+  .health-copy strong { display: block; font-size: 11.5px; font-weight: 600; }
+  .health-copy span { display: block; font-size: 9.5px; color: var(--muted); margin-top: 1px; }
+  .health-status { display: inline-flex; align-items: center; gap: 5px; font-size: 9.5px; font-weight: 600; color: var(--success); }
+  .health-status i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .health-status.warn { color: var(--warning); }
+  .health-status.off { color: var(--faint); }
+
+  .table-wrap { overflow-x: auto; }
+  table.data { width: 100%; border-collapse: collapse; min-width: 620px; }
+  table.data th { padding: 9px 16px; text-align: left; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); background: var(--surface-2); border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.data td { padding: 11px 16px; border-bottom: 1px solid var(--line); font-size: 11.5px; color: var(--ink-2); vertical-align: middle; }
+  table.data tr:last-child td { border-bottom: 0; }
+  table.data tbody tr:hover { background: var(--surface-2); }
+  .post-cell { display: flex; align-items: center; gap: 10px; min-width: 240px; }
+  .post-thumb { width: 34px; height: 34px; flex: none; border-radius: 6px; background: linear-gradient(135deg, #e9edf2, #d7dee6); border: 1px solid var(--line); display: grid; place-items: center; color: var(--faint); }
+  .post-thumb .icon { width: 14px; height: 14px; }
+  .post-cell strong { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+  .post-cell span { display: block; margin-top: 2px; font-size: 9.5px; color: var(--muted); }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .muted { color: var(--muted); }
+  .table-foot { display: flex; align-items: center; justify-content: space-between; padding: 9px 16px; font-size: 10px; color: var(--muted); border-top: 1px solid var(--line); }
+
+  /* ---------- composer ---------- */
+  .composer-shell { display: grid; grid-template-columns: 296px minmax(0, 1fr) 340px; gap: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; box-shadow: var(--shadow-xs); min-height: 610px; }
+  .queue { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; }
+  .queue-head { padding: 12px 12px 10px; border-bottom: 1px solid var(--line); }
+  .queue-search { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--muted); font-size: 11px; }
+  .queue-search .icon { width: 14px; height: 14px; }
+  .filter-row { display: flex; gap: 4px; margin-top: 8px; }
+  .chip { border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 9.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
+  .chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .queue-list { overflow: auto; flex: 1; max-height: 560px; }
+  .q-item { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 11px 13px 11px 15px; position: relative; }
+  .q-item:hover { background: var(--surface-2); }
+  .q-item[aria-selected="true"] { background: var(--brand-soft); box-shadow: inset 2px 0 0 var(--brand); }
+  .q-source { display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
+  .src-mark { display: grid; place-items: center; width: 14px; height: 14px; border-radius: 3px; background: var(--surface-3); border: 1px solid var(--line); color: var(--ink-2); font-size: 8px; font-weight: 700; }
+  .q-source em { margin-left: auto; font-style: normal; color: var(--faint); font-weight: 500; }
+  .q-title { margin-top: 5px; font-size: 11.5px; font-weight: 600; line-height: 1.32; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .q-foot { display: flex; align-items: center; gap: 6px; margin-top: 7px; }
+  .q-foot .pill { font-size: 8.5px; padding: 1px 6px; }
+  .q-foot .time { margin-left: auto; font-size: 9px; color: var(--faint); }
+
+  .editor { min-width: 0; display: flex; flex-direction: column; }
+  .editor-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .editor-head .crumbs { font-size: 10px; }
+  .editor-scroll { flex: 1; overflow: auto; padding: 14px 16px 18px; }
+  .source-card { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); display: flex; gap: 10px; align-items: flex-start; }
+  .source-card .post-thumb { width: 30px; height: 30px; }
+  .source-card strong { display: block; font-size: 11.5px; line-height: 1.35; }
+  .source-card span { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 9.5px; color: var(--muted); }
+  .source-card .icon { width: 11px; height: 11px; }
+  .compose-label { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 7px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .compose-label .count { letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--muted); }
+  .writing {
+    min-height: 214px; padding: 13px 14px; border: 1px solid var(--line-strong); border-radius: 8px;
+    background: var(--surface); font-size: 12.5px; line-height: 1.62; color: var(--ink-2);
+    box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.03);
+  }
+  .writing p + p { margin-top: 9px; }
+  .writing .cursor { display: inline-block; width: 1.5px; height: 14px; background: var(--brand); vertical-align: -3px; animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .toolbar { display: flex; align-items: center; gap: 3px; margin-top: 9px; padding: 4px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); }
+  .tool { display: grid; place-items: center; width: 28px; height: 27px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); }
+  .tool:hover { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-xs); }
+  .tool .icon { width: 14px; height: 14px; }
+  .tool-sep { width: 1px; height: 17px; background: var(--line-strong); margin: 0 3px; }
+  .lang { margin-left: auto; display: flex; align-items: center; gap: 4px; padding-right: 3px; }
+  .lang button { border: 0; background: transparent; font-size: 9.5px; font-weight: 600; color: var(--muted); padding: 3px 5px; border-radius: 4px; }
+  .lang button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-xs); }
+  .attach-row { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+  .attach { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px; border: 1px dashed var(--line-strong); border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 600; }
+  .attach:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+  .attach .icon { width: 13px; height: 13px; }
+  .stat-line { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: 9.5px; color: var(--muted); }
+  .stat-line b { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .stat-line .sep { width: 1px; height: 9px; background: var(--line-strong); }
+  .editor-foot { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); background: var(--surface-2); }
+  .editor-foot .left { font-size: 9.5px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+  .editor-foot .left .icon { width: 12px; height: 12px; }
+  .editor-foot .right { margin-left: auto; display: flex; gap: 7px; }
+  .schedule-wrap { position: relative; }
+  .schedule-pop {
+    display: none; position: absolute; right: 0; bottom: calc(100% + 8px); width: 258px; z-index: 20;
+    padding: 13px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: var(--shadow-md);
+  }
+  .schedule-pop.open { display: block; }
+  .schedule-pop h4 { font-size: 11.5px; font-weight: 600; }
+  .schedule-pop p { margin-top: 2px; font-size: 9.5px; color: var(--muted); }
+  .field { display: grid; gap: 4px; margin-top: 10px; }
+  .field label { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+  .field input, .field select { height: 30px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); font-size: 11px; }
+  .schedule-pop .btn { width: 100%; margin-top: 11px; }
+
+  .preview-pane { border-left: 1px solid var(--line); background: var(--surface-2); display: flex; flex-direction: column; min-width: 0; }
+  .preview-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .preview-head span { font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .preview-scroll { padding: 14px; overflow: auto; }
+  .fb-card { border: 1px solid var(--line); border-radius: 9px; background: var(--surface); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .fb-top { display: flex; align-items: center; gap: 8px; padding: 10px 11px 8px; }
+  .fb-page { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #20303f; color: #fff; font-family: var(--serif); font-size: 13px; }
+  .fb-name { min-width: 0; }
+  .fb-name strong { display: block; font-size: 11px; font-weight: 600; }
+  .fb-name span { display: flex; align-items: center; gap: 4px; font-size: 8.5px; color: var(--muted); }
+  .fb-name .icon { width: 9px; height: 9px; }
+  .fb-more { margin-left: auto; color: var(--faint); }
+  .fb-text { padding: 2px 11px 10px; font-size: 10.5px; line-height: 1.55; color: var(--ink-2); white-space: pre-line; }
+  .fb-media { margin: 0 11px 10px; aspect-ratio: 1.18; border-radius: 6px; border: 1px solid var(--line); background: linear-gradient(145deg, #223647 0%, #345163 48%, #7d6a4f 100%); display: grid; place-items: center; position: relative; overflow: hidden; }
+  .fb-media::after { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 70% at 20% 0%, rgba(255,255,255,0.2), transparent 55%); }
+  .fb-media .media-copy { position: relative; z-index: 1; text-align: center; color: #fff; padding: 16px; }
+  .fb-media .media-copy small { display: block; font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.72; }
+  .fb-media .media-copy strong { display: block; margin-top: 6px; font-family: var(--serif); font-size: 19px; font-weight: 500; line-height: 1.15; }
+  .fb-reactions { display: flex; align-items: center; gap: 5px; padding: 0 11px 8px; font-size: 8.5px; color: var(--muted); }
+  .react-dots { display: flex; }
+  .react-dots i { width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid var(--surface); margin-right: -3px; display: grid; place-items: center; font-size: 7px; color: #fff; font-style: normal; }
+  .react-dots i:nth-child(1) { background: var(--fb); }
+  .react-dots i:nth-child(2) { background: #e5484d; }
+  .react-dots i:nth-child(3) { background: #f5a524; }
+  .fb-actions { display: flex; border-top: 1px solid var(--line); }
+  .fb-actions button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; height: 30px; border: 0; background: transparent; color: var(--muted); font-size: 9px; font-weight: 600; }
+  .fb-actions button:hover { background: var(--surface-2); }
+  .fb-actions .icon { width: 12px; height: 12px; }
+  .preview-note { display: flex; gap: 7px; margin-top: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 9.5px; line-height: 1.45; color: var(--muted); }
+  .preview-note .icon { width: 13px; height: 13px; color: var(--brand); flex: none; margin-top: 1px; }
+
+  /* ---------- analytics ---------- */
+  .analytics-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 14px; align-items: start; }
+  .top-list { display: grid; }
+  .top-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+  .top-row:last-child { border-bottom: 0; }
+  .rank { font-family: var(--serif); font-size: 13px; color: var(--faint); }
+  .top-copy strong { display: block; font-size: 11px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .top-copy span { display: block; margin-top: 2px; font-size: 9px; color: var(--muted); }
+  .top-num { text-align: right; }
+  .top-num strong { display: block; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .top-num span { display: block; font-size: 8.5px; color: var(--muted); }
+  .mix { display: grid; gap: 13px; }
+  .mix-row { display: grid; gap: 6px; }
+  .mix-top { display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--ink-2); }
+  .mix-top strong { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 10.5px; }
+  .mix-bar { height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+  .mix-bar i { display: block; height: 100%; border-radius: inherit; background: var(--fb); }
+  .mix-bar i.ig { background: linear-gradient(90deg, #b5488c, #e08a3c); }
+  .mix-bar i.li { background: #2f6fed; }
+  .mix-bar i.yt { background: var(--yt); }
+  .rhythm { display: flex; align-items: flex-end; gap: 6px; height: 92px; margin-top: 4px; }
+  .rhythm i { flex: 1; border-radius: 4px 4px 2px 2px; background: var(--brand-soft); position: relative; }
+  .rhythm i.best { background: var(--brand); }
+  .rhythm-x { display: flex; gap: 6px; margin-top: 6px; font-size: 8.5px; color: var(--faint); }
+  .rhythm-x span { flex: 1; text-align: center; }
+
+  /* ---------- accounts ---------- */
+  .acct-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .acct-sum { display: flex; align-items: center; gap: 11px; padding: 13px 15px; }
+  .acct-sum-value { font-family: var(--serif); font-size: 22px; line-height: 1; letter-spacing: -0.01em; }
+  .acct-sum-copy { min-width: 0; }
+  .acct-sum-copy strong { display: block; font-size: 10.5px; font-weight: 600; color: var(--ink-2); }
+  .acct-sum-copy span { display: block; margin-top: 2px; font-size: 9.5px; color: var(--muted); }
+  .acct-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(280px, 1fr); gap: 14px; align-items: start; }
+  .acct-grid > * { min-width: 0; }
+  .acct-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 15px 16px; border-bottom: 1px solid var(--line); }
+  .acct-row:last-child { border-bottom: 0; }
+  .acct-main { min-width: 0; }
+  .acct-name { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .acct-name strong { font-size: 12.5px; font-weight: 600; }
+  .acct-name .handle { font-size: 10.5px; color: var(--muted); }
+  .acct-stats { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 5px; font-size: 10px; color: var(--muted); }
+  .acct-stats b { color: var(--ink-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .caps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .cap { padding: 2px 6px; border-radius: 4px; background: var(--surface-3); color: var(--muted); font-size: 9px; font-weight: 600; }
+  .cap.on { background: var(--success-soft); color: var(--success); }
+  .cap.no { background: var(--danger-soft); color: var(--danger); }
+  .acct-side { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+  .acct-actions { display: flex; gap: 6px; }
+  .available-row { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+  .available-row:last-child { border-bottom: 0; }
+  .available-copy { min-width: 0; flex: 1; }
+  .available-copy strong { display: block; font-size: 11.5px; font-weight: 600; }
+  .available-copy span { display: block; margin-top: 1px; font-size: 9.5px; color: var(--muted); line-height: 1.4; }
+  .flow { display: grid; gap: 10px; }
+  .flow-step { display: flex; gap: 10px; align-items: flex-start; padding: 10px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+  .flow-num { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 50%; background: var(--brand-soft); color: var(--brand-strong); font-size: 10px; font-weight: 700; }
+  .flow-step strong { display: block; font-size: 11px; font-weight: 600; }
+  .flow-step p { margin-top: 2px; font-size: 9.5px; line-height: 1.45; color: var(--muted); }
+  .launch-list { display: grid; gap: 0; }
+  .launch-row { display: flex; align-items: center; gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 10.5px; }
+  .launch-row:last-child { border-bottom: 0; }
+  .launch-row .plat.sm { width: 18px; height: 18px; }
+  .launch-row .phase { margin-left: auto; font-size: 9px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
+  .launch-row.live .phase { color: var(--success); }
+
+  /* ---------- composer channels + platform previews ---------- */
+  .channel-pick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .channel-pick .label { margin-right: 2px; font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .channel-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); font-size: 10.5px; font-weight: 600; }
+  .channel-chip[aria-pressed="true"] { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-strong); box-shadow: 0 0 0 1px var(--brand-ring); }
+  .channel-chip[aria-pressed="false"] { opacity: 0.6; }
+  .channel-note { display: flex; align-items: center; gap: 5px; margin-left: auto; font-size: 9px; color: var(--muted); }
+  .channel-note .icon { width: 12px; height: 12px; color: var(--warning); }
+  .preview-tabs { display: inline-flex; padding: 2px; gap: 2px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; }
+  .preview-tabs button { border: 0; background: transparent; padding: 4px 8px; border-radius: 5px; font-size: 10px; font-weight: 600; color: var(--muted); }
+  .preview-tabs button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-xs); }
+  .ig-card, .yt-card { border: 1px solid var(--line); border-radius: 9px; background: var(--surface); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .ig-card[hidden], .yt-card[hidden], .fb-card[hidden] { display: none; }
+  .ig-top { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-bottom: 1px solid var(--line); }
+  .ig-avatar { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #f9ce34, #ee2a7b 55%, #6228d7); color: #fff; font-family: var(--serif); font-size: 12px; }
+  .ig-top strong { display: block; font-size: 10.5px; }
+  .ig-top span { display: block; font-size: 8.5px; color: var(--muted); }
+  .ig-media { position: relative; aspect-ratio: 1 / 1; background: linear-gradient(145deg, #223647 0%, #345163 48%, #7d6a4f 100%); display: grid; place-items: center; }
+  .ig-media .media-copy { text-align: center; color: #fff; padding: 16px; }
+  .ig-media small { display: block; font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.72; }
+  .ig-media strong { display: block; margin-top: 6px; font-family: var(--serif); font-size: 18px; font-weight: 500; line-height: 1.15; }
+  .ig-actions { display: flex; gap: 11px; padding: 9px 11px 4px; color: var(--ink-2); }
+  .ig-actions .icon { width: 16px; height: 16px; }
+  .ig-caption { padding: 2px 11px 11px; font-size: 10px; line-height: 1.5; color: var(--ink-2); }
+  .ig-caption b { font-weight: 600; }
+  .ig-caption span { color: #8b95a3; }
+  .yt-thumb { position: relative; aspect-ratio: 16 / 9; background: linear-gradient(145deg, #1c2a36 0%, #2f4a5c 52%, #6b5a44 100%); display: grid; place-items: center; }
+  .yt-play { display: grid; place-items: center; width: 38px; height: 27px; border-radius: 7px; background: rgba(0, 0, 0, 0.62); color: #fff; }
+  .yt-play .icon { width: 16px; height: 16px; fill: currentColor; stroke: none; }
+  .yt-duration { position: absolute; right: 7px; bottom: 7px; padding: 1px 4px; border-radius: 3px; background: rgba(0, 0, 0, 0.72); color: #fff; font-size: 8.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .yt-body { padding: 10px 11px 12px; }
+  .yt-body strong { display: block; font-size: 11px; font-weight: 600; line-height: 1.35; }
+  .yt-meta { margin-top: 4px; font-size: 9px; color: var(--muted); }
+  .yt-channel { display: flex; align-items: center; gap: 7px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .yt-channel .plat.sm { border-radius: 50%; }
+  .yt-channel span { font-size: 9px; color: var(--muted); }
+
+  /* ---------- capability matrix ---------- */
+  .matrix { width: 100%; border-collapse: collapse; min-width: 720px; }
+  .matrix th { padding: 9px 12px; text-align: center; font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); background: var(--surface-2); border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .matrix th:first-child, .matrix td:first-child { text-align: left; }
+  .matrix td { padding: 10px 12px; text-align: center; border-bottom: 1px solid var(--line); font-size: 10px; color: var(--muted); }
+  .matrix tr:last-child td { border-bottom: 0; }
+  .matrix .ch { display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+  .matrix .yes { color: var(--success); font-weight: 700; }
+  .matrix .no { color: var(--line-strong); font-weight: 700; }
+  .matrix .cond { color: var(--warning); font-size: 9px; font-weight: 600; }
+
+  /* ---------- foundations ---------- */
+  .found-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .found-grid .span-2 { grid-column: span 2; }
+  .swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .swatches.platforms { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .swatch { border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .swatch i { display: block; height: 46px; }
+  .swatch div { padding: 6px 8px; background: var(--surface); }
+  .swatch strong { display: block; font-size: 9.5px; font-weight: 600; }
+  .swatch span { display: block; font-size: 8.5px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 1px; }
+  .type-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .type-row:last-child { border-bottom: 0; }
+  .type-row .sample-serif { font-family: var(--serif); font-size: 24px; line-height: 1.1; letter-spacing: -0.01em; }
+  .type-row .sample-h2 { font-family: var(--serif); font-size: 17px; }
+  .type-row .sample-body { font-size: 12.5px; }
+  .type-row .sample-caption { font-size: 10px; color: var(--muted); }
+  .type-row span + span { font-size: 9px; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+  .type-row .sample-body { color: var(--ink-2); }
+  .btn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .field-demo { display: grid; gap: 10px; max-width: 320px; }
+  .input-demo { height: 32px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); font-size: 11.5px; width: 100%; }
+  .input-demo:focus { outline: 2px solid var(--brand-ring); border-color: var(--brand); }
+  .empty { display: grid; place-items: center; text-align: center; padding: 30px 16px; border: 1px dashed var(--line-strong); border-radius: 8px; background: var(--surface-2); }
+  .empty-badge { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+  .empty h4 { margin-top: 9px; font-family: var(--serif); font-size: 16px; font-weight: 500; }
+  .empty p { margin-top: 3px; max-width: 260px; font-size: 10px; line-height: 1.5; color: var(--muted); }
+  .skeleton { display: grid; gap: 8px; }
+  .skeleton i { display: block; height: 9px; border-radius: 4px; background: linear-gradient(90deg, var(--surface-3), #e8ecf1, var(--surface-3)); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
+  .skeleton i:nth-child(2) { width: 82%; }
+  .skeleton i:nth-child(3) { width: 56%; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .token-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; }
+  .token-row { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 10px; }
+  .token-row code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+
+  /* ---------- concept B: ink rail ---------- */
+  body[data-theme="b"] {
+    --canvas: #f3f5f7;
+    --brand-soft: rgba(240, 178, 122, 0.14);
+    --brand-ring: rgba(240, 178, 122, 0.28);
+  }
+  body[data-theme="b"] .sidebar { background: #151b23; border-right-color: #242d38; color: #cfd6df; }
+  body[data-theme="b"] .workspace { background: #1b232d; border-color: #2a3440; }
+  body[data-theme="b"] .ws-mark { background: #f3f5f7; color: #151b23; }
+  body[data-theme="b"] .ws-copy strong { color: #f1f4f7; }
+  body[data-theme="b"] .ws-copy span, body[data-theme="b"] .workspace > .icon { color: #8793a1; }
+  body[data-theme="b"] .new-post { background: var(--brand); border-color: var(--brand); color: #fff; }
+  body[data-theme="b"] .nav-title { color: #6f7d8c; }
+  body[data-theme="b"] .nav-item { color: #b6c0cb; }
+  body[data-theme="b"] .nav-item .icon { color: #7f8b99; }
+  body[data-theme="b"] .nav-item:hover { background: #1d2631; color: #fff; }
+  body[data-theme="b"] .nav-item[aria-current="page"] { background: rgba(240, 178, 122, 0.13); color: #f2c294; box-shadow: inset 2px 0 0 #e3a164; }
+  body[data-theme="b"] .nav-item[aria-current="page"] .icon { color: #f2c294; }
+  body[data-theme="b"] .nav-badge { background: #232d38; color: #98a5b3; }
+  body[data-theme="b"] .nav-item[aria-current="page"] .nav-badge { background: rgba(240, 178, 122, 0.18); color: #f2c294; }
+  body[data-theme="b"] .usage { background: #1a222c; border-color: #2a3440; }
+  body[data-theme="b"] .usage-row { color: #8793a1; }
+  body[data-theme="b"] .usage-row strong { color: #d3dae2; }
+  body[data-theme="b"] .meter { background: #2d3743; }
+  body[data-theme="b"] .user:hover { background: #1d2631; }
+  body[data-theme="b"] .user-copy strong { color: #eef2f6; }
+  body[data-theme="b"] .user-copy span { color: #8793a1; }
+  body[data-theme="b"] .avatar { background: #2b3642; color: #d7dee6; }
+  body[data-theme="b"] .eyebrow { color: #b46a1f; }
+  body[data-theme="b"] .page-title { font-weight: 500; }
+
+  /* ---------- concept C: top navigation ---------- */
+  body[data-theme="c"] .app { grid-template-columns: minmax(0, 1fr); }
+  body[data-theme="c"] .sidebar { display: none; }
+  body[data-theme="c"] .topbar { display: none; }
+  body[data-theme="c"] .topnav {
+    position: sticky; top: 52px; z-index: 40;
+    display: flex; align-items: center; gap: 18px;
+    height: 60px; padding-inline: max(26px, calc((100vw - 1320px) / 2 + 26px));
+    background: rgba(255, 255, 255, 0.94); border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(10px);
+  }
+  body[data-theme="c"] .topnav .brand { display: flex; align-items: center; gap: 9px; margin-right: 6px; }
+  body[data-theme="c"] .topnav .brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 7px; background: #20303f; color: #fff; font-family: var(--serif); font-size: 14px; }
+  body[data-theme="c"] .topnav .brand-copy strong { display: block; font-family: var(--serif); font-size: 15px; font-weight: 500; line-height: 1; }
+  body[data-theme="c"] .topnav .brand-copy span { display: block; margin-top: 3px; font-size: 8px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); }
+  body[data-theme="c"] .topnav .links { display: flex; align-items: center; gap: 2px; }
+  body[data-theme="c"] .topnav .links a { padding: 7px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+  body[data-theme="c"] .topnav .links a:hover { background: var(--surface-3); color: var(--ink); }
+  body[data-theme="c"] .topnav .links a[aria-current="page"] { color: var(--ink); font-weight: 600; background: var(--surface-3); }
+  body[data-theme="c"] .topnav .links a[aria-current="page"]::after { content: ""; display: block; height: 2px; margin: 5px 2px -7px; border-radius: 2px; background: var(--brand); }
+  body[data-theme="c"] .topnav .actions { margin-left: auto; display: flex; align-items: center; gap: 7px; }
+  body[data-theme="c"] .topnav .nav-search { display: flex; align-items: center; gap: 7px; width: 190px; height: 32px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); color: var(--muted); font-size: 11px; }
+  body[data-theme="c"] .topnav .nav-search kbd { margin-left: auto; font-family: var(--font); font-size: 9px; color: var(--faint); border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 4px; background: var(--surface); }
+  body[data-theme="c"] .topnav .menu-btn { display: none; }
+  body[data-theme="c"] .content { max-width: 1320px; padding-top: 28px; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 1240px) {
+    .composer-shell { grid-template-columns: 274px minmax(0, 1fr); }
+    .preview-pane { display: none; }
+    .dash-grid, .analytics-grid { grid-template-columns: minmax(0, 1fr); }
+    .found-grid { grid-template-columns: minmax(0, 1fr); }
+    .found-grid .span-2 { grid-column: span 1; }
+  }
+  @media (max-width: 1080px) and (min-width: 861px) {
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 1024px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .sidebar {
+      position: fixed; left: 0; top: 52px; bottom: 0; z-index: 120; width: 264px;
+      transform: translateX(-100%); transition: transform 0.2s ease;
+      box-shadow: var(--shadow-md); border-right: 1px solid var(--line);
+    }
+    body.nav-open .sidebar { transform: translateX(0); }
+    body.nav-open::after { content: ""; position: fixed; inset: 52px 0 0; z-index: 110; background: rgba(12, 17, 23, 0.4); }
+    body.nav-open { overflow: hidden; }
+    .menu-btn { display: grid; }
+    .icon-btn.nav-close { display: grid; }
+    .workspace > .icon { display: none; }
+    .crumbs { display: none; }
+    .topbar-search { margin-left: number; }
+    .topbar-search { margin-left: auto; }
+    .content { padding: 20px 20px 48px; }
+    body[data-theme="c"] .topnav { padding: 0 20px; }
+    body[data-theme="c"] .topnav .links { display: none; }
+    body[data-theme="c"] .topnav .menu-btn { display: grid; }
+    body[data-theme="c"] .topnav .nav-search { display: none; }
+  }
+  @media (max-width: 860px) {
+    .composer-shell { grid-template-columns: minmax(0, 1fr); }
+    .queue { display: none; }
+    .editor-head .crumbs { display: flex; }
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pb-note { display: none; }
+    .preview-bar { gap: 8px; }
+    .acct-grid { grid-template-columns: minmax(0, 1fr); }
+    .channel-note { margin-left: 0; width: 100%; }
+  }
+  @media (max-width: 640px) {
+    .preview-bar { position: static; flex-wrap: wrap; height: auto; min-height: 52px; padding: 8px 12px; white-space: normal; overflow: visible; }
+    .app { padding-top: 0; }
+    .sidebar { top: 0; bottom: 0; }
+    body.nav-open::after { inset: 0; }
+    body[data-theme="c"] .topnav { top: 0; }
+    .topbar { top: 0; padding: 0 14px; }
+    .topbar-search { display: none; }
+    .content { padding: 16px 14px 40px; }
+    .page-title { font-size: 27px; }
+    .kpis { gap: 8px; }
+    .kpi { padding: 12px; }
+    .kpi-value { font-size: 23px; }
+    .mini-chart { display: none; }
+    .page-head { align-items: flex-start; }
+    .head-actions { width: 100%; }
+    .head-actions .btn { flex: 1; }
+    .editor-foot { flex-wrap: wrap; }
+    .editor-foot .left { width: 100%; }
+    .editor-foot .right { width: 100%; margin-left: 0; }
+    .editor-foot .right > * { flex: 1; }
+    .editor-foot .right .btn { width: 100%; }
+    .acct-summary { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .acct-sum { padding: 10px 13px; }
+    .acct-sum .health-icon { display: none; }
+    .acct-sum-copy { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+    .acct-sum-value { font-size: 19px; }
+    .acct-sum-copy span { width: 100%; margin-top: 0; }
+    .acct-row { grid-template-columns: 34px minmax(0, 1fr); align-items: start; }
+    .acct-side { grid-column: 1 / -1; flex-direction: row; align-items: center; flex-wrap: wrap; }
+    .acct-actions .btn { flex: 1; }
+    .preview-tabs button { padding: 4px 7px; font-size: 9.5px; }
+    .swatches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .swatches.platforms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .token-list { grid-template-columns: minmax(0, 1fr); }
+    .chart-card .card-body { padding: 12px 12px 10px; }
+    .chart-y, .chart-area { height: 170px; }
+    .pb-label { display: none; }
+    .pb-btn { padding: 6px 7px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body data-theme="a">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.7 12 3l9 7.7V20a1 1 0 0 1-1 1h-5.5v-7h-5v7H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 4h16l2 8v7a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-7z"/><path d="M2 12h5l2 3h6l2-3h5"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/></symbol>
+  <symbol id="i-rss" viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.4"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-arrow-ur" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6zM19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9zM5 14l.7 1.6L7.5 16l-1.8.7L5 18.5l-.7-1.8L2.5 16l1.8-.4z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m4 18 5.5-5.5L14 17l2.5-2.5L21 19"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4zM22 2 11 13"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 9v5M12 17.5v.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-5L4 8"/><path d="M4 4v4h4M4 13a8 8 0 0 0 14.3 5L20 16"/><path d="M20 20v-4h-4"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M3 17 9 11l4 4 8-8"/><path d="M15 7h6v6"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 21l8.8-8.3a5 5 0 0 0 0-7.1z"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.5 7.5L3 21l2-5.5A8.5 8.5 0 1 1 21 11.5z"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V3M7 8l5-5 5 5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></symbol>
+  <symbol id="i-instagram" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-youtube" viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="m10 9.4 5 2.6-5 2.6z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-tiktok" viewBox="0 0 24 24"><path d="M14 4v9.4a4 4 0 1 1-3.3-3.9"/><path d="M14 4c.4 2.5 2.1 4.1 4.6 4.3"/></symbol>
+  <symbol id="i-linkedin" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 10.2V17M8 7.3v.4M12 17v-3.8a2 2 0 0 1 4 0V17"/></symbol>
+  <symbol id="i-threads" viewBox="0 0 24 24"><path d="M12 21c-4.4 0-7-2.9-7-9s2.6-9 7-9c3.2 0 5.5 1.5 6.5 4"/><path d="M8.6 14.4c0-1.9 1.5-3.1 3.6-3.1 2.4 0 3.6 1.2 3.6 3.4 0 2-1.2 3.3-3.1 3.3-1.6 0-2.7-.9-2.7-2.2 0-1.1 1-1.9 2.5-1.9 2.1 0 3.5 1.2 3.7 3.1"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="1"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z"/></symbol>
+  <symbol id="i-bold" viewBox="0 0 24 24"><path d="M6 4h7a4 4 0 0 1 0 8H6zM6 12h8a4 4 0 0 1 0 8H6z"/></symbol>
+  <symbol id="i-italic" viewBox="0 0 24 24"><path d="M10 4h8M6 20h8M14 4 10 20"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M4 6h.5M4 12h.5M4 18h.5"/></symbol>
+  <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.5M15 9h.5"/></symbol>
+</svg>
+
+<!-- Preview controls -->
+<div class="preview-bar" role="toolbar" aria-label="Design preview controls">
+  <div class="pb-brand">News Workbench <span class="tag">Design preview</span></div>
+  <div class="pb-group" role="group" aria-label="View">
+    <span class="pb-label">View</span>
+    <button class="pb-btn" data-view="dashboard" aria-pressed="true">Dashboard</button>
+    <button class="pb-btn" data-view="composer" aria-pressed="false">Composer</button>
+    <button class="pb-btn" data-view="analytics" aria-pressed="false">Analytics</button>
+    <button class="pb-btn" data-view="accounts" aria-pressed="false">Accounts</button>
+    <button class="pb-btn" data-view="foundations" aria-pressed="false">Tokens</button>
+  </div>
+  <div class="pb-group" role="group" aria-label="Concept">
+    <span class="pb-label">Concept</span>
+    <button class="pb-btn" data-theme="a" aria-pressed="true">A · Light</button>
+    <button class="pb-btn" data-theme="b" aria-pressed="false">B · Ink</button>
+    <button class="pb-btn" data-theme="c" aria-pressed="false">C · Top nav</button>
+  </div>
+  <div class="pb-spacer"></div>
+  <span class="pb-note">Static mockup · production untouched</span>
+</div>
+
+<div class="app">
+  <!-- Sidebar (A and B; drawer on mobile) -->
+  <aside class="sidebar" aria-label="Workspace navigation">
+    <div class="workspace">
+      <div class="ws-mark">DB</div>
+      <div class="ws-copy">
+        <strong>The Daily Buzz</strong>
+        <span>Pro workspace</span>
+      </div>
+      <svg class="icon"><use href="#i-chev-down"/></svg>
+      <button class="icon-btn nav-close" data-nav-close aria-label="Close navigation"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+
+    <button class="new-post"><svg class="icon icon-sm"><use href="#i-plus"/></svg> New post</button>
+
+    <nav class="nav-group" aria-label="Workspace">
+      <p class="nav-title">Workspace</p>
+      <a class="nav-item" href="#" data-nav="dashboard" aria-current="page"><svg class="icon"><use href="#i-home"/></svg> Dashboard</a>
+      <a class="nav-item" href="#" data-nav="composer"><svg class="icon"><use href="#i-inbox"/></svg> Inbox <span class="nav-badge alert">12</span></a>
+      <a class="nav-item" href="#" data-nav="calendar"><svg class="icon"><use href="#i-calendar"/></svg> Calendar</a>
+      <a class="nav-item" href="#" data-nav="posts"><svg class="icon"><use href="#i-file"/></svg> Posts</a>
+    </nav>
+
+    <nav class="nav-group" aria-label="Grow">
+      <p class="nav-title">Grow</p>
+      <a class="nav-item" href="#" data-nav="analytics"><svg class="icon"><use href="#i-chart"/></svg> Analytics</a>
+      <a class="nav-item" href="#" data-nav="accounts"><svg class="icon"><use href="#i-users"/></svg> Accounts <span class="nav-badge">3</span></a>
+    </nav>
+
+    <nav class="nav-group" aria-label="Manage">
+      <p class="nav-title">Manage</p>
+      <a class="nav-item" href="#" data-nav="sources"><svg class="icon"><use href="#i-rss"/></svg> Sources</a>
+      <a class="nav-item" href="#" data-nav="settings"><svg class="icon"><use href="#i-settings"/></svg> Settings</a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="usage">
+        <div class="usage-row"><strong>AI credits</strong><span>6,800 / 10,000</span></div>
+        <div class="meter"><i></i></div>
+      </div>
+      <div class="user">
+        <div class="avatar">RS</div>
+        <div class="user-copy"><strong>Roel Somido</strong><span>Owner</span></div>
+        <svg class="icon icon-sm" style="color:var(--faint)"><use href="#i-chev-down"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <!-- Topbar for A/B -->
+    <header class="topbar">
+      <button class="icon-btn menu-btn" data-nav-toggle aria-label="Open navigation"><svg class="icon"><use href="#i-menu"/></svg></button>
+      <div class="crumbs">
+        <span>The Daily Buzz</span>
+        <svg class="icon"><use href="#i-chev-right"/></svg>
+        <strong id="breadcrumb">Dashboard</strong>
+      </div>
+      <div class="topbar-search" role="search">
+        <svg class="icon icon-sm"><use href="#i-search"/></svg>
+        Search stories, posts, people
+        <kbd>⌘K</kbd>
+      </div>
+      <button class="icon-btn" aria-label="Notifications"><svg class="icon"><use href="#i-bell"/></svg><span class="dot"></span></button>
+      <div class="avatar" title="Roel Somido">RS</div>
+    </header>
+
+    <!-- Topnav for C -->
+    <nav class="topnav" aria-label="Primary">
+      <button class="icon-btn menu-btn" data-nav-toggle aria-label="Open navigation"><svg class="icon"><use href="#i-menu"/></svg></button>
+      <div class="brand">
+        <span class="brand-mark">NW</span>
+        <span class="brand-copy"><strong>News Workbench</strong><span>Philippine desk</span></span>
+      </div>
+      <div class="links">
+        <a href="#" data-nav="dashboard" aria-current="page">Dashboard</a>
+        <a href="#" data-nav="composer">Inbox</a>
+        <a href="#" data-nav="calendar">Calendar</a>
+        <a href="#" data-nav="posts">Posts</a>
+        <a href="#" data-nav="analytics">Analytics</a>
+        <a href="#" data-nav="accounts">Accounts</a>
+      </div>
+      <div class="actions">
+        <div class="nav-search"><svg class="icon icon-sm"><use href="#i-search"/></svg> Search <kbd>⌘K</kbd></div>
+        <button class="icon-btn" aria-label="Notifications"><svg class="icon"><use href="#i-bell"/></svg><span class="dot"></span></button>
+        <div class="avatar">RS</div>
+      </div>
+    </nav>
+
+    <main class="content">
+      <!-- ============ DASHBOARD ============ -->
+      <section class="view" id="view-dashboard" aria-label="Dashboard">
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">Wednesday, 4 November · The Daily Buzz</p>
+            <h1 class="page-title">Good morning, Roel</h1>
+            <p class="page-sub">Three posts go out today and one draft is waiting for review. Reach is up 12.6% week over week.</p>
+          </div>
+          <div class="head-actions">
+            <button class="btn"><svg class="icon"><use href="#i-rss"/></svg> Import sources</button>
+            <button class="btn btn-brand"><svg class="icon"><use href="#i-plus"/></svg> New post</button>
+          </div>
+        </div>
+
+        <div class="kpis">
+          <article class="card kpi">
+            <div class="kpi-label">Total reach <svg class="icon"><use href="#i-eye"/></svg></div>
+            <p class="kpi-value">128.4K</p>
+            <div class="kpi-foot"><span class="delta"><svg class="icon"><use href="#i-trend"/></svg> 12.6%</span> vs. last week</div>
+            <svg class="mini-chart" viewBox="0 0 64 26" aria-hidden="true"><path d="M1 22 10 19 19 20 27 14 36 16 45 9 54 11 63 4"/></svg>
+          </article>
+          <article class="card kpi">
+            <div class="kpi-label">Engagements <svg class="icon"><use href="#i-heart"/></svg></div>
+            <p class="kpi-value">9,240</p>
+            <div class="kpi-foot"><span class="delta"><svg class="icon"><use href="#i-trend"/></svg> 8.1%</span> vs. last week</div>
+            <svg class="mini-chart" viewBox="0 0 64 26" aria-hidden="true"><path d="M1 20 10 21 19 16 27 18 36 12 45 14 54 8 63 7"/></svg>
+          </article>
+          <article class="card kpi">
+            <div class="kpi-label">Scheduled <svg class="icon"><use href="#i-clock"/></svg></div>
+            <p class="kpi-value">14</p>
+            <div class="kpi-foot"><span class="delta" style="color:var(--info)">Next in 2h 14m</span></div>
+            <svg class="mini-chart" viewBox="0 0 64 26" aria-hidden="true"><path d="M1 18 10 14 19 17 27 10 36 13 45 8 54 10 63 5"/></svg>
+          </article>
+          <article class="card kpi">
+            <div class="kpi-label">Avg. engagement <svg class="icon"><use href="#i-zap"/></svg></div>
+            <p class="kpi-value">7.2%</p>
+            <div class="kpi-foot"><span class="delta down"><svg class="icon"><use href="#i-trend"/></svg> 0.4%</span> vs. last week</div>
+            <svg class="mini-chart" viewBox="0 0 64 26" aria-hidden="true"><path d="M1 6 10 9 19 8 27 13 36 11 45 16 54 15 63 20"/></svg>
+          </article>
+        </div>
+
+        <div class="dash-grid">
+          <div class="stack">
+            <section class="card chart-card">
+              <div class="card-head">
+                <div>
+                  <h2 class="card-title">Reach &amp; engagement</h2>
+                  <p class="card-sub">All connected accounts · last 30 days</p>
+                </div>
+                <div class="seg" role="group" aria-label="Date range">
+                  <button aria-pressed="false">7D</button>
+                  <button aria-pressed="true">30D</button>
+                  <button aria-pressed="false">90D</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="chart-top">
+                  <div class="legend">
+                    <span><i style="background:var(--brand)"></i> Reach</span>
+                    <span><i style="background:#2f6fed"></i> Engagements</span>
+                  </div>
+                  <span class="muted" style="font-size:10px">Peak: 16.2K on Oct 29</span>
+                </div>
+                <div class="chart">
+                  <div class="chart-y"><span>16K</span><span>12K</span><span>8K</span><span>4K</span><span>0</span></div>
+                  <div class="chart-area">
+                    <svg viewBox="0 0 720 208" preserveAspectRatio="none" aria-hidden="true">
+                      <defs>
+                        <linearGradient id="reachFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stop-color="#a85f18" stop-opacity="0.18"/>
+                          <stop offset="100%" stop-color="#a85f18" stop-opacity="0.01"/>
+                        </linearGradient>
+                      </defs>
+                      <path d="M0,166 C30,162 55,152 80,154 C105,156 125,136 150,134 C175,132 195,144 220,138 C245,132 265,104 290,108 C315,112 335,90 360,96 C385,102 405,74 430,78 C455,82 475,62 500,66 C525,70 545,48 570,52 C595,56 615,34 640,38 C665,42 690,26 720,24 L720,208 L0,208 Z" fill="url(#reachFill)"/>
+                      <path d="M0,166 C30,162 55,152 80,154 C105,156 125,136 150,134 C175,132 195,144 220,138 C245,132 265,104 290,108 C315,112 335,90 360,96 C385,102 405,74 430,78 C455,82 475,62 500,66 C525,70 545,48 570,52 C595,56 615,34 640,38 C665,42 690,26 720,24" fill="none" stroke="#a85f18" stroke-width="2" vector-effect="non-scaling-stroke"/>
+                      <path d="M0,190 C30,186 55,182 80,184 C105,186 125,174 150,172 C175,170 195,178 220,174 C245,170 265,156 290,158 C315,160 335,146 360,150 C385,154 405,136 430,140 C455,144 475,130 500,132 C525,134 545,122 570,124 C595,126 615,114 640,116 C665,118 690,106 720,104" fill="none" stroke="#2f6fed" stroke-width="1.6" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="chart-x"><span>Oct 6</span><span>Oct 13</span><span>Oct 20</span><span>Oct 27</span><span>Nov 3</span></div>
+                <div class="chart-note"><svg class="icon"><use href="#i-trend"/></svg> Wednesday 9:00 and 17:00 are your strongest publishing windows.</div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head">
+                <div><h2 class="card-title">Recent posts</h2><p class="card-sub">Last 5 posts across accounts</p></div>
+                <a class="link" href="#">View all <svg class="icon"><use href="#i-arrow-ur"/></svg></a>
+              </div>
+              <div class="table-wrap">
+                <table class="data">
+                  <thead><tr><th>Post</th><th>Account</th><th>Status</th><th>Reach</th><th>Eng.</th><th>When</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td><div class="post-cell"><div class="post-thumb"><svg class="icon"><use href="#i-image"/></svg></div><div><strong>DepEd rolls out 12,000 laptops to public schools</strong><span>Education · 763 characters</span></div></div></td>
+                      <td><span class="account-cell"><span class="account-dot">f</span> Daily Buzz</span></td>
+                      <td><span class="pill pill-published">Published</span></td>
+                      <td class="num">18.2K</td><td class="num">1,204</td><td class="muted num">2h ago</td>
+                    </tr>
+                    <tr>
+                      <td><div class="post-cell"><div class="post-thumb"><svg class="icon"><use href="#i-image"/></svg></div><div><strong>PAGASA tracks LPA east of Mindanao</strong><span>Weather · 512 characters</span></div></div></td>
+                      <td><span class="account-cell"><span class="account-dot">f</span> Daily Buzz</span></td>
+                      <td><span class="pill pill-scheduled">Scheduled</span></td>
+                      <td class="num muted">—</td><td class="num muted">—</td><td class="muted num">Today 12:30</td>
+                    </tr>
+                    <tr>
+                      <td><div class="post-cell"><div class="post-thumb"><svg class="icon"><use href="#i-image"/></svg></div><div><strong>LTFRB approves provisional fare matrix</strong><span>Transport · 684 characters</span></div></div></td>
+                      <td><span class="account-cell"><span class="account-dot">f</span> Daily Buzz</span></td>
+                      <td><span class="pill pill-scheduled">Scheduled</span></td>
+                      <td class="num muted">—</td><td class="num muted">—</td><td class="muted num">Today 17:00</td>
+                    </tr>
+                    <tr>
+                      <td><div class="post-cell"><div class="post-thumb"><svg class="icon"><use href="#i-image"/></svg></div><div><strong>UP opens applications for AY 2027–2028</strong><span>Education · 498 characters</span></div></div></td>
+                      <td><span class="account-cell"><span class="account-dot">f</span> Daily Buzz</span></td>
+                      <td><span class="pill pill-published">Published</span></td>
+                      <td class="num">9.4K</td><td class="num">640</td><td class="muted num">Yesterday</td>
+                    </tr>
+                    <tr>
+                      <td><div class="post-cell"><div class="post-thumb"><svg class="icon"><use href="#i-image"/></svg></div><div><strong>Marcos signs 2027 national budget</strong><span>Politics · 901 characters</span></div></div></td>
+                      <td><span class="account-cell"><span class="account-dot">f</span> Daily Buzz</span></td>
+                      <td><span class="pill pill-failed">Failed</span></td>
+                      <td class="num muted">—</td><td class="num muted">—</td><td class="muted num">Yesterday</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="table-foot"><span>Showing 5 of 142 posts</span><span>Last synced 4 minutes ago</span></div>
+            </section>
+          </div>
+
+          <div class="stack">
+            <section class="card">
+              <div class="card-head">
+                <div><h2 class="card-title">Up next</h2><p class="card-sub">Today · 3 posts</p></div>
+                <a class="link" href="#">Calendar <svg class="icon"><use href="#i-arrow-ur"/></svg></a>
+              </div>
+              <div class="upcoming">
+                <div class="up-item">
+                  <div class="up-time">09:00<span>in 2h</span></div>
+                  <div class="up-copy"><p>DepEd rolls out 12,000 laptops to public schools</p><div class="up-meta"><span class="account-dot">f</span> The Daily Buzz <span class="pill pill-scheduled pill-plain" style="margin-left:auto">Scheduled</span></div></div>
+                </div>
+                <div class="up-item">
+                  <div class="up-time">12:30<span>5h</span></div>
+                  <div class="up-copy"><p>PAGASA tracks LPA east of Mindanao</p><div class="up-meta"><span class="account-dot">f</span> The Daily Buzz <span class="pill pill-pending pill-plain" style="margin-left:auto">Review</span></div></div>
+                </div>
+                <div class="up-item">
+                  <div class="up-time">17:00<span>10h</span></div>
+                  <div class="up-copy"><p>LTFRB approves provisional fare matrix</p><div class="up-meta"><span class="account-dot">f</span> The Daily Buzz <span class="pill pill-scheduled pill-plain" style="margin-left:auto">Scheduled</span></div></div>
+                </div>
+              </div>
+              <div style="padding:11px 16px"><button class="btn btn-sm" style="width:100%"><svg class="icon"><use href="#i-plus"/></svg> Add to queue</button></div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">Channel health</h2><p class="card-sub">1 live · 2 designed</p></div><a class="link" href="#" data-nav="accounts">Manage <svg class="icon"><use href="#i-arrow-ur"/></svg></a></div>
+              <div class="health">
+                <div class="health-row">
+                  <div class="health-icon" style="background:var(--fb-soft);border-color:transparent"><span class="plat sm fb">f</span></div>
+                  <div class="health-copy"><strong>The Daily Buzz</strong><span>Facebook Page · 42.1K followers</span></div>
+                  <span class="health-status"><i></i> Live</span>
+                </div>
+                <div class="health-row">
+                  <div class="health-icon" style="background:var(--ig-soft);border-color:transparent"><span class="plat sm ig"><svg class="icon"><use href="#i-instagram"/></svg></span></div>
+                  <div class="health-copy"><strong>@thedailybuzz.ph</strong><span>Instagram Business · same Meta app</span></div>
+                  <span class="pill pill-pending pill-plain">Next</span>
+                </div>
+                <div class="health-row">
+                  <div class="health-icon" style="background:var(--yt-soft);border-color:transparent"><span class="plat sm yt"><svg class="icon"><use href="#i-youtube"/></svg></span></div>
+                  <div class="health-copy"><strong>Daily Buzz PH</strong><span>YouTube · video workflow needed</span></div>
+                  <span class="health-status off">Designed</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">Needs attention</h2><p class="card-sub">1 failed post</p></div></div>
+              <div class="card-body" style="padding-top:12px">
+                <div style="display:flex;gap:9px;align-items:flex-start">
+                  <div class="health-icon" style="color:var(--danger);background:var(--danger-soft);border-color:transparent"><svg class="icon"><use href="#i-alert"/></svg></div>
+                  <div style="min-width:0"><p style="font-size:11.5px;font-weight:600;line-height:1.35">Marcos signs 2027 national budget</p><p style="margin-top:2px;font-size:9.5px;color:var(--muted);line-height:1.45">The Page token expired during publishing. It has been refreshed; retry is safe.</p><button class="btn btn-sm" style="margin-top:7px">Retry post</button></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ COMPOSER ============ -->
+      <section class="view" id="view-composer" aria-label="Composer" hidden>
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">Inbox · 12 stories</p>
+            <h1 class="page-title">Compose</h1>
+            <p class="page-sub">Turn a sourced story into a post, add an image, and schedule it for the right window.</p>
+          </div>
+          <div class="head-actions">
+            <button class="btn"><svg class="icon"><use href="#i-filter"/></svg> Filters</button>
+            <button class="btn"><svg class="icon"><use href="#i-rss"/></svg> Refresh feeds</button>
+          </div>
+        </div>
+
+        <div class="composer-shell">
+          <div class="queue">
+            <div class="queue-head">
+              <div class="queue-search"><svg class="icon"><use href="#i-search"/></svg> Search stories</div>
+              <div class="filter-row">
+                <button class="chip" aria-pressed="true">All</button>
+                <button class="chip" aria-pressed="false">Pending</button>
+                <button class="chip" aria-pressed="false">Drafted</button>
+                <button class="chip" aria-pressed="false">Published</button>
+              </div>
+            </div>
+            <div class="queue-list">
+              <button class="q-item" aria-selected="true">
+                <div class="q-source"><span class="src-mark">I</span> Inquirer <em>18m</em></div>
+                <p class="q-title">DepEd rolls out 12,000 laptops to public schools</p>
+                <div class="q-foot"><span class="pill pill-draft">Drafted</span><span class="time">763 chars</span></div>
+              </button>
+              <button class="q-item" aria-selected="false">
+                <div class="q-source"><span class="src-mark">R</span> Rappler <em>42m</em></div>
+                <p class="q-title">PAGASA tracks LPA east of Mindanao, warns of heavy rain</p>
+                <div class="q-foot"><span class="pill pill-pending">Review</span><span class="time">Scheduled 12:30</span></div>
+              </button>
+              <button class="q-item" aria-selected="false">
+                <div class="q-source"><span class="src-mark">P</span> Philstar <em>1h</em></div>
+                <p class="q-title">LTFRB approves provisional fare matrix for buses</p>
+                <div class="q-foot"><span class="pill pill-pending">Pending</span><span class="time">—</span></div>
+              </button>
+              <button class="q-item" aria-selected="false">
+                <div class="q-source"><span class="src-mark">I</span> Inquirer <em>2h</em></div>
+                <p class="q-title">Marcos signs 2027 national budget into law</p>
+                <div class="q-foot"><span class="pill pill-failed">Failed</span><span class="time">Yesterday</span></div>
+              </button>
+              <button class="q-item" aria-selected="false">
+                <div class="q-source"><span class="src-mark">R</span> Rappler <em>3h</em></div>
+                <p class="q-title">UP opens applications for AY 2027–2028</p>
+                <div class="q-foot"><span class="pill pill-published">Published</span><span class="time">9.4K reach</span></div>
+              </button>
+            </div>
+          </div>
+
+          <div class="editor">
+            <div class="editor-head">
+              <div class="crumbs"><span>Inbox</span><svg class="icon"><use href="#i-chev-right"/></svg><strong>DepEd laptops</strong></div>
+              <button class="btn btn-ghost btn-sm" style="margin-left:auto"><svg class="icon"><use href="#i-external"/></svg> Source</button>
+              <button class="icon-btn" style="width:28px;height:28px" aria-label="More options"><svg class="icon icon-sm"><use href="#i-more"/></svg></button>
+            </div>
+            <div class="channel-pick" role="group" aria-label="Publish to">
+              <span class="label">Publish to</span>
+              <button class="channel-chip" data-channel="facebook" aria-pressed="true"><span class="plat sm fb">f</span> Facebook</button>
+              <button class="channel-chip" data-channel="instagram" aria-pressed="false"><span class="plat sm ig"><svg class="icon"><use href="#i-instagram"/></svg></span> Instagram</button>
+              <button class="channel-chip" data-channel="youtube" aria-pressed="false"><span class="plat sm yt"><svg class="icon"><use href="#i-youtube"/></svg></span> YouTube</button>
+              <span class="channel-note"><svg class="icon"><use href="#i-alert"/></svg> Only Facebook is live today. Enable channels in Accounts.</span>
+            </div>
+            <div class="editor-scroll">
+              <div class="source-card">
+                <div class="post-thumb" style="background:#eef2f7"><span class="src-mark" style="width:20px;height:20px;font-size:10px">I</span></div>
+                <div style="min-width:0">
+                  <strong>DepEd rolls out 12,000 laptops to public schools</strong>
+                  <span><svg class="icon"><use href="#i-globe"/></svg> inquirer.net · 18 minutes ago</span>
+                </div>
+              </div>
+
+              <div class="compose-label">Post text <span class="count">763 / 63,206</span></div>
+              <div class="writing" aria-label="Post draft" tabindex="0">
+                <p>DepEd is rolling out 12,000 laptops to public high schools before the end of the year, prioritizing schools in underserved districts.</p>
+                <p>The first batch arrives this month. Teachers will also receive training and offline learning packs, the agency said.</p>
+                <p>Full story: inquirer.net<span class="cursor" aria-hidden="true"></span></p>
+              </div>
+
+              <div class="toolbar" role="toolbar" aria-label="Formatting">
+                <button class="tool" aria-label="Bold"><svg class="icon"><use href="#i-bold"/></svg></button>
+                <button class="tool" aria-label="Italic"><svg class="icon"><use href="#i-italic"/></svg></button>
+                <button class="tool" aria-label="List"><svg class="icon"><use href="#i-list"/></svg></button>
+                <span class="tool-sep"></span>
+                <button class="tool" aria-label="AI assist" style="color:var(--brand)"><svg class="icon"><use href="#i-sparkles"/></svg></button>
+                <button class="tool" aria-label="Add image"><svg class="icon"><use href="#i-image"/></svg></button>
+                <button class="tool" aria-label="Emoji"><svg class="icon"><use href="#i-smile"/></svg></button>
+                <div class="lang" role="group" aria-label="Language">
+                  <button aria-pressed="true">EN</button>
+                  <button aria-pressed="false">TL</button>
+                </div>
+              </div>
+
+              <div class="attach-row">
+                <button class="attach"><svg class="icon"><use href="#i-image"/></svg> Add image</button>
+                <button class="attach" style="border-style:solid;border-color:var(--line)"><svg class="icon"><use href="#i-sparkles"/></svg> Generate</button>
+                <span class="muted" style="font-size:9.5px;margin-left:auto">1 of 10 images</span>
+              </div>
+
+              <div class="stat-line">
+                <span><b>118</b> words</span><span class="sep"></span>
+                <span><b>9.1K</b> input tokens</span><span class="sep"></span>
+                <span><b>$0.021</b> est. cost</span><span class="sep"></span>
+                <span style="color:var(--success);font-weight:600">Reads well</span>
+              </div>
+            </div>
+            <div class="editor-foot">
+              <span class="left"><svg class="icon"><use href="#i-globe"/></svg> Public · The Daily Buzz (Facebook)</span>
+              <div class="right">
+                <button class="btn btn-sm">Save draft</button>
+                <div class="schedule-wrap">
+                  <button class="btn btn-sm" data-schedule-toggle><svg class="icon"><use href="#i-clock"/></svg> Schedule <svg class="icon" style="width:11px"><use href="#i-chev-down"/></svg></button>
+                  <div class="schedule-pop" id="schedule-pop">
+                    <h4>Schedule post</h4>
+                    <p>Best window today: 09:00–10:30</p>
+                    <div class="field"><label>Date</label><input type="date" value="2026-11-04" /></div>
+                    <div class="field"><label>Time · Asia/Manila</label><input type="time" value="09:00" /></div>
+                    <button class="btn btn-brand">Add to queue</button>
+                  </div>
+                </div>
+                <button class="btn btn-primary btn-sm"><svg class="icon"><use href="#i-send"/></svg> Publish now</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="preview-pane">
+            <div class="preview-head"><span>Channel preview</span><div class="preview-tabs" role="group" aria-label="Preview channel">
+              <button data-preview="facebook" aria-pressed="true">Facebook</button>
+              <button data-preview="instagram" aria-pressed="false">Instagram</button>
+              <button data-preview="youtube" aria-pressed="false">YouTube</button>
+            </div></div>
+            <div class="preview-scroll">
+              <div class="fb-card" data-preview-pane="facebook">
+                <div class="fb-top">
+                  <div class="fb-page">DB</div>
+                  <div class="fb-name"><strong>The Daily Buzz</strong><span>Just now · <svg class="icon"><use href="#i-globe"/></svg> Public</span></div>
+                  <svg class="icon fb-more"><use href="#i-more"/></svg>
+                </div>
+                <div class="fb-text">DepEd is rolling out 12,000 laptops to public high schools before the end of the year, prioritizing schools in underserved districts.
+
+The first batch arrives this month. Teachers will also receive training and offline learning packs, the agency said.
+
+Full story: inquirer.net</div>
+                <div class="fb-media">
+                  <div class="media-copy"><small>Education · Philippines</small><strong>12,000 laptops<br/>for public schools</strong></div>
+                </div>
+                <div class="fb-reactions">
+                  <div class="react-dots"><i>f</i><i>♥</i><i>★</i></div>
+                  42 · 12 comments · 8 shares
+                </div>
+                <div class="fb-actions">
+                  <button><svg class="icon"><use href="#i-heart"/></svg> Like</button>
+                  <button><svg class="icon"><use href="#i-message"/></svg> Comment</button>
+                  <button><svg class="icon"><use href="#i-share"/></svg> Share</button>
+                </div>
+              </div>
+
+              <div class="ig-card" data-preview-pane="instagram" hidden>
+                <div class="ig-top">
+                  <div class="ig-avatar">DB</div>
+                  <div><strong>thedailybuzz.ph</strong><span>Manila, Philippines · Original audio</span></div>
+                  <svg class="icon" style="margin-left:auto;color:var(--faint)"><use href="#i-more"/></svg>
+                </div>
+                <div class="ig-media">
+                  <div class="media-copy"><small>Education · Philippines</small><strong>12,000 laptops<br/>for public schools</strong></div>
+                </div>
+                <div class="ig-actions">
+                  <svg class="icon"><use href="#i-heart"/></svg>
+                  <svg class="icon"><use href="#i-message"/></svg>
+                  <svg class="icon"><use href="#i-send"/></svg>
+                  <svg class="icon" style="margin-left:auto"><use href="#i-share"/></svg>
+                </div>
+                <div class="ig-caption"><b>thedailybuzz.ph</b> DepEd is rolling out 12,000 laptops to public high schools before the end of the year, prioritizing underserved districts. <span>more</span></div>
+                <div class="preview-note" style="margin:0 11px 11px"><svg class="icon"><use href="#i-alert"/></svg><span>Instagram feed posts require an image or video. Caption limit is 2,200 characters; the first 125 show before “more”.</span></div>
+              </div>
+
+              <div class="yt-card" data-preview-pane="youtube" hidden>
+                <div class="yt-thumb">
+                  <div class="yt-play"><svg class="icon"><use href="#i-youtube"/></svg></div>
+                  <span class="yt-duration">12:04</span>
+                </div>
+                <div class="yt-body">
+                  <strong>DepEd rolls out 12,000 laptops to public schools</strong>
+                  <div class="yt-meta">1 view · 2 hours ago</div>
+                  <div class="yt-channel"><span class="plat sm yt"><svg class="icon"><use href="#i-youtube"/></svg></span><span>The Daily Buzz PH · 4.1K subscribers</span></div>
+                </div>
+                <div class="preview-note" style="margin:0 11px 11px"><svg class="icon"><use href="#i-alert"/></svg><span>YouTube needs a video file, a title (100 characters) and a description. Shorts and long-form uploads use the same endpoint.</span></div>
+              </div>
+
+              <div class="preview-note"><svg class="icon"><use href="#i-zap"/></svg><span>Previews are channel-accurate. Publishing stays disabled until a channel is connected and its API access is approved.</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ANALYTICS ============ -->
+      <section class="view" id="view-analytics" aria-label="Analytics" hidden>
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">Insights</p>
+            <h1 class="page-title">Analytics</h1>
+            <p class="page-sub">How your stories travel across connected accounts. Updated every 6 hours.</p>
+          </div>
+          <div class="head-actions">
+            <div class="seg" role="group" aria-label="Date range"><button aria-pressed="false">7D</button><button aria-pressed="true">30D</button><button aria-pressed="false">90D</button></div>
+            <button class="btn"><svg class="icon"><use href="#i-download"/></svg> Export</button>
+          </div>
+        </div>
+
+        <div class="kpis">
+          <article class="card kpi"><div class="kpi-label">Reach <svg class="icon"><use href="#i-eye"/></svg></div><p class="kpi-value">128.4K</p><div class="kpi-foot"><span class="delta"><svg class="icon"><use href="#i-trend"/></svg> 12.6%</span> 30-day</div></article>
+          <article class="card kpi"><div class="kpi-label">Engagements <svg class="icon"><use href="#i-heart"/></svg></div><p class="kpi-value">9,240</p><div class="kpi-foot"><span class="delta"><svg class="icon"><use href="#i-trend"/></svg> 8.1%</span> 30-day</div></article>
+          <article class="card kpi"><div class="kpi-label">Post clicks <svg class="icon"><use href="#i-link"/></svg></div><p class="kpi-value">3,860</p><div class="kpi-foot"><span class="delta"><svg class="icon"><use href="#i-trend"/></svg> 4.4%</span> 30-day</div></article>
+          <article class="card kpi"><div class="kpi-label">Followers <svg class="icon"><use href="#i-users"/></svg></div><p class="kpi-value">42,180</p><div class="kpi-foot"><span class="delta"><svg class="icon"><use href="#i-trend"/></svg> 618</span> net new</div></article>
+        </div>
+
+        <div class="analytics-grid">
+          <div class="stack">
+            <section class="card chart-card">
+              <div class="card-head"><div><h2 class="card-title">Audience growth</h2><p class="card-sub">Reach vs. engagements · 30 days</p></div><span class="pill pill-brand pill-plain">1 channel live</span></div>
+              <div class="card-body">
+                <div class="chart-top">
+                  <div class="legend"><span><i style="background:var(--brand)"></i> Reach</span><span><i style="background:#2f6fed"></i> Engagements</span></div>
+                </div>
+                <div class="chart">
+                  <div class="chart-y"><span>16K</span><span>12K</span><span>8K</span><span>4K</span><span>0</span></div>
+                  <div class="chart-area">
+                    <svg viewBox="0 0 720 208" preserveAspectRatio="none" aria-hidden="true">
+                      <path d="M0,166 C30,162 55,152 80,154 C105,156 125,136 150,134 C175,132 195,144 220,138 C245,132 265,104 290,108 C315,112 335,90 360,96 C385,102 405,74 430,78 C455,82 475,62 500,66 C525,70 545,48 570,52 C595,56 615,34 640,38 C665,42 690,26 720,24 L720,208 L0,208 Z" fill="url(#reachFill)"/>
+                      <path d="M0,166 C30,162 55,152 80,154 C105,156 125,136 150,134 C175,132 195,144 220,138 C245,132 265,104 290,108 C315,112 335,90 360,96 C385,102 405,74 430,78 C455,82 475,62 500,66 C525,70 545,48 570,52 C595,56 615,34 640,38 C665,42 690,26 720,24" fill="none" stroke="#a85f18" stroke-width="2" vector-effect="non-scaling-stroke"/>
+                      <path d="M0,190 C30,186 55,182 80,184 C105,186 125,174 150,172 C175,170 195,178 220,174 C245,170 265,156 290,158 C315,160 335,146 360,150 C385,154 405,136 430,140 C455,144 475,130 500,132 C525,134 545,122 570,124 C595,126 615,114 640,116 C665,118 690,106 720,104" fill="none" stroke="#2f6fed" stroke-width="1.6" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="chart-x"><span>Oct 6</span><span>Oct 13</span><span>Oct 20</span><span>Oct 27</span><span>Nov 3</span></div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">Top posts</h2><p class="card-sub">By reach · last 30 days</p></div><a class="link" href="#">All posts <svg class="icon"><use href="#i-arrow-ur"/></svg></a></div>
+              <div class="top-list">
+                <div class="top-row"><span class="rank">01</span><div class="top-copy"><strong>DepEd rolls out 12,000 laptops to public schools</strong><span>Facebook · 2h ago</span></div><div class="top-num"><strong>18.2K</strong><span>1,204 eng.</span></div></div>
+                <div class="top-row"><span class="rank">02</span><div class="top-copy"><strong>PAGASA: LPA may intensify into a tropical depression</strong><span>Facebook · 1d ago</span></div><div class="top-num"><strong>14.6K</strong><span>980 eng.</span></div></div>
+                <div class="top-row"><span class="rank">03</span><div class="top-copy"><strong>UP opens applications for AY 2027–2028</strong><span>Facebook · 1d ago</span></div><div class="top-num"><strong>9.4K</strong><span>640 eng.</span></div></div>
+                <div class="top-row"><span class="rank">04</span><div class="top-copy"><strong>LTFRB approves provisional fare matrix</strong><span>Facebook · 2d ago</span></div><div class="top-num"><strong>8.1K</strong><span>512 eng.</span></div></div>
+                <div class="top-row"><span class="rank">05</span><div class="top-copy"><strong>Marcos signs 2027 national budget</strong><span>Facebook · 3d ago</span></div><div class="top-num"><strong>7.2K</strong><span>1,040 eng.</span></div></div>
+              </div>
+            </section>
+          </div>
+
+          <div class="stack">
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">Channel mix</h2><p class="card-sub">Share of reach</p></div></div>
+              <div class="card-body mix">
+                <div class="mix-row"><div class="mix-top"><span class="plat sm fb">f</span> Facebook <strong>100%</strong></div><div class="mix-bar"><i style="width:100%"></i></div></div>
+                <div class="mix-row" style="opacity:0.55"><div class="mix-top"><span class="plat sm ig"><svg class="icon"><use href="#i-instagram"/></svg></span> Instagram <strong>Planned</strong></div><div class="mix-bar"><i class="ig" style="width:0%"></i></div></div>
+                <div class="mix-row" style="opacity:0.55"><div class="mix-top"><span class="plat sm yt"><svg class="icon"><use href="#i-youtube"/></svg></span> YouTube <strong>Planned</strong></div><div class="mix-bar"><i class="yt" style="width:0%"></i></div></div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">Publishing rhythm</h2><p class="card-sub">Engagement by hour</p></div></div>
+              <div class="card-body">
+                <div class="rhythm" aria-hidden="true">
+                  <i style="height:30%"></i><i class="best" style="height:92%"></i><i style="height:42%"></i><i style="height:60%"></i><i class="best" style="height:84%"></i><i style="height:66%"></i><i style="height:34%"></i><i style="height:24%"></i>
+                </div>
+                <div class="rhythm-x"><span>6a</span><span>9a</span><span>12p</span><span>3p</span><span>6p</span><span>9p</span><span>12a</span><span>3a</span></div>
+                <div class="chart-note"><svg class="icon"><use href="#i-trend"/></svg> Best windows: 09:00 and 17:00 PHT.</div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">Sync status</h2></div><span class="health-status"><i></i> Healthy</span></div>
+              <div class="card-body" style="display:grid;gap:7px;font-size:10px;color:var(--muted)">
+                <div style="display:flex;justify-content:space-between"><span>Last sync</span><strong style="color:var(--ink-2)">4 minutes ago</strong></div>
+                <div style="display:flex;justify-content:space-between"><span>Metrics pulled</span><strong style="color:var(--ink-2)">142 posts</strong></div>
+                <div style="display:flex;justify-content:space-between"><span>Next sync</span><strong style="color:var(--ink-2)">in 1h 56m</strong></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ACCOUNTS ============ -->
+      <section class="view" id="view-accounts" aria-label="Accounts" hidden>
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">Channels</p>
+            <h1 class="page-title">Connected accounts</h1>
+            <p class="page-sub">Facebook is live today. Every other channel plugs into the same connection, publishing, and insights model — it unlocks here as its API access is approved.</p>
+          </div>
+          <div class="head-actions">
+            <button class="btn"><svg class="icon"><use href="#i-refresh"/></svg> Refresh all</button>
+            <button class="btn btn-brand"><svg class="icon"><use href="#i-plus"/></svg> Connect account</button>
+          </div>
+        </div>
+
+        <div class="acct-summary">
+          <article class="card acct-sum"><div class="health-icon" style="background:var(--success-soft);border-color:transparent;color:var(--success)"><svg class="icon"><use href="#i-check"/></svg></div><div class="acct-sum-copy"><p class="acct-sum-value">1</p><strong>Live channel</strong><span>Facebook Page · publishing</span></div></article>
+          <article class="card acct-sum"><div class="health-icon" style="background:var(--brand-soft);border-color:transparent;color:var(--brand)"><svg class="icon"><use href="#i-users"/></svg></div><div class="acct-sum-copy"><p class="acct-sum-value">4</p><strong>Designed channels</strong><span>Instagram, YouTube, TikTok, LinkedIn</span></div></article>
+          <article class="card acct-sum"><div class="health-icon" style="color:var(--warning)"><svg class="icon"><use href="#i-clock"/></svg></div><div class="acct-sum-copy"><p class="acct-sum-value">2</p><strong>App reviews</strong><span>Meta · TikTok before launch</span></div></article>
+        </div>
+
+        <div class="acct-grid">
+          <div class="stack">
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">Live now</h2><p class="card-sub">Publishing and insights are both active</p></div><span class="pill pill-published">1 connected</span></div>
+              <div class="acct-row">
+                <span class="plat fb">f</span>
+                <div class="acct-main">
+                  <div class="acct-name"><strong>The Daily Buzz</strong><span class="handle">facebook.com/thedailybuzzph</span></div>
+                  <div class="acct-stats"><span><b>42.1K</b> followers</span><span><b>18.2K</b> reach · 30d</span><span>Last sync <b>4m</b> ago</span></div>
+                  <div class="caps"><span class="cap on">Text</span><span class="cap on">Single image</span><span class="cap on">Carousel</span><span class="cap on">Video</span><span class="cap on">Insights</span></div>
+                </div>
+                <div class="acct-side">
+                  <span class="health-status"><i></i> Connected</span>
+                  <div class="acct-actions"><button class="btn btn-sm">Manage</button><button class="btn btn-sm"><svg class="icon"><use href="#i-send"/></svg> Test post</button></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">Ready to enable</h2><p class="card-sub">Same UX, one adapter per platform</p></div><button class="btn btn-ghost btn-sm">Connection guide</button></div>
+              <div class="available-row">
+                <span class="plat ig"><svg class="icon"><use href="#i-instagram"/></svg></span>
+                <div class="available-copy"><strong>Instagram Business</strong><span>Reuses the Meta app and Page link. Needs <b>instagram_content_publish</b> plus Meta App Review. Feed posts require media.</span></div>
+                <button class="btn btn-sm">Connect</button>
+              </div>
+              <div class="available-row">
+                <span class="plat yt"><svg class="icon"><use href="#i-youtube"/></svg></span>
+                <div class="available-copy"><strong>YouTube</strong><span>Google OAuth. Video uploads only, 10K quota units/day by default, title and description required.</span></div>
+                <button class="btn btn-sm">Connect</button>
+              </div>
+              <div class="available-row">
+                <span class="plat tk"><svg class="icon"><use href="#i-tiktok"/></svg></span>
+                <div class="available-copy"><strong>TikTok</strong><span>Content Posting API access is reviewed per app. Video-only; scheduling happens in our queue.</span></div>
+                <button class="btn btn-sm">Request access</button>
+              </div>
+              <div class="available-row">
+                <span class="plat li"><svg class="icon"><use href="#i-linkedin"/></svg></span>
+                <div class="available-copy"><strong>LinkedIn Page</strong><span>Community Management API. Text, image, video, and document posts for company pages.</span></div>
+                <button class="btn btn-sm">Request access</button>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">What each channel supports</h2><p class="card-sub">Drives which composer fields appear</p></div><span class="pill pill-draft pill-plain">Design reference</span></div>
+              <div class="table-wrap">
+                <table class="matrix">
+                  <thead><tr><th>Channel</th><th>Text</th><th>Image</th><th>Carousel</th><th>Video</th><th>Stories</th><th>Schedule</th><th>Insights</th></tr></thead>
+                  <tbody>
+                    <tr><td><span class="ch"><span class="plat sm fb">f</span> Facebook</span></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                    <tr><td><span class="ch"><span class="plat sm ig"><svg class="icon"><use href="#i-instagram"/></svg></span> Instagram</span></td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                    <tr><td><span class="ch"><span class="plat sm yt"><svg class="icon"><use href="#i-youtube"/></svg></span> YouTube</span></td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                    <tr><td><span class="ch"><span class="plat sm tk"><svg class="icon"><use href="#i-tiktok"/></svg></span> TikTok</span></td><td class="no">—</td><td class="cond">Photo post</td><td class="cond">Photo post</td><td class="yes">✓</td><td class="no">—</td><td class="cond">App queue</td><td class="yes">✓</td></tr>
+                    <tr><td><span class="ch"><span class="plat sm li"><svg class="icon"><use href="#i-linkedin"/></svg></span> LinkedIn</span></td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="table-foot"><span>✓ supported · — not supported</span><span>Capabilities follow each platform’s public API</span></div>
+            </section>
+          </div>
+
+          <div class="stack">
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">How a channel plugs in</h2><p class="card-sub">One contract, many adapters</p></div></div>
+              <div class="card-body">
+                <div class="flow">
+                  <div class="flow-step"><span class="flow-num">1</span><div><strong>Authorize once per workspace</strong><p>OAuth per platform. Tokens are encrypted and stored against the workspace, not the user, so teammates inherit access.</p></div></div>
+                  <div class="flow-step"><span class="flow-num">2</span><div><strong>Adapt, don’t special-case the UI</strong><p>Every channel implements the same publish, schedule, and insights interface. The composer renders fields from channel capabilities.</p></div></div>
+                  <div class="flow-step"><span class="flow-num">3</span><div><strong>One queue, normalized metrics</strong><p>The scheduler claims due posts and calls the adapter. Insights land in one metrics table with a channel column.</p></div></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">Launch order</h2><p class="card-sub">Ship value before breadth</p></div></div>
+              <div class="card-body">
+                <div class="launch-list">
+                  <div class="launch-row live"><span class="plat sm fb">f</span> Facebook Page <span class="phase">Live</span></div>
+                  <div class="launch-row"><span class="plat sm ig"><svg class="icon"><use href="#i-instagram"/></svg></span> Instagram Business <span class="phase">Next</span></div>
+                  <div class="launch-row"><span class="plat sm yt"><svg class="icon"><use href="#i-youtube"/></svg></span> YouTube <span class="phase">Then</span></div>
+                  <div class="launch-row"><span class="plat sm tk"><svg class="icon"><use href="#i-tiktok"/></svg></span> TikTok <span class="phase">Later</span></div>
+                  <div class="launch-row"><span class="plat sm li"><svg class="icon"><use href="#i-linkedin"/></svg></span> LinkedIn Page <span class="phase">Later</span></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><div><h2 class="card-title">Before launch</h2></div></div>
+              <div class="card-body" style="display:grid;gap:7px;font-size:10px;color:var(--muted)">
+                <div style="display:flex;gap:7px"><svg class="icon" style="width:13px;height:13px;color:var(--warning);flex:none;margin-top:1px"><use href="#i-alert"/></svg><span>Meta App Review is required before any user outside the test app can connect a Page.</span></div>
+                <div style="display:flex;gap:7px"><svg class="icon" style="width:13px;height:13px;color:var(--warning);flex:none;margin-top:1px"><use href="#i-alert"/></svg><span>YouTube and TikTok each need separate app verification before public use.</span></div>
+                <div style="display:flex;gap:7px"><svg class="icon" style="width:13px;height:13px;color:var(--warning);flex:none;margin-top:1px"><use href="#i-alert"/></svg><span>Until then, Facebook remains the only channel enabled for this workspace.</span></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ FOUNDATIONS ============ -->
+      <section class="view" id="view-foundations" aria-label="Design foundations" hidden>
+        <div class="page-head">
+          <div>
+            <p class="eyebrow">Design system</p>
+            <h1 class="page-title">Foundations</h1>
+            <p class="page-sub">Proposed tokens and components. Serif for editorial titles, Geist for everything operational, one warm accent.</p>
+          </div>
+        </div>
+
+        <div class="found-grid">
+          <section class="card">
+            <div class="card-head"><h2 class="card-title">Color tokens</h2></div>
+            <div class="card-body swatches">
+              <div class="swatch"><i style="background:#f5f7f9"></i><div><strong>Canvas</strong><span>#f5f7f9</span></div></div>
+              <div class="swatch"><i style="background:#ffffff"></i><div><strong>Surface</strong><span>#ffffff</span></div></div>
+              <div class="swatch"><i style="background:#161b23"></i><div><strong>Ink</strong><span>#161b23</span></div></div>
+              <div class="swatch"><i style="background:#6b7482"></i><div><strong>Muted</strong><span>#6b7482</span></div></div>
+              <div class="swatch"><i style="background:#a85f18"></i><div><strong>Brand</strong><span>#a85f18</span></div></div>
+              <div class="swatch"><i style="background:#0d7355"></i><div><strong>Success</strong><span>#0d7355</span></div></div>
+              <div class="swatch"><i style="background:#1f5fbf"></i><div><strong>Info</strong><span>#1f5fbf</span></div></div>
+              <div class="swatch"><i style="background:#b3261e"></i><div><strong>Danger</strong><span>#b3261e</span></div></div>
+            </div>
+          </section>
+
+          <section class="card span-2">
+            <div class="card-head"><h2 class="card-title">Platform colors</h2><p class="card-sub">Channel badges and charts only — amber stays the product accent</p></div>
+            <div class="card-body swatches platforms">
+              <div class="swatch"><i style="background:#1877f2"></i><div><strong>Facebook</strong><span>#1877f2</span></div></div>
+              <div class="swatch"><i style="background:linear-gradient(135deg,#f9ce34,#ee2a7b 55%,#6228d7)"></i><div><strong>Instagram</strong><span>#d62976</span></div></div>
+              <div class="swatch"><i style="background:#d93025"></i><div><strong>YouTube</strong><span>#d93025</span></div></div>
+              <div class="swatch"><i style="background:#14181d"></i><div><strong>TikTok</strong><span>#14181d</span></div></div>
+              <div class="swatch"><i style="background:#0a66c2"></i><div><strong>LinkedIn</strong><span>#0a66c2</span></div></div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2 class="card-title">Type scale</h2></div>
+            <div class="card-body">
+              <div class="type-row"><span class="sample-serif">Editorial title</span><span>Newsreader · 31/1.08</span></div>
+              <div class="type-row"><span class="sample-h2">Section heading</span><span>Newsreader · 17</span></div>
+              <div class="type-row"><span class="sample-body">Body and controls stay Geist.</span><span>Geist · 12.5</span></div>
+              <div class="type-row"><span class="sample-caption">Eyebrow labels · metadata</span><span>Geist · 9.5–10</span></div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2 class="card-title">Buttons</h2></div>
+            <div class="card-body btn-row">
+              <button class="btn btn-brand">Primary action</button>
+              <button class="btn">Secondary</button>
+              <button class="btn btn-ghost">Ghost</button>
+              <button class="btn" style="color:var(--danger);border-color:rgba(179,38,30,.25)">Destructive</button>
+              <button class="btn" disabled>Disabled</button>
+              <button class="btn btn-sm"><svg class="icon"><use href="#i-plus"/></svg> Small</button>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2 class="card-title">Status pills</h2></div>
+            <div class="card-body pill-row">
+              <span class="pill pill-published">Published</span>
+              <span class="pill pill-scheduled">Scheduled</span>
+              <span class="pill pill-pending">Review</span>
+              <span class="pill pill-draft">Draft</span>
+              <span class="pill pill-failed">Failed</span>
+              <span class="pill pill-brand">Beta</span>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2 class="card-title">Inputs</h2></div>
+            <div class="card-body field-demo">
+              <label class="field" style="margin-top:0"><span style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Workspace name</span><input class="input-demo" value="The Daily Buzz" /></label>
+              <label class="field" style="margin-top:0"><span style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Timezone</span><select class="input-demo"><option>Asia/Manila (PHT)</option><option>Asia/Singapore</option></select></label>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2 class="card-title">Empty state</h2></div>
+            <div class="card-body">
+              <div class="empty">
+                <div class="empty-badge"><svg class="icon"><use href="#i-inbox"/></svg></div>
+                <h4>The desk is quiet</h4>
+                <p>Connect a source and the latest stories will land here, ready to draft.</p>
+                <button class="btn btn-sm" style="margin-top:9px"><svg class="icon"><use href="#i-plus"/></svg> Add source</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2 class="card-title">Loading state</h2></div>
+            <div class="card-body"><div class="skeleton"><i style="width:38%"></i><i></i><i></i><i style="width:70%"></i></div></div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2 class="card-title">Layout tokens</h2></div>
+            <div class="card-body">
+              <div class="token-list">
+                <div class="token-row"><span>Sidebar</span><code>250px</code></div>
+                <div class="token-row"><span>Topbar</span><code>58px</code></div>
+                <div class="token-row"><span>Radius</span><code>10px / 7px</code></div>
+                <div class="token-row"><span>Control height</span><code>34px / 29px</code></div>
+                <div class="token-row"><span>Row height</span><code>44px</code></div>
+                <div class="token-row"><span>Grid</span><code>8px base</code></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+  const views = ['dashboard', 'composer', 'analytics', 'accounts', 'foundations'];
+  const titles = { dashboard: 'Dashboard', composer: 'Inbox', analytics: 'Analytics', accounts: 'Accounts', foundations: 'Foundations' };
+
+  function showView(name) {
+    views.forEach((view) => {
+      document.getElementById('view-' + view).hidden = view !== name;
+    });
+    document.querySelectorAll('[data-view]').forEach((btn) => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.view === name));
+    });
+    const activeNav = { dashboard: 'dashboard', composer: 'composer', analytics: 'analytics', accounts: 'accounts' }[name];
+    document.querySelectorAll('[data-nav]').forEach((link) => {
+      if (link.dataset.nav === activeNav) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+    const crumb = document.getElementById('breadcrumb');
+    if (crumb) crumb.textContent = titles[name];
+    window.scrollTo({ top: 0 });
+  }
+
+  document.querySelectorAll('[data-view]').forEach((btn) => {
+    btn.addEventListener('click', () => showView(btn.dataset.view));
+  });
+
+  document.querySelectorAll('[data-nav]').forEach((link) => {
+    link.addEventListener('click', (event) => {
+      if (!views.includes(link.dataset.nav)) return;
+      event.preventDefault();
+      showView(link.dataset.nav);
+    });
+  });
+
+  document.querySelectorAll('[data-preview]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.preview;
+      document.querySelectorAll('[data-preview]').forEach((other) => other.setAttribute('aria-pressed', String(other === btn)));
+      document.querySelectorAll('[data-preview-pane]').forEach((pane) => {
+        pane.hidden = pane.dataset.previewPane !== target;
+      });
+    });
+  });
+
+  const channelNotes = {
+    facebook: 'Only Facebook is live today. Enable channels in Accounts.',
+    instagram: 'Instagram is designed and ready; enable it after Meta App Review.',
+    youtube: 'YouTube is designed and ready; enable it after Google verification.'
+  };
+  document.querySelectorAll('.channel-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const channel = chip.dataset.channel;
+      document.querySelectorAll('.channel-chip').forEach((other) => other.setAttribute('aria-pressed', 'false'));
+      chip.setAttribute('aria-pressed', 'true');
+      const note = document.querySelector('.channel-note');
+      if (note) note.innerHTML = '<svg class="icon"><use href="#i-alert"/></svg> ' + (channelNotes[channel] || channelNotes.facebook);
+      const tab = document.querySelector('[data-preview="' + channel + '"]');
+      if (tab) tab.click();
+    });
+  });
+
+  document.querySelectorAll('[data-theme]').forEach((btn) => {
+    btn.addEventListener('click', () => setTheme(btn.dataset.theme));
+  });
+
+  function setTheme(name) {
+    if (!['a', 'b', 'c'].includes(name)) return;
+    document.body.dataset.theme = name;
+    document.querySelectorAll('[data-theme]').forEach((other) => {
+      other.setAttribute('aria-pressed', String(other.dataset.theme === name));
+    });
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if (views.includes(params.get('view'))) showView(params.get('view'));
+  setTheme(params.get('theme') || 'a');
+
+  document.querySelectorAll('[data-nav-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => document.body.classList.toggle('nav-open'));
+  });
+
+  document.querySelectorAll('[data-nav-close], .sidebar .nav-item').forEach((el) => {
+    el.addEventListener('click', () => document.body.classList.remove('nav-open'));
+  });
+  document.addEventListener('click', (event) => {
+    if (!document.body.classList.contains('nav-open')) return;
+    if (event.target.closest('.sidebar') || event.target.closest('[data-nav-toggle]')) return;
+    document.body.classList.remove('nav-open');
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') document.body.classList.remove('nav-open');
+  });
+
+  const scheduleToggle = document.querySelector('[data-schedule-toggle]');
+  const schedulePop = document.getElementById('schedule-pop');
+  if (scheduleToggle && schedulePop) {
+    scheduleToggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      schedulePop.classList.toggle('open');
+    });
+    schedulePop.addEventListener('click', (event) => event.stopPropagation());
+    document.addEventListener('click', () => schedulePop.classList.remove('open'));
+  }
+
+  document.querySelectorAll('.seg').forEach((group) => {
+    group.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        group.querySelectorAll('button').forEach((other) => other.setAttribute('aria-pressed', 'false'));
+        btn.setAttribute('aria-pressed', 'true');
+      });
+    });
+  });
+
+  document.querySelectorAll('.chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      chip.parentElement.querySelectorAll('.chip').forEach((other) => other.setAttribute('aria-pressed', 'false'));
+      chip.setAttribute('aria-pressed', 'true');
+    });
+  });
+</script>
+</body>
+</html>
