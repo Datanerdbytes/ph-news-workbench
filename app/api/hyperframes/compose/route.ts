@@ -1,6 +1,14 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
-import { chatCompletion, resolveComposerLlm } from '@/lib/llm';
+import { chatCompletion, resolveComposerLlm, type ChatMessage } from '@/lib/llm';
+import { adoptFootage, localRuntimeEnabled } from '@/lib/hyperframes/project';
+import {
+  probeVideoDurationSeconds,
+  transcodeToReelFootage,
+} from '@/lib/hyperframes/media';
 import { stopPreviewServer } from '@/lib/hyperframes/preview';
 import { requireWorkspace, unauthorized } from '@/lib/session';
 
@@ -11,6 +19,8 @@ const MIN_DURATION = 3;
 const MAX_DURATION = 90;
 const MAX_BRIEF = 2000;
 const MAX_OUTPUT_TOKENS = 8000;
+const MAX_FOOTAGE_BYTES = 100 * 1024 * 1024;
+const FOOTAGE_SRC = 'assets/footage.mp4';
 const GSAP_SCRIPT_URL = 'https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js';
 
 function extractHtml(raw: string): string {
@@ -24,9 +34,45 @@ function extractHtml(raw: string): string {
   return text.trim();
 }
 
+/**
+ * Models keep omitting required attributes on the footage tag; patch them in
+ * deterministically instead of burning another LLM round-trip on rejection.
+ */
+function normalizeFootageTag(html: string): string {
+  return html.replace(/<video\b[^>]*>/i, (tag) => {
+    let fixed = tag;
+    const append = (attrs: string) => fixed.replace(/(\/?>)$/, ` ${attrs}$1`);
+    if (attribute(fixed, 'src') === null) {
+      fixed = append(`src="${FOOTAGE_SRC}"`);
+    } else if (attribute(fixed, 'src') !== FOOTAGE_SRC) {
+      fixed = fixed.replace(/\ssrc\s*=\s*(["'])[^"']*\1/i, ` src="${FOOTAGE_SRC}"`);
+    }
+    if (attribute(fixed, 'id') === null) {
+      fixed = append('id="footage"');
+    }
+    if (!hasAttribute(fixed, 'playsinline')) {
+      fixed = append('playsinline');
+    }
+    if (
+      attribute(fixed, 'data-has-audio') !== 'true' &&
+      !hasAttribute(fixed, 'muted')
+    ) {
+      fixed = append('data-has-audio="true"');
+    }
+    fixed = fixed.replace(/\s+crossorigin(=\s*(["']).*?\2)?(?=[\s>])/gi, '');
+    return fixed;
+  });
+}
+
 function attribute(tag: string, name: string): string | null {
   const match = tag.match(new RegExp(`\\b${name}\\s*=\\s*(["'])(.*?)\\1`, 'i'));
   return match?.[2] ?? null;
+}
+
+// Boolean HTML attributes (playsinline, muted) carry no =value, so they need
+// a presence check rather than the attribute() value matcher.
+function hasAttribute(tag: string, name: string): boolean {
+  return new RegExp(`\\b${name}(?![\\w-])`, 'i').test(tag);
 }
 
 function briefUrls(brief: string): Set<string> {
@@ -40,9 +86,10 @@ function briefUrls(brief: string): Set<string> {
 function validateComposition(
   html: string,
   expectedDuration: number,
-  brief: string
+  brief: string,
+  footage: boolean
 ): { duration: number } | { error: string } {
-  if (!/^(?:<!doctype html\s*)?<html[\s>]/i.test(html)) {
+  if (!/^(?:<!doctype html\s*>\s*)?<html[\s>]/i.test(html)) {
     return { error: 'The model did not return an HTML document. Try again.' };
   }
   const rootTag = html.match(
@@ -61,7 +108,7 @@ function validateComposition(
   ) {
     return { error: 'The composition is missing data-duration. Try again.' };
   }
-  if (duration !== expectedDuration) {
+  if (Math.abs(duration - expectedDuration) > 0.11) {
     return {
       error: `The composition must be exactly ${expectedDuration} seconds long. Try again.`,
     };
@@ -77,9 +124,40 @@ function validateComposition(
   if (!/window\.__timelines\s*\[\s*["']main["']\s*\]\s*=/i.test(html)) {
     return { error: 'The composition is missing its paused HyperFrames timeline. Try again.' };
   }
+  const videoTags = [...html.matchAll(/<video\b[^>]*>/gi)].map((m) => m[0]);
+  if (footage) {
+    if (videoTags.length !== 1) {
+      return {
+        error: `With footage attached, use exactly one <video> element referencing ${FOOTAGE_SRC} as the full-bleed background. Try again.`,
+      };
+    }
+    const videoTag = videoTags[0];
+    if (attribute(videoTag, 'src') !== FOOTAGE_SRC) {
+      return { error: `The footage video must use src="${FOOTAGE_SRC}". Try again.` };
+    }
+    if (attribute(videoTag, 'crossorigin') !== null) {
+      return { error: 'The footage video must not set crossorigin. Try again.' };
+    }
+    if (!hasAttribute(videoTag, 'playsinline')) {
+      return { error: 'The footage video must include playsinline. Try again.' };
+    }
+    if (
+      attribute(videoTag, 'data-has-audio') !== 'true' &&
+      !hasAttribute(videoTag, 'muted')
+    ) {
+      return {
+        error: 'The footage video must set data-has-audio="true" or muted. Try again.',
+      };
+    }
+  } else if (videoTags.length) {
+    return {
+      error:
+        'Your brief asks for video footage, but none is attached. Choose your video with the "Attach footage" picker above the brief, then generate again.',
+    };
+  }
   if (
-    /<(?:iframe|object|embed|link|base|video|audio)\b/i.test(html) ||
-    /\bsrcset\s*=|\bposter\s*=/i.test(html) ||
+    /<(?:iframe|object|embed|link|base|audio)\b/i.test(html) ||
+    /\bsrcset\s*=|\bposter\s*=|\bcrossorigin\b/i.test(html) ||
     /\bon[a-z]+\s*=/i.test(html) ||
     /@import\b|@font-face\b|url\s*\(|javascript:|data:text\/html/i.test(html)
   ) {
@@ -119,6 +197,7 @@ function validateComposition(
     }
     if (source) {
       if (tagName === 'script' && source === GSAP_SCRIPT_URL) continue;
+      if (tagName === 'video' && source === FOOTAGE_SRC) continue;
       let isHttps = false;
       try {
         isHttps = new URL(source).protocol === 'https:';
@@ -183,6 +262,57 @@ function validateComposition(
     return { error: 'Composition scripts may only define deterministic timeline animation.' };
   }
 
+  // The live preview opens paused at t=0, so frame zero must already show
+  // composed content. Flag the "everything fades in from nothing" opening:
+  // every clip whose window includes t=0 getting an opacity-0 entrance at the
+  // very start of the timeline leaves the first frame blank.
+  const timelineScript = scriptBodies
+    .map((script) => script[1])
+    .join('\n');
+  const clipsAtZero = [...html.matchAll(/<([a-z][\w:-]*)\b[^>]*>/gi)]
+    .filter(
+      (match) =>
+        match[1].toLowerCase() !== 'div' ||
+        !/data-composition-id/i.test(match[0])
+    )
+    .map((match) => match[0])
+    .filter(
+      (tag) =>
+        (attribute(tag, 'class') ?? '').split(/\s+/).includes('clip') &&
+        Number(attribute(tag, 'data-start')) === 0
+    )
+    .map((tag) => attribute(tag, 'id'))
+    .filter((id): id is string => Boolean(id));
+
+  if (clipsAtZero.length) {
+    const fadesInFromNothing = (id: string): boolean => {
+      const callPattern = new RegExp(
+        `tl\\.fromTo\\(\\s*["']#${id}["'][^;]{0,500}?\\)\\s*;`,
+        'i'
+      );
+      const call = timelineScript.match(callPattern);
+      if (!call) return false;
+      const body = call[0];
+      // The first {...} after the target is the tween's "from" state.
+      const fromObject = body.match(/\{[\s\S]*?\}/);
+      if (!fromObject || !/opacity\s*:\s*0(?![.\d])/i.test(fromObject[0])) {
+        return false;
+      }
+      // gsap defaults the tween position to 0 when omitted; only a tween
+      // starting at the very beginning blanks frame zero.
+      const tail = body.slice(body.lastIndexOf('}') + 1);
+      const positionMatch = tail.match(/,\s*([\d.]+)\s*\)\s*;$/);
+      const position = positionMatch ? Number(positionMatch[1]) : 0;
+      return position < 0.05;
+    };
+    if (clipsAtZero.every(fadesInFromNothing)) {
+      return {
+        error:
+          'The first frame would be blank: every opening clip fades in from opacity 0. Keep the background and headline fully visible at t=0.',
+      };
+    }
+  }
+
   return { duration };
 }
 
@@ -190,13 +320,15 @@ export async function POST(request: Request) {
   const access = await requireWorkspace(request);
   if (!access) return unauthorized();
 
-  const body = (await request.json().catch(() => null)) as {
-    brief?: unknown;
-    durationSeconds?: unknown;
-    compositionId?: unknown;
-  } | null;
+  const form = await request.formData().catch(() => null);
+  if (!form) {
+    return NextResponse.json(
+      { error: 'Send the composition request as multipart form data.' },
+      { status: 400 }
+    );
+  }
 
-  const brief = typeof body?.brief === 'string' ? body.brief.trim() : '';
+  const brief = String(form.get('brief') ?? '').trim();
   if (brief.length < 10 || brief.length > MAX_BRIEF) {
     return NextResponse.json(
       { error: `Describe the reel in 10–${MAX_BRIEF} characters.` },
@@ -204,17 +336,107 @@ export async function POST(request: Request) {
     );
   }
 
-  const durationSeconds =
-    typeof body?.durationSeconds === 'number' ? body.durationSeconds : 30;
-  if (
-    !Number.isInteger(durationSeconds) ||
-    durationSeconds < MIN_DURATION ||
-    durationSeconds > MAX_DURATION
-  ) {
-    return NextResponse.json(
-      { error: `Duration must be a whole number between ${MIN_DURATION} and ${MAX_DURATION} seconds.` },
-      { status: 400 }
-    );
+  const rawCompositionId = Number(form.get('compositionId'));
+  const regenerateId =
+    Number.isInteger(rawCompositionId) && rawCompositionId > 0
+      ? rawCompositionId
+      : null;
+  if (form.get('compositionId') !== null && regenerateId === null) {
+    return NextResponse.json({ error: 'Composition not found.' }, { status: 404 });
+  }
+
+  const requestedDuration = Number(form.get('durationSeconds'));
+
+  // Footage upload: probe, then transcode to a normalized 1080×1920 H.264
+  // asset. The reel matches the footage length, overriding the target.
+  const footage = form.get('footage');
+  const hasFootage = footage instanceof File && footage.size > 0;
+  let footageTempPath: string | null = null;
+  let durationSeconds: number;
+  let cleanupFootage: () => void = () => {};
+
+  if (hasFootage) {
+    if (!localRuntimeEnabled()) {
+      return NextResponse.json(
+        {
+          error:
+            'Footage reels are processed locally. Run the app on your machine (or set HYPERFRAMES_ENABLE_RENDER=1).',
+        },
+        { status: 400 }
+      );
+    }
+    const footageFile = footage as File;
+    const looksLikeVideo =
+      footageFile.type === 'video/mp4' ||
+      footageFile.type === 'video/quicktime' ||
+      (!footageFile.type && /\.(mp4|mov)$/i.test(footageFile.name));
+    if (!looksLikeVideo) {
+      return NextResponse.json(
+        { error: 'Footage must be an MP4 or MOV file.' },
+        { status: 400 }
+      );
+    }
+    if (footageFile.size > MAX_FOOTAGE_BYTES) {
+      return NextResponse.json(
+        { error: 'Footage must be 100 MB or smaller.' },
+        { status: 400 }
+      );
+    }
+
+    let tempInput: string | null = null;
+    let tempOutput: string | null = null;
+    try {
+      const workDir = await mkdtemp(path.join(tmpdir(), 'hf-footage-'));
+      tempInput = path.join(workDir, 'input.mp4');
+      tempOutput = path.join(workDir, 'footage.mp4');
+      cleanupFootage = () => void rm(workDir, { recursive: true, force: true });
+      await writeFile(tempInput, Buffer.from(await footageFile.arrayBuffer()));
+
+      const probed = await probeVideoDurationSeconds(tempInput);
+      if (probed === null) {
+        return NextResponse.json(
+          { error: 'Could not read the footage duration. Is it a valid video file?' },
+          { status: 400 }
+        );
+      }
+      if (probed < MIN_DURATION || probed > MAX_DURATION) {
+        return NextResponse.json(
+          {
+            error: `Footage must be between ${MIN_DURATION} and ${MAX_DURATION} seconds for a reel (this one is ${probed.toFixed(1)}s).`,
+          },
+          { status: 400 }
+        );
+      }
+
+      await transcodeToReelFootage(tempInput, tempOutput);
+      footageTempPath = tempOutput;
+      durationSeconds = Math.round(probed * 100) / 100;
+    } catch (error) {
+      cleanupFootage();
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : 'The footage could not be processed.',
+        },
+        { status: 500 }
+      );
+    }
+  } else {
+    durationSeconds = Number.isInteger(requestedDuration) ? requestedDuration : 30;
+    if (
+      !Number.isInteger(durationSeconds) ||
+      durationSeconds < MIN_DURATION ||
+      durationSeconds > MAX_DURATION
+    ) {
+      return NextResponse.json(
+        {
+          error: `Duration must be a whole number between ${MIN_DURATION} and ${MAX_DURATION} seconds.`,
+        },
+        { status: 400 }
+      );
+    }
   }
 
   let llm: Awaited<ReturnType<typeof resolveComposerLlm>>;
@@ -252,42 +474,89 @@ Rules for the document you return:
     window.__timelines = window.__timelines || {};
     window.__timelines["main"] = tl;
   </script>
-- Use fromTo (never from). Never call tl.play(), use timers, randomness, network APIs, event handlers, or browser storage. Every visual change must be a function of timeline time.
-- Keep type inside the action-safe band (x=90–990, y=168–1330), use large legible type, strong contrast, and a visible hook at frame zero.
+- Use fromTo (never from). When one element needs more than one fromTo (for example an entrance and a later exit), add immediateRender: false to every fromTo except the earliest-positioned one, so seeks before the first tween keep the element's CSS state. Never call tl.play(), use timers, randomness, network APIs, event handlers, or browser storage. Every visual change must be a function of timeline time.
+- FIRST FRAME RULE: at t=0 the canvas must already show the fully composed opening — background AND the primary headline (or key visual) at full opacity. Never begin with a blank, black, or near-empty canvas. The hero element must have data-start="0" so it is on the canvas from the first frame, and must not get an entrance tween starting from opacity 0 at or near position 0 (entrances are for SECONDARY elements only). The first impression must read as a finished design, not a fade-in from nothing.
+- Keep something visibly changing at least every ~2.5 seconds across the whole duration (a move, a highlight, a counter, a shape). Never hold one static frame longer than that.
+- Keep type inside the action-safe band (x=90–990, y=168–1330), use large legible type, and strong contrast.
 - This is a news reel for a Filipino news page. Never invent media URLs; use typography, color, and shapes when no URL is supplied.
+${
+  hasFootage
+    ? `- FOOTAGE MODE: the project ships a local video at src="${FOOTAGE_SRC}" (${durationSeconds}s, 1080×1920, with sound). It MUST be the full-bleed background, written exactly like this (no extra attributes, no styling transforms):
+  <video id="footage" class="clip" data-start="0" data-duration="${durationSeconds}" data-track-index="0" data-has-audio="true" playsinline src="${FOOTAGE_SRC}" style="position:absolute;left:0;top:0;width:1080px;height:1920px;object-fit:cover;"></video>
+  Never animate or transform the video element itself — build overlay elements above it (z-index 1+) that stay readable over moving footage: a dark gradient scrim behind every text area, then the headline, badges, and accent shapes. The footage stays visible to the last frame (exit only the overlays); the film keeps the footage's own audio, so add no audio elements.`
+    : ''
+}
 
 Return ONLY the HTML document, no explanation, no markdown fences.`;
 
-  let result: { content: string };
-  try {
-    result = await chatCompletion({
-      llm,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: `Create a ${durationSeconds}-second reel composition.\n\nBrief: ${brief}` },
-      ],
-      maxTokens: MAX_OUTPUT_TOKENS,
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : 'The composition could not be generated.',
-      },
-      { status: 502 }
+  const baseMessages: ChatMessage[] = [
+    { role: 'system', content: system },
+    {
+      role: 'user',
+      content: `Create a ${durationSeconds}-second reel composition.\n\nBrief: ${brief}`,
+    },
+  ];
+  const chatOptions = {
+    maxTokens: MAX_OUTPUT_TOKENS,
+    ...(llm.providerId === 'nim' &&
+    llm.model === 'nvidia/nemotron-3.5-super-vl-120b-a12b'
+      ? { chatTemplateKwargs: { enable_thinking: false } }
+      : {}),
+  } as const;
+
+  // Models rarely nail every composition contract on the first pass, so give
+  // the validation verdict back to the model and let it correct itself once.
+  let html = '';
+  let validation: ReturnType<typeof validateComposition> = {
+    error: 'The composition could not be generated.',
+  };
+  let messages: ChatMessage[] = baseMessages;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let result: { content: string };
+    try {
+      result = await chatCompletion({ llm, messages, ...chatOptions });
+    } catch (error) {
+      cleanupFootage();
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : 'The composition could not be generated.',
+        },
+        { status: 502 }
+      );
+    }
+
+    const candidate = hasFootage
+      ? normalizeFootageTag(extractHtml(result.content))
+      : extractHtml(result.content);
+    const check = validateComposition(
+      candidate,
+      durationSeconds,
+      brief,
+      hasFootage
     );
+    if (!('error' in check)) {
+      html = candidate;
+      validation = check;
+      break;
+    }
+
+    messages = [
+      ...messages,
+      { role: 'assistant', content: result.content },
+      {
+        role: 'user',
+        content: `Your document failed validation: ${check.error}\nReturn the corrected, complete HTML document only — no explanation, no markdown fences.`,
+      },
+    ];
   }
 
-  const html = extractHtml(result.content);
-  const validation = validateComposition(html, durationSeconds, brief);
   if ('error' in validation) {
+    cleanupFootage();
     return NextResponse.json({ error: validation.error }, { status: 502 });
-  }
-
-  const regenerateId =
-    typeof body?.compositionId === 'number' ? body.compositionId : null;
-  if (body?.compositionId !== undefined && regenerateId === null) {
-    return NextResponse.json({ error: 'Composition not found.' }, { status: 404 });
   }
 
   try {
@@ -301,9 +570,12 @@ Return ONLY the HTML document, no explanation, no markdown fences.`;
         RETURNING id
       `) as unknown as { id: number }[];
       if (!rows[0]) {
+        cleanupFootage();
         return NextResponse.json({ error: 'Composition not found.' }, { status: 404 });
       }
       await stopPreviewServer(regenerateId);
+      if (footageTempPath) await adoptFootage(footageTempPath, rows[0].id);
+      cleanupFootage();
       return NextResponse.json({
         id: rows[0].id,
         html,
@@ -322,6 +594,9 @@ Return ONLY the HTML document, no explanation, no markdown fences.`;
       RETURNING id
     `) as unknown as { id: number }[];
 
+    if (footageTempPath) await adoptFootage(footageTempPath, rows[0].id);
+    cleanupFootage();
+
     return NextResponse.json({
       id: rows[0].id,
       html,
@@ -330,6 +605,7 @@ Return ONLY the HTML document, no explanation, no markdown fences.`;
       model: llm.model,
     });
   } catch (error) {
+    cleanupFootage();
     console.error('Could not save HyperFrames composition:', error);
     return NextResponse.json(
       { error: 'The composition could not be saved.' },

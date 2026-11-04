@@ -116,6 +116,60 @@ async function waitForPreview(
   throw new Error(`HyperFrames preview did not start in time: ${output().slice(-2000)}`);
 }
 
+type CliPreviewStatus = {
+  ok?: boolean;
+  result?: {
+    state?: string;
+    port?: number;
+    serverUrl?: string;
+    studioUrl?: string;
+    ready?: boolean;
+  };
+};
+
+/**
+ * The CLI keeps one background preview per project and refuses to start a
+ * second on a different port, so always ask it for an existing server before
+ * spawning our own.
+ */
+async function existingCliPreview(
+  directory: string
+): Promise<{ port: number; studioUrl: string | null } | null> {
+  const output = await new Promise<string>((resolve) => {
+    const child = spawn(
+      npmCommand(),
+      ['--yes', 'hyperframes', 'preview', '--status', '--json'],
+      {
+        cwd: directory,
+        env: cliEnvironment(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
+    );
+    let stdout = '';
+    child.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.once('error', () => resolve(''));
+    child.once('close', () => resolve(stdout));
+  });
+
+  const start = output.indexOf('{');
+  if (start === -1) return null;
+  try {
+    const parsed = JSON.parse(output.slice(start)) as CliPreviewStatus;
+    if (
+      parsed.ok &&
+      parsed.result?.state === 'running' &&
+      typeof parsed.result.port === 'number'
+    ) {
+      return { port: parsed.result.port, studioUrl: parsed.result.studioUrl ?? null };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function ensurePreviewServer(
   compositionId: number,
   html: string
@@ -128,8 +182,27 @@ export async function ensurePreviewServer(
     return existing.url;
   }
 
+  const directory = projectDir(compositionId);
+  await syncProject(compositionId, html);
+
+  const adopted = await existingCliPreview(directory);
+  if (adopted) {
+    const entry: PreviewEntry = {
+      directory,
+      url:
+        adopted.studioUrl ??
+        `http://localhost:${adopted.port}/#project/${path.basename(directory)}`,
+      port: adopted.port,
+      ready: Promise.resolve(''),
+      idleTimer: null,
+    };
+    previewServers.set(compositionId, entry);
+    armIdleTimer(compositionId, entry);
+    return entry.url;
+  }
+
   const entry: PreviewEntry = {
-    directory: projectDir(compositionId),
+    directory,
     url: '',
     port: 0,
     ready: Promise.resolve(''),

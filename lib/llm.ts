@@ -129,18 +129,21 @@ export async function resolveComposerLlm(
   return null;
 }
 
-export type ChatMessage =
-  | { role: 'system'; content: string }
-  | { role: 'user'; content: string };
+export type ChatMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
 
 export async function chatCompletion({
   llm,
   messages,
   maxTokens,
+  chatTemplateKwargs,
 }: {
   llm: ResolvedComposerLlm;
   messages: ChatMessage[];
   maxTokens: number;
+  chatTemplateKwargs?: { enable_thinking: boolean };
 }): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
   let res: Response;
   try {
@@ -150,7 +153,14 @@ export async function chatCompletion({
         'Content-Type': 'application/json',
         Authorization: `Bearer ${llm.apiKey}`,
       },
-      body: JSON.stringify({ model: llm.model, messages, max_tokens: maxTokens }),
+      body: JSON.stringify({
+        model: llm.model,
+        messages,
+        max_tokens: maxTokens,
+        ...(chatTemplateKwargs
+          ? { chat_template_kwargs: chatTemplateKwargs }
+          : {}),
+      }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (error) {

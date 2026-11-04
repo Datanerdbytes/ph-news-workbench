@@ -22,6 +22,11 @@ export const TEXT_MODELS: TextModel[] = [
     label: "Nemotron 3.5 Lightning",
     detail: "Strongest reasoning, but slower to respond",
   },
+  {
+    id: "nvidia/nemotron-3.5-super-vl-120b-a12b",
+    label: "Nemotron 3.5 Super VL 120B",
+    detail: "Large vision-language model; supports text-based Reel composition",
+  },
 ];
 
 export const DEFAULT_TEXT_MODEL = "nvidia/nemotron-3.5-bolt-e4b";

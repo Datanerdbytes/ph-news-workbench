@@ -25,6 +25,7 @@ type ComposerProviderOption = {
   detail: string;
   baseUrl: string | null;
   envKeyVar: string | null;
+  envKeyAvailable: boolean;
   freeTextModel: boolean;
   models: { id: string; label: string; detail: string }[];
 };
@@ -440,8 +441,10 @@ export default function SettingsPage() {
                 {composerKeySet
                   ? 'A key is saved securely. It is never returned to the browser.'
                   : selectedComposerProvider?.envKeyVar
-                    ? `No workspace key is saved. The server may use ${selectedComposerProvider.envKeyVar} as a fallback.`
-                    : 'No workspace key is saved yet.'}
+                    ? selectedComposerProvider.envKeyAvailable
+                      ? `No workspace key is saved. The server has ${selectedComposerProvider.envKeyVar} configured as a fallback.`
+                      : `No key is configured. Enter your ${selectedComposerProvider.label} API key to save these settings.`
+                    : 'No key is configured. Enter an API key to save these settings.'}
               </p>
             </div>
             {selectedComposerProvider?.detail && (

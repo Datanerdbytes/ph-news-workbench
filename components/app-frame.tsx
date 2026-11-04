@@ -231,7 +231,7 @@ export function AppFrame({
       <div
         className={cn(
           "lg:grid lg:grid-cols-[250px_minmax(0,1fr)]",
-          fill ? "h-full" : "min-h-dvh"
+          fill ? "h-full" : "min-h-dvh lg:h-dvh lg:overflow-hidden"
         )}
       >
         <aside
@@ -463,7 +463,7 @@ export function AppFrame({
           <main
             className={cn(
               "flex min-h-0 flex-1 flex-col",
-              fill && "overflow-clip"
+              fill ? "overflow-clip" : "lg:overflow-y-auto"
             )}
           >
             {children}

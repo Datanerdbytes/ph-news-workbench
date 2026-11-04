@@ -17,8 +17,8 @@ export function PublishPage({
 }: {
   eyebrow: string;
   title: string;
-  description: string;
-  endpoint: string;
+  description?: string;
+  endpoint?: string;
   children: React.ReactNode;
 }) {
   const connection = useFacebookConnection();
@@ -32,13 +32,17 @@ export function PublishPage({
             <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight">
               {title}
             </h1>
-            <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
-              {description}
-            </p>
+            {description && (
+              <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
+                {description}
+              </p>
+            )}
           </div>
-          <code className="self-start rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-secondary-foreground">
-            {endpoint}
-          </code>
+          {endpoint && (
+            <code className="self-start rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-secondary-foreground">
+              {endpoint}
+            </code>
+          )}
         </header>
 
         {connection.loading ? (
@@ -144,7 +148,7 @@ export function ComposerCard({
   icon: React.ReactNode;
   title: string;
   badge?: string;
-  aside: React.ReactNode;
+  aside?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -160,11 +164,18 @@ export function ComposerCard({
           </span>
         )}
       </div>
-      <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_240px]">
+      <div
+        className={cn(
+          'grid gap-5 p-5',
+          aside && 'lg:grid-cols-[minmax(0,1fr)_240px]'
+        )}
+      >
         <div className="min-w-0 space-y-4">{children}</div>
-        <aside className="space-y-3 text-[11px] leading-relaxed text-muted-foreground">
-          {aside}
-        </aside>
+        {aside && (
+          <aside className="space-y-3 text-[11px] leading-relaxed text-muted-foreground">
+            {aside}
+          </aside>
+        )}
       </div>
     </section>
   );

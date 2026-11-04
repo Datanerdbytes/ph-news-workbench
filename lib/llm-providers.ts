@@ -21,6 +21,11 @@ export type ComposerProvider = {
 
 const HF_MODELS: ComposerModel[] = [
   {
+    id: 'zai-org/GLM-5.3-Flash',
+    label: 'GLM-5.3 Flash',
+    detail: 'Fast Z.ai model available through Hugging Face Inference Providers',
+  },
+  {
     id: 'deepseek-ai/DeepSeek-V3.1',
     label: 'DeepSeek V3.1',
     detail: 'Strong general coding model — good HTML/CSS compositions',

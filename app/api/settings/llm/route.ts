@@ -183,6 +183,9 @@ function providerCatalog() {
     detail: provider.detail,
     baseUrl: provider.baseUrl,
     envKeyVar: provider.envKeyVar,
+    envKeyAvailable: provider.envKeyVar
+      ? Boolean(process.env[provider.envKeyVar]?.trim())
+      : false,
     freeTextModel: provider.freeTextModel,
     models: providerModels(provider.id),
   }));
