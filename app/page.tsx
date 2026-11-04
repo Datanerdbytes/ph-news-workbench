@@ -2,19 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowLeft,
   ArrowUpRight,
   CalendarClock,
+  ChevronDown,
   Copy,
-  Film,
   ImagePlus,
-  Inbox as InboxIcon,
+  Newspaper,
   PenLine,
   RefreshCw,
   Search,
   Sparkles,
   Trash2,
-  Upload,
-  Video,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -53,11 +52,17 @@ type DraftStats = {
   estimatedCost: number;
 };
 
+type ItemCounts = {
+  total: number;
+  pending: number;
+  drafted: number;
+  published: number;
+};
+
 type StatusFilter = 'all' | 'pending' | 'drafted' | 'published';
 
 const MAX_IMAGES = 10;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
-const MAX_REEL_BYTES = 100 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -94,7 +99,7 @@ function EmptyWorkspace({ onRefresh }: { onRefresh: () => void }) {
     <div className="grid min-h-[55vh] place-items-center rounded-xl border border-dashed border-border bg-card/50 p-8 text-center">
       <div className="max-w-sm">
         <span className="mx-auto grid size-11 place-items-center rounded-full bg-secondary">
-          <InboxIcon className="size-5 text-muted-foreground" aria-hidden />
+          <Newspaper className="size-5 text-muted-foreground" aria-hidden />
         </span>
         <h2 className="mt-4 font-heading text-2xl">The desk is quiet</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -120,15 +125,15 @@ export default function Home() {
   const [images, setImages] = useState<string[]>([]);
   const [imagesBusy, setImagesBusy] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const [reelFile, setReelFile] = useState<File | null>(null);
-  const [reelPreview, setReelPreview] = useState<string | null>(null);
-  const [reelCaption, setReelCaption] = useState('');
-  const [reelBusy, setReelBusy] = useState(false);
-  const reelInputRef = useRef<HTMLInputElement>(null);
   const selectionRef = useRef<number | null>(null);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [counts, setCounts] = useState<ItemCounts | null>(null);
+  const [pane, setPane] = useState<'queue' | 'compose'>('queue');
   const [refreshing, setRefreshing] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -141,10 +146,14 @@ export default function Home() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/items');
+      const res = await fetch('/api/items', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Could not load the news feed');
       const data = await res.json();
       const list: Item[] = Array.isArray(data) ? data : (data.rows ?? []);
       setItems(list);
+      setNextCursor(typeof data.nextCursor === 'number' ? data.nextCursor : null);
+      setHasMore(Boolean(data.hasMore));
+      setCounts(data.counts ?? null);
       setSelected((prev) => {
         if (prev) {
           const next = list.find((item) => item.id === prev.id);
@@ -159,25 +168,41 @@ export default function Home() {
     }
   }, []);
 
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/items?before=${nextCursor}`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error('Could not load more stories');
+      const data = await res.json();
+      const list: Item[] = data.rows ?? [];
+      setItems((prev) => {
+        const seen = new Set(prev.map((item) => item.id));
+        return [...prev, ...list.filter((item) => !seen.has(item.id))];
+      });
+      setNextCursor(typeof data.nextCursor === 'number' ? data.nextCursor : null);
+      setHasMore(Boolean(data.hasMore));
+    } catch {
+      toast.error('Could not load more stories');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore]);
+
   useEffect(() => {
     load();
   }, [load]);
 
-  useEffect(() => {
-    if (!reelFile) {
-      setReelPreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(reelFile);
-    setReelPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [reelFile]);
-
-  const pendingCount = items.filter((item) => item.status === 'pending').length;
-  const draftedCount = items.filter((item) => item.status === 'drafted').length;
-  const publishedCount = items.filter(
-    (item) => item.status === 'published'
-  ).length;
+  const pendingCount =
+    counts?.pending ?? items.filter((item) => item.status === 'pending').length;
+  const draftedCount =
+    counts?.drafted ?? items.filter((item) => item.status === 'drafted').length;
+  const publishedCount =
+    counts?.published ??
+    items.filter((item) => item.status === 'published').length;
+  const totalStories = counts?.total ?? items.length;
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -195,6 +220,7 @@ export default function Home() {
     if (selected?.id === item.id) return;
     selectionRef.current = item.id;
     setSelected(item);
+    setPane('compose');
     setDraft('');
     setStats(null);
     setImages([]);
@@ -363,135 +389,6 @@ export default function Home() {
     setImages((prev) => prev.filter((_, position) => position !== index));
   }
 
-  function readVideoMeta(
-    file: File
-  ): Promise<{ duration: number; width: number; height: number }> {
-    return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const element = document.createElement('video');
-      element.preload = 'metadata';
-      element.onloadedmetadata = () => {
-        URL.revokeObjectURL(url);
-        resolve({
-          duration: element.duration,
-          width: element.videoWidth,
-          height: element.videoHeight,
-        });
-      };
-      element.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error(`Could not read ${file.name}.`));
-      };
-      element.src = url;
-    });
-  }
-
-  async function pickReel(file: File | null) {
-    if (!file) return;
-    const reset = () => {
-      if (reelInputRef.current) reelInputRef.current.value = '';
-    };
-
-    const isVideo =
-      file.type === 'video/mp4' ||
-      file.type === 'video/quicktime' ||
-      (!file.type && /\.(mp4|mov)$/i.test(file.name));
-    if (!isVideo) {
-      toast.error('Choose an MP4 or MOV video.');
-      reset();
-      return;
-    }
-    if (file.size > MAX_REEL_BYTES) {
-      toast.error('That video is too large', {
-        description: 'Reels must be 100 MB or smaller.',
-      });
-      reset();
-      return;
-    }
-
-    try {
-      const meta = await readVideoMeta(file);
-      if (!Number.isFinite(meta.duration)) {
-        throw new Error('Could not read the video length.');
-      }
-      if (meta.duration < 3 || meta.duration > 90) {
-        const seconds = Math.round(meta.duration);
-        toast.error('Reels must be 3 to 90 seconds.', {
-          description: `This clip is ${seconds} second${seconds === 1 ? '' : 's'}.`,
-        });
-        reset();
-        return;
-      }
-      if (meta.width && meta.height && meta.width >= meta.height) {
-        toast('Landscape video', {
-          description:
-            'Reels are shown in 9:16 portrait, so the sides may be cropped.',
-        });
-      }
-      setReelFile(file);
-    } catch (error) {
-      toast.error('Could not read that video', {
-        description:
-          error instanceof Error ? error.message : 'Try another file.',
-      });
-      reset();
-    }
-  }
-
-  function removeReel() {
-    setReelFile(null);
-    if (reelInputRef.current) reelInputRef.current.value = '';
-  }
-
-  async function postReel() {
-    if (!reelFile) return;
-
-    if (!facebook.scopes.includes('pages_manage_posts')) {
-      toast.error('Publishing permission missing', {
-        description: 'Reconnect the Page so it can publish on your behalf.',
-        action: { label: 'Reconnect', onClick: () => facebook.connect() },
-      });
-      return;
-    }
-
-    setReelBusy(true);
-    try {
-      const form = new FormData();
-      form.append('video', reelFile);
-      const caption = (reelCaption.trim() || stripMarkdown(draft)).trim();
-      if (caption) form.append('caption', caption);
-
-      const res = await fetch('/api/reels', { method: 'POST', body: form });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(data?.error ?? 'The reel could not be posted.');
-      }
-
-      toast.success(
-        `Reel posted to ${data.page?.name ?? facebook.page?.name ?? 'your Page'}`,
-        {
-          description: 'Facebook is processing the video; it will go live shortly.',
-          action: data.permalink
-            ? {
-                label: 'View reel',
-                onClick: () =>
-                  window.open(data.permalink, '_blank', 'noopener,noreferrer'),
-              }
-            : undefined,
-        }
-      );
-      setReelCaption('');
-      removeReel();
-    } catch (error) {
-      toast.error('Reel upload failed', {
-        description:
-          error instanceof Error ? error.message : 'Please try again.',
-      });
-    } finally {
-      setReelBusy(false);
-    }
-  }
-
   async function schedulePost() {
     if (!selected || !draft.trim() || !scheduledFor) return;
     setScheduling(true);
@@ -641,7 +538,7 @@ export default function Home() {
               : 'Posts to your Page immediately';
 
   const filters: { value: StatusFilter; label: string; count: number }[] = [
-    { value: 'all', label: 'All', count: items.length },
+    { value: 'all', label: 'All', count: totalStories },
     { value: 'pending', label: 'Pending', count: pendingCount },
     { value: 'drafted', label: 'Drafted', count: draftedCount },
     ...(publishedCount
@@ -653,35 +550,21 @@ export default function Home() {
     <AppFrame fill>
       <div className="flex min-h-0 flex-1 flex-col">
         <header className="shrink-0 border-b border-border/70">
-          <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
-              <p className="eyebrow text-brand">
-                Editorial queue · {formatLongDate()}
-              </p>
-              <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h1 className="font-heading text-[32px] leading-none tracking-[-0.02em]">
-                  Inbox
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {pendingCount} pending · {draftedCount} drafted ·{' '}
-                  {items.length} total
+          <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 px-4 py-4 sm:px-6">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="min-w-0">
+                <p className="eyebrow text-brand">
+                  Editorial queue · {formatLongDate()}
                 </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <Search
-                  className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden
-                />
-                <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search stories"
-                  aria-label="Search stories"
-                  className="h-9 w-full bg-card pl-8 sm:w-56"
-                />
+                <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <h1 className="font-heading text-[32px] leading-none tracking-[-0.02em]">
+                    Story Queue
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    {pendingCount} pending · {draftedCount} drafted ·{' '}
+                    {totalStories} total
+                  </p>
+                </div>
               </div>
 
               <Button
@@ -699,15 +582,57 @@ export default function Home() {
                 {refreshing ? 'Refreshing…' : 'Refresh feeds'}
               </Button>
             </div>
+
+            <div
+              className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-card p-1 md:hidden"
+              role="group"
+              aria-label="Story Queue sections"
+            >
+              <button
+                type="button"
+                onClick={() => setPane('queue')}
+                aria-pressed={pane === 'queue'}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                  pane === 'queue'
+                    ? 'bg-ink text-paper'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Story Queue · {filtered.length}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPane('compose')}
+                aria-pressed={pane === 'compose'}
+                disabled={!selected}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40',
+                  pane === 'compose'
+                    ? 'bg-ink text-paper'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Compose
+              </button>
+            </div>
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto md:overflow-hidden">
-          <div className="mx-auto grid w-full max-w-[1680px] md:h-full md:grid-cols-[320px_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]">
-            <aside className="flex min-h-0 flex-col border-b border-border/70 bg-paper/40 md:h-full md:border-b-0 md:border-r">
+        <div className="min-h-0 flex-1">
+          <div className="mx-auto grid h-full w-full max-w-[1680px] md:grid-cols-[340px_minmax(0,1fr)]">
+            <aside
+              className={cn(
+                'min-h-0 flex-col border-b border-border/70 bg-paper/40 md:flex md:h-full md:border-b-0 md:border-r',
+                pane === 'queue' ? 'flex' : 'hidden md:flex'
+              )}
+              aria-label="Story queue"
+            >
               <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <span className="eyebrow text-muted-foreground">Stories</span>
+                  <span className="eyebrow text-muted-foreground">
+                    Story queue
+                  </span>
                   <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
                     {filtered.length}
                   </span>
@@ -715,6 +640,22 @@ export default function Home() {
                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Newest first
                 </span>
+              </div>
+
+              <div className="border-b border-border/60 px-3 py-2">
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search stories"
+                    aria-label="Search stories"
+                    className="h-8 w-full bg-card pl-8 text-xs"
+                  />
+                </div>
               </div>
 
               <div
@@ -743,7 +684,7 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="max-h-[340px] flex-1 overflow-y-auto overscroll-contain md:max-h-none">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {itemsLoading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <div
@@ -824,21 +765,78 @@ export default function Home() {
                   })
                 ) : (
                   <div className="px-6 py-12 text-center">
-                    <InboxIcon
+                    <Newspaper
                       className="mx-auto size-5 text-muted-foreground/60"
                       aria-hidden
                     />
                     <p className="mt-2 text-sm font-medium">No stories found</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      Try another filter or refresh the feeds.
+                      Try another filter, load more stories, or refresh the
+                      feeds.
                     </p>
                   </div>
                 )}
               </div>
+
+              {items.length > 0 && (
+                <footer className="shrink-0 border-t border-border/60 bg-card/60 px-3 py-2.5">
+                  {hasMore ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void loadMore()}
+                      disabled={loadingMore}
+                      aria-busy={loadingMore}
+                      className="w-full"
+                    >
+                      {loadingMore ? (
+                        <RefreshCw
+                          className="size-3.5 animate-spin"
+                          aria-hidden
+                        />
+                      ) : (
+                        <ChevronDown className="size-3.5" aria-hidden />
+                      )}
+                      {loadingMore ? 'Loading…' : 'Load more stories'}
+                    </Button>
+                  ) : (
+                    <p className="py-1 text-center text-[10.5px] text-muted-foreground">
+                      All stories loaded
+                    </p>
+                  )}
+                  <p className="mt-1.5 text-center text-[10px] tabular-nums text-muted-foreground">
+                    {items.length} loaded · {totalStories} total
+                  </p>
+                </footer>
+              )}
             </aside>
 
-            <div className="min-h-0 overscroll-contain md:overflow-y-auto">
-              <div className="mx-auto w-full max-w-[1180px] p-4 sm:p-6">
+            <section
+              aria-label="Compose"
+              className={cn(
+                'min-h-0 min-w-0 flex-col md:flex',
+                pane === 'compose' ? 'flex' : 'hidden md:flex'
+              )}
+            >
+              <header className="flex shrink-0 items-center gap-2 border-b border-border/70 px-4 py-3 sm:px-6">
+                <button
+                  type="button"
+                  onClick={() => setPane('queue')}
+                  aria-label="Back to story queue"
+                  className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 md:hidden"
+                >
+                  <ArrowLeft className="size-3.5" aria-hidden />
+                </button>
+                <div className="min-w-0">
+                  <p className="eyebrow text-brand">Compose</p>
+                  <h2 className="truncate text-sm font-semibold">
+                    {selected ? selected.title : 'Select a story to begin'}
+                  </h2>
+                </div>
+              </header>
+
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <div className="mx-auto w-full max-w-[1180px] p-4 sm:p-6">
                 {itemsLoading ? (
                   <WorkspaceSkeleton />
                 ) : !selected ? (
@@ -1157,7 +1155,7 @@ export default function Home() {
                       </div>
                     </section>
 
-                    <div className="xl:col-start-2 xl:row-span-3 xl:sticky xl:top-5">
+                    <div className="xl:col-start-2 xl:row-span-2 xl:sticky xl:top-5">
                       <FacebookPreview
                         text={stripMarkdown(draft)}
                         imageUrls={images}
@@ -1166,157 +1164,11 @@ export default function Home() {
                       />
                     </div>
 
-                    <section className="overflow-hidden rounded-xl border border-border/80 bg-card paper-shadow-sm xl:col-start-1 xl:row-start-3">
-                      <div className="flex items-center justify-between gap-3 border-b border-border/60 px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <Film className="size-4 text-brand" aria-hidden />
-                          <span className="text-sm font-semibold">Reels</span>
-                          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Facebook Reels
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                          {facebook.connected ? 'Page ready' : 'Connect Page'}
-                        </span>
-                      </div>
-
-                      <div className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_200px]">
-                        <div className="space-y-3">
-                          <div>
-                            <span className="eyebrow text-muted-foreground">
-                              Video
-                            </span>
-                            <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-dashed border-border bg-background/60 px-2 py-1.5">
-                              <button
-                                type="button"
-                                onClick={() => reelInputRef.current?.click()}
-                                className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                              >
-                                <Upload className="size-3.5" aria-hidden />
-                                <span className="truncate">
-                                  {reelFile
-                                    ? reelFile.name
-                                    : 'Choose an MP4 or MOV'}
-                                </span>
-                              </button>
-                              <input
-                                ref={reelInputRef}
-                                type="file"
-                                accept="video/mp4,video/quicktime"
-                                tabIndex={-1}
-                                className="sr-only"
-                                onChange={(event) =>
-                                  void pickReel(event.target.files?.[0] ?? null)
-                                }
-                              />
-                              {reelFile && (
-                                <button
-                                  type="button"
-                                  onClick={removeReel}
-                                  aria-label="Remove video"
-                                  className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                                >
-                                  <X className="size-3.5" aria-hidden />
-                                </button>
-                              )}
-                            </div>
-                            <p className="mt-1 text-[10px] text-muted-foreground">
-                              3–90 seconds · up to 100 MB · 9:16 portrait
-                              recommended
-                            </p>
-                          </div>
-
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <label
-                                htmlFor="reel-caption"
-                                className="eyebrow text-muted-foreground"
-                              >
-                                Caption
-                              </label>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setReelCaption(stripMarkdown(draft))
-                                }
-                                disabled={!draft}
-                                className="text-[10px] font-semibold uppercase tracking-wider text-brand transition-colors hover:text-brand/80 disabled:opacity-40"
-                              >
-                                Use draft text
-                              </button>
-                            </div>
-                            <textarea
-                              id="reel-caption"
-                              value={reelCaption}
-                              onChange={(event) =>
-                                setReelCaption(event.target.value)
-                              }
-                              rows={3}
-                              maxLength={2200}
-                              placeholder="Write a caption for the reel…"
-                              className="mt-1.5 w-full resize-y rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
-                            />
-                            <p className="mt-1 text-right text-[10px] tabular-nums text-muted-foreground">
-                              {reelCaption.length}/2200
-                            </p>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              variant="brand"
-                              size="sm"
-                              onClick={postReel}
-                              disabled={
-                                !reelFile || reelBusy || !facebook.connected
-                              }
-                              title={
-                                facebook.connected
-                                  ? 'Uploads the video and publishes it as a reel'
-                                  : 'Connect your Facebook Page first'
-                              }
-                            >
-                              <Video className="size-3.5" aria-hidden />
-                              {reelBusy ? 'Uploading…' : 'Post reel'}
-                            </Button>
-                            <span className="text-[10px] text-muted-foreground">
-                              {reelBusy
-                                ? 'Uploading and processing — this can take a minute.'
-                                : 'Publishes straight to your Page.'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="relative aspect-[9/16] overflow-hidden rounded-lg border border-dashed border-border bg-ink">
-                          {reelPreview ? (
-                            <video
-                              src={reelPreview}
-                              className="h-full w-full object-cover"
-                              muted
-                              loop
-                              playsInline
-                              controls
-                            />
-                          ) : (
-                            <div className="grid h-full place-items-center p-4 text-center">
-                              <div>
-                                <Film
-                                  className="mx-auto size-5 text-paper/60"
-                                  aria-hidden
-                                />
-                                <p className="mt-2 text-[11px] leading-relaxed text-paper/70">
-                                  9:16 preview
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </section>
-
                   </div>
                 )}
               </div>
             </div>
+          </section>
           </div>
         </div>
       </div>

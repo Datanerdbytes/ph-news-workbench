@@ -7,7 +7,7 @@ import {
   CheckCircle2,
   Circle,
   FileText,
-  Inbox,
+  Newspaper,
   RefreshCw,
   TriangleAlert,
 } from "lucide-react";
@@ -71,9 +71,13 @@ export default function DashboardPage() {
       }
 
       const draftData = (await draftsRes.json()) as Draft[];
-      const storyData = (await itemsRes.json()) as Story[];
+      const storyData = (await itemsRes.json()) as
+        | Story[]
+        | { rows?: Story[] };
       setDrafts(Array.isArray(draftData) ? draftData : []);
-      setStories(Array.isArray(storyData) ? storyData : []);
+      setStories(
+        Array.isArray(storyData) ? storyData : (storyData.rows ?? [])
+      );
     } catch (error) {
       toast.error("Could not load the dashboard", {
         description:
@@ -119,7 +123,7 @@ export default function DashboardPage() {
       hint:
         stories.length > 0
           ? `${stories.length} stories tracked`
-          : "Open the inbox and fetch your feeds.",
+          : "Open the story queue and fetch your feeds.",
     },
     {
       label: "Generate your first draft",
@@ -158,7 +162,7 @@ export default function DashboardPage() {
                 ? "Loading your workspace…"
                 : `${ready} draft${ready === 1 ? "" : "s"} ready for review, ${pending} stor${
                     pending === 1 ? "y" : "ies"
-                  } in the inbox. ${
+                  } in the story queue. ${
                     connection.loading
                       ? "Checking the Facebook Page connection."
                       : connection.connected
@@ -189,7 +193,7 @@ export default function DashboardPage() {
                 className: "h-9 rounded-[7px] px-3 text-[12px]",
               })}
             >
-              Open inbox
+              Open story queue
               <ArrowUpRight className="size-3.5" aria-hidden />
             </Link>
           </div>
@@ -204,10 +208,10 @@ export default function DashboardPage() {
             loading={loading}
           />
           <StatCard
-            label="Stories in inbox"
+            label="Stories in queue"
             value={pending}
             hint={`${stories.length} tracked in total`}
-            icon={Inbox}
+            icon={Newspaper}
             loading={loading}
           />
           <StatCard
@@ -312,8 +316,8 @@ export default function DashboardPage() {
                 />
                 <p className="mt-2 text-[12.5px] font-semibold">No drafts yet</p>
                 <p className="mx-auto mt-1 max-w-[260px] text-[11px] leading-relaxed text-muted-foreground">
-                  Open a story from the inbox and generate a post to see it
-                  here.
+                  Open a story from the story queue and generate a post to see
+                  it here.
                 </p>
                 <Link
                   href="/"
@@ -323,7 +327,7 @@ export default function DashboardPage() {
                     className: "mt-4 h-8 rounded-[7px] px-3 text-[11.5px]",
                   })}
                 >
-                  Open inbox
+                  Open story queue
                 </Link>
               </div>
             )}

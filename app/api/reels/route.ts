@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
-import { requireWorkspace, unauthorized } from '@/lib/session';
-import { decryptToken } from '@/lib/facebook-token';
+import { publishPageReel } from '@/lib/facebook';
 import { stripMarkdown } from '@/lib/format';
-import { readMp4DurationSeconds } from '@/lib/reel-meta';
+import { requirePublishingConnection } from '@/lib/publishing/connection';
 import {
-  FacebookApiError,
-  publishPageReel,
-  redactTokens,
-} from '@/lib/facebook';
+  crosspostResponse,
+  publishToSelectedPages,
+} from '@/lib/publishing/crosspost';
+import { facebookErrorResponse } from '@/lib/publishing/errors';
+import { readPageIds } from '@/lib/publishing/request';
+import { parseScheduledPublishTime } from '@/lib/publishing/schedule';
+import { readMp4DurationSeconds } from '@/lib/reel-meta';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,42 +18,11 @@ const MIN_SECONDS = 3;
 const MAX_SECONDS = 90;
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
 
-type ConnectionRow = {
-  page_id: string;
-  page_name: string;
-  access_token: string;
-  scopes: string | null;
-};
-
 export async function POST(request: Request) {
-  const access = await requireWorkspace(request);
-  if (!access) return unauthorized();
+  const result = await requirePublishingConnection(request, 'post a reel');
+  if (result.response) return result.response;
 
-  const rows = (await sql`
-    SELECT page_id, page_name, access_token, scopes
-    FROM facebook_connections
-    WHERE workspace_id = ${access.workspace.id}
-  `) as unknown as ConnectionRow[];
-
-  const connection = rows[0];
-  if (!connection) {
-    return NextResponse.json(
-      { error: 'Connect your Facebook Page before posting a reel.', code: 'not_connected' },
-      { status: 409 }
-    );
-  }
-
-  const scopes = (connection.scopes ?? '').split(',').filter(Boolean);
-  if (!scopes.includes('pages_manage_posts')) {
-    return NextResponse.json(
-      {
-        error:
-          'This connection cannot post reels. Reconnect the Page to grant pages_manage_posts.',
-        code: 'scope_missing',
-      },
-      { status: 403 }
-    );
-  }
+  const { access } = result.context;
 
   const form = await request.formData().catch(() => null);
   const video = form?.get('video');
@@ -84,6 +54,12 @@ export async function POST(request: Request) {
       ? stripMarkdown(rawCaption).trim().slice(0, 2200)
       : '';
 
+  const schedule = parseScheduledPublishTime(form?.get('scheduledFor'));
+  if (schedule.error) {
+    return NextResponse.json({ error: schedule.error }, { status: 400 });
+  }
+
+  const pageIds = readPageIds(form?.get('pageIds'));
   const videoBytes = Buffer.from(await video.arrayBuffer());
   const durationSeconds = readMp4DurationSeconds(videoBytes);
   if (durationSeconds === null) {
@@ -102,48 +78,33 @@ export async function POST(request: Request) {
   }
 
   try {
-    const accessToken = decryptToken(connection.access_token);
-    const reel = await publishPageReel({
-      pageId: connection.page_id,
-      accessToken,
-      caption,
-      video: {
-        bytes: videoBytes,
-        type: video.type || 'video/mp4',
-        filename: video.name || 'reel.mp4',
-      },
+    const { results } = await publishToSelectedPages({
+      workspaceId: access.workspace.id,
+      pageIds,
+      publish: (page) =>
+        publishPageReel({
+          pageId: page.id,
+          accessToken: page.accessToken,
+          caption,
+          video: {
+            bytes: videoBytes,
+            type: video.type || 'video/mp4',
+            filename: video.name || 'reel.mp4',
+          },
+          scheduledPublishTime: schedule.unix,
+        }),
     });
 
-    return NextResponse.json(
-      {
-        id: reel.id,
-        permalink: reel.permalink,
-        page: { id: connection.page_id, name: connection.page_name },
-      },
-      { status: 201 }
-    );
+    return crosspostResponse(results, {
+      scheduledFor: schedule.unix
+        ? new Date(schedule.unix * 1000).toISOString()
+        : null,
+    });
   } catch (error) {
-    if (error instanceof FacebookApiError) {
-      const permissionIssue =
-        error.code === 10 || error.code === 200 || error.code === 190;
-      if (permissionIssue) {
-        return NextResponse.json(
-          {
-            error: `${redactTokens(error.message)} Reconnect the Page to refresh its permissions.`,
-            code: 'permission',
-          },
-          { status: 403 }
-        );
-      }
-      return NextResponse.json(
-        { error: redactTokens(error.message), code: 'reel_failed' },
-        { status: 502 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: 'The reel could not be posted.', code: 'reel_failed' },
-      { status: 500 }
+    return facebookErrorResponse(
+      error,
+      'reel_failed',
+      'The reel could not be posted.'
     );
   }
 }

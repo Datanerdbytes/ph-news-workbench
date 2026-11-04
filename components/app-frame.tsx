@@ -6,18 +6,24 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   CalendarDays,
   ChartColumn,
+  ChevronDown,
   ChevronRight,
   ChevronsUpDown,
+  Film,
   FileText,
-  Inbox,
+  Images,
   LayoutDashboard,
+  Newspaper,
   LogOut,
   Menu,
   Plus,
+  Radio,
   Rss,
   Settings,
+  Sparkles,
   UserPlus,
   Users,
+  Video,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,9 +44,19 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Workspace",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/", label: "Inbox", icon: Inbox, exact: true },
+      { href: "/", label: "Story Queue", icon: Newspaper, exact: true },
       { href: "/status", label: "Drafts", icon: FileText },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
+    ],
+  },
+  {
+    title: "Publish",
+    items: [
+      { href: "/photos", label: "Photos", icon: Images },
+      { href: "/videos", label: "Videos", icon: Film },
+      { href: "/reels", label: "Reels", icon: Video },
+      { href: "/live", label: "Live", icon: Radio },
+      { href: "/stories", label: "Stories", icon: Sparkles },
     ],
   },
   {
@@ -60,6 +76,29 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   },
 ];
 
+const PUBLISH_LINKS = [
+  {
+    href: "/photos",
+    label: "Photos",
+    hint: "Single posts, carousels, albums",
+    icon: Images,
+  },
+  {
+    href: "/videos",
+    label: "Videos",
+    hint: "Long-form video uploads",
+    icon: Film,
+  },
+  { href: "/reels", label: "Reels", hint: "Short vertical video", icon: Video },
+  { href: "/live", label: "Live", hint: "RTMP streams & comments", icon: Radio },
+  {
+    href: "/stories",
+    label: "Stories",
+    hint: "Photo & video stories",
+    icon: Sparkles,
+  },
+];
+
 function isActivePath(pathname: string, item: NavItem) {
   if (!item.href) return false;
   if (item.exact) return pathname === item.href;
@@ -69,7 +108,7 @@ function isActivePath(pathname: string, item: NavItem) {
 }
 
 function pageLabel(pathname: string) {
-  if (pathname === "/") return "Inbox";
+  if (pathname === "/") return "Story Queue";
   if (pathname.startsWith("/dashboard")) return "Dashboard";
   if (pathname.startsWith("/status") || pathname.startsWith("/drafts"))
     return "Drafts";
@@ -78,6 +117,11 @@ function pageLabel(pathname: string) {
   if (pathname.startsWith("/team")) return "Team";
   if (pathname.startsWith("/settings")) return "Settings";
   if (pathname.startsWith("/calendar")) return "Calendar";
+  if (pathname.startsWith("/photos")) return "Photos";
+  if (pathname.startsWith("/videos")) return "Videos";
+  if (pathname.startsWith("/reels")) return "Reels";
+  if (pathname.startsWith("/live")) return "Live";
+  if (pathname.startsWith("/stories")) return "Stories";
   return "Workspace";
 }
 
@@ -397,8 +441,10 @@ export function AppFrame({
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-              <FacebookStatusChip />
-              <FacebookMobileChip />
+              <StoryQueueQuickLink />
+              <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
+              <PublishQuickNav />
+              <FacebookConnectionButton />
             </div>
           </header>
 
@@ -412,6 +458,147 @@ export function AppFrame({
           </main>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StoryQueueQuickLink() {
+  const pathname = usePathname();
+  const active = pathname === "/";
+
+  return (
+    <Link
+      href="/"
+      aria-label="Story Queue"
+      aria-current={active ? "page" : undefined}
+      title="Story Queue"
+      className={cn(
+        "flex items-center gap-1.5 rounded-[7px] px-2 py-1.5 text-[11.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        active
+          ? "bg-brand-soft text-[#8a4b0f]"
+          : "text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+      )}
+    >
+      <Newspaper
+        className={cn("size-3.5", active && "text-brand")}
+        aria-hidden
+      />
+      <span className="hidden sm:inline">Story Queue</span>
+    </Link>
+  );
+}
+
+function PublishQuickNav() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative flex items-center">
+      <nav aria-label="Publishing tools" className="hidden items-center gap-0.5 lg:flex">
+        {PUBLISH_LINKS.map(({ href, label, icon: Icon }) => {
+          const active = pathname.startsWith(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-label={label}
+              aria-current={active ? "page" : undefined}
+              title={label}
+              className={cn(
+                "flex items-center gap-1.5 rounded-[7px] px-2 py-1.5 text-[11.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                active
+                  ? "bg-brand-soft text-[#8a4b0f]"
+                  : "text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+              )}
+            >
+              <Icon
+                className={cn("size-3.5", active && "text-brand")}
+                aria-hidden
+              />
+              <span className="hidden xl:inline">{label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex items-center gap-1 rounded-[7px] border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
+      >
+        Publish
+        <ChevronDown
+          className={cn("size-3.5 transition-transform", open && "rotate-180")}
+          aria-hidden
+        />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-[calc(100%+6px)] z-50 w-60 rounded-lg border border-border bg-card p-1 shadow-lg"
+        >
+          {PUBLISH_LINKS.map(({ href, label, hint, icon: Icon }) => {
+            const active = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                role="menuitem"
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                  active
+                    ? "bg-brand-soft text-[#8a4b0f]"
+                    : "text-secondary-foreground hover:bg-surface-3 hover:text-foreground"
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "size-4 shrink-0",
+                    active ? "text-brand" : "text-muted-foreground"
+                  )}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[12px] font-semibold">
+                    {label}
+                  </span>
+                  <span className="block truncate text-[10px] text-muted-foreground">
+                    {hint}
+                  </span>
+                </span>
+                <ChevronRight className="size-3 text-faint" aria-hidden />
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -438,48 +625,7 @@ function facebookStatus(connection: ReturnType<typeof useFacebookConnection>) {
   return { label: "Not connected", dot: "bg-warning" };
 }
 
-function FacebookStatusChip() {
-  const connection = useFacebookConnection();
-  const status = facebookStatus(connection);
-
-  return (
-    <div className="hidden items-center gap-2 rounded-full border border-border bg-card py-0.5 pl-0.5 pr-0.5 sm:flex">
-      <FacebookMark className="size-6" />
-      <div className="hidden min-w-0 leading-none md:block">
-        <p className="text-[10.5px] font-semibold">Facebook</p>
-        <p className="mt-0.5 flex items-center gap-1 text-[9.5px] text-muted-foreground">
-          <span
-            className={cn("size-1.5 shrink-0 rounded-full", status.dot)}
-            aria-hidden
-          />
-          <span className="max-w-[130px] truncate">{status.label}</span>
-        </p>
-      </div>
-
-      {connection.connected ? (
-        <button
-          type="button"
-          onClick={() => void connection.disconnect()}
-          disabled={connection.refreshing}
-          className="rounded-full border border-border bg-background px-2.5 py-1 text-[10.5px] font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
-        >
-          {connection.refreshing ? "…" : "Disconnect"}
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={connection.connect}
-          disabled={connection.loading}
-          className="rounded-full bg-ink px-2.5 py-1 text-[10.5px] font-semibold text-paper transition-colors hover:bg-ink/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
-        >
-          Connect
-        </button>
-      )}
-    </div>
-  );
-}
-
-function FacebookMobileChip() {
+function FacebookConnectionButton() {
   const connection = useFacebookConnection();
   const status = facebookStatus(connection);
 
@@ -500,6 +646,10 @@ function FacebookMobileChip() {
     connection.connect();
   }
 
+  const title = connection.connected
+    ? `Facebook: ${connection.page?.name ?? "connected"}`
+    : status.label;
+
   return (
     <button
       type="button"
@@ -509,7 +659,8 @@ function FacebookMobileChip() {
           ? "Manage Facebook Page connection"
           : "Connect Facebook Page"
       }
-      className="relative grid size-8 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:hidden"
+      title={title}
+      className="relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
     >
       <FacebookMark className="size-5" />
       <span

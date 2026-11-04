@@ -101,6 +101,21 @@ export async function GET(request: NextRequest) {
             updated_at = now()
         `;
 
+        await sql`
+          DELETE FROM facebook_pages
+          WHERE workspace_id = ${workspace.id}
+        `;
+
+        for (const managed of pages) {
+          await sql`
+            INSERT INTO facebook_pages
+              (workspace_id, page_id, page_name, access_token, is_primary, updated_at)
+            VALUES
+              (${workspace.id}, ${managed.id}, ${managed.name},
+               ${encryptToken(managed.accessToken)}, ${managed.id === page.id}, now())
+          `;
+        }
+
         outcome = 'connected';
       }
     }

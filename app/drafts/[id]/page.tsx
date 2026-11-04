@@ -234,7 +234,7 @@ export default function DraftPage({
                     href="/"
                     className="text-[11px] font-medium text-brand hover:underline"
                   >
-                    Back to the inbox
+                    Back to the story queue
                   </Link>
                 </div>
               </section>

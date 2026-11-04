@@ -117,7 +117,9 @@ export default function LoginPage() {
             <li className="flex gap-3">
               <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-brand" />
               <span>
-                <strong className="font-medium text-paper">Feed-first inbox.</strong>{" "}
+                <strong className="font-medium text-paper">
+                  Feed-first story queue.
+                </strong>{" "}
                 Inquirer, Rappler, and Philstar in one queue.
               </span>
             </li>

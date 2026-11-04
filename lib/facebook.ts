@@ -41,7 +41,7 @@ type PermissionNode = {
   status: string;
 };
 
-type GraphErrorBody = {
+export type GraphErrorBody = {
   error?: { message?: string; code?: number; type?: string };
 };
 
@@ -91,7 +91,7 @@ export function buildAuthorizationUrl(state: string): string {
   return url.toString();
 }
 
-async function graphRequest<T>(
+export async function graphRequest<T>(
   path: string,
   params: Record<string, string>,
   accessToken?: string
@@ -282,27 +282,35 @@ export async function fetchPageActivity(
   return { engagements7d, mediaViews7d };
 }
 
-function toArrayBuffer(bytes: Buffer): ArrayBuffer {
+export function toArrayBuffer(bytes: Buffer): ArrayBuffer {
   return bytes.buffer.slice(
     bytes.byteOffset,
     bytes.byteOffset + bytes.byteLength
   ) as ArrayBuffer;
 }
 
-async function graphPost<T>(
+export type GraphUploadFile = {
+  field: string;
+  bytes: Buffer;
+  type: string;
+  filename: string;
+};
+
+export async function graphPostForm<T>(
   path: string,
   fields: Record<string, string>,
   accessToken: string,
-  file?: { bytes: Buffer; type: string; filename: string }
+  files: GraphUploadFile[] = [],
+  timeoutMs = TIMEOUT_MS
 ): Promise<T> {
   const form = new FormData();
   for (const [key, value] of Object.entries(fields)) {
     form.append(key, value);
   }
   form.append('access_token', accessToken);
-  if (file) {
+  for (const file of files) {
     form.append(
-      'source',
+      file.field,
       new Blob([toArrayBuffer(file.bytes)], { type: file.type }),
       file.filename
     );
@@ -316,7 +324,7 @@ async function graphPost<T>(
         method: 'POST',
         body: form,
         cache: 'no-store',
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       }
     );
   } catch {
@@ -339,6 +347,20 @@ async function graphPost<T>(
   }
 
   return body;
+}
+
+async function graphPost<T>(
+  path: string,
+  fields: Record<string, string>,
+  accessToken: string,
+  file?: { bytes: Buffer; type: string; filename: string }
+): Promise<T> {
+  return graphPostForm(
+    path,
+    fields,
+    accessToken,
+    file ? [{ field: 'source', ...file }] : []
+  );
 }
 
 export type PublishImage =
@@ -506,11 +528,13 @@ export async function publishPageReel({
   accessToken,
   caption,
   video,
+  scheduledPublishTime = null,
 }: {
   pageId: string;
   accessToken: string;
   caption: string;
   video: ReelVideo;
+  scheduledPublishTime?: number | null;
 }): Promise<PublishedPost> {
   const session = await graphPost<{ video_id?: string; upload_url?: string }>(
     `${pageId}/video_reels`,
@@ -556,7 +580,10 @@ export async function publishPageReel({
     {
       upload_phase: 'finish',
       video_id: session.video_id,
-      video_state: 'PUBLISHED',
+      video_state: scheduledPublishTime ? 'SCHEDULED' : 'PUBLISHED',
+      ...(scheduledPublishTime
+        ? { scheduled_publish_time: String(scheduledPublishTime) }
+        : {}),
       ...(caption ? { description: caption } : {}),
     },
     accessToken

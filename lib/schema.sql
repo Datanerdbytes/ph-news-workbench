@@ -105,3 +105,36 @@ CREATE TABLE IF NOT EXISTS facebook_connections (
   connected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS facebook_pages (
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  page_id TEXT NOT NULL,
+  page_name TEXT NOT NULL,
+  access_token TEXT NOT NULL,
+  is_primary BOOLEAN NOT NULL DEFAULT false,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (workspace_id, page_id)
+);
+
+CREATE INDEX IF NOT EXISTS facebook_pages_workspace_idx
+  ON facebook_pages (workspace_id, is_primary DESC);
+
+CREATE TABLE IF NOT EXISTS live_streams (
+  id SERIAL PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  facebook_video_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'created',
+  stream_key TEXT,
+  secure_stream_url TEXT,
+  permalink_url TEXT,
+  planned_start_time TIMESTAMPTZ,
+  created_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (workspace_id, facebook_video_id)
+);
+
+CREATE INDEX IF NOT EXISTS live_streams_workspace_idx
+  ON live_streams (workspace_id, created_at DESC);
