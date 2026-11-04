@@ -3,6 +3,7 @@ import { sql } from '@/lib/db';
 import { requireWorkspace, unauthorized } from '@/lib/session';
 import { decryptToken } from '@/lib/facebook-token';
 import { stripMarkdown } from '@/lib/format';
+import { readMp4DurationSeconds } from '@/lib/reel-meta';
 import {
   FacebookApiError,
   publishPageReel,
@@ -12,6 +13,8 @@ import {
 export const dynamic = 'force-dynamic';
 
 const MAX_BYTES = 100 * 1024 * 1024;
+const MIN_SECONDS = 3;
+const MAX_SECONDS = 90;
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
 
 type ConnectionRow = {
@@ -81,6 +84,23 @@ export async function POST(request: Request) {
       ? stripMarkdown(rawCaption).trim().slice(0, 2200)
       : '';
 
+  const videoBytes = Buffer.from(await video.arrayBuffer());
+  const durationSeconds = readMp4DurationSeconds(videoBytes);
+  if (durationSeconds === null) {
+    return NextResponse.json(
+      { error: 'Could not read the video length. Upload an MP4 or MOV file.' },
+      { status: 400 }
+    );
+  }
+  if (durationSeconds < MIN_SECONDS || durationSeconds > MAX_SECONDS) {
+    return NextResponse.json(
+      {
+        error: `Reels must be ${MIN_SECONDS} to ${MAX_SECONDS} seconds. This clip is ${Math.round(durationSeconds)} seconds.`,
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const accessToken = decryptToken(connection.access_token);
     const reel = await publishPageReel({
@@ -88,7 +108,7 @@ export async function POST(request: Request) {
       accessToken,
       caption,
       video: {
-        bytes: Buffer.from(await video.arrayBuffer()),
+        bytes: videoBytes,
         type: video.type || 'video/mp4',
         filename: video.name || 'reel.mp4',
       },
