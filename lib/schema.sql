@@ -138,3 +138,43 @@ CREATE TABLE IF NOT EXISTS live_streams (
 
 CREATE INDEX IF NOT EXISTS live_streams_workspace_idx
   ON live_streams (workspace_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS llm_settings (
+  workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  base_url TEXT,
+  api_key_encrypted TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS hyperframes_compositions (
+  id SERIAL PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  brief TEXT NOT NULL,
+  html TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  created_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS hyperframes_compositions_workspace_idx
+  ON hyperframes_compositions (workspace_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS hyperframes_renders (
+  id SERIAL PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  composition_id INTEGER NOT NULL REFERENCES hyperframes_compositions(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'queued',
+  quality TEXT NOT NULL DEFAULT 'draft',
+  mp4_path TEXT,
+  log_tail TEXT,
+  error TEXT,
+  created_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS hyperframes_renders_workspace_idx
+  ON hyperframes_renders (workspace_id, created_at DESC);

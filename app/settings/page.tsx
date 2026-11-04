@@ -19,12 +19,40 @@ type WorkspaceInfo = {
   defaultModel: string;
 };
 
+type ComposerProviderOption = {
+  id: string;
+  label: string;
+  detail: string;
+  baseUrl: string | null;
+  envKeyVar: string | null;
+  freeTextModel: boolean;
+  models: { id: string; label: string; detail: string }[];
+};
+
+type ComposerSettingsResponse = {
+  configured: boolean;
+  provider?: string;
+  model?: string;
+  baseUrl?: string | null;
+  keySet?: boolean;
+  providers: ComposerProviderOption[];
+  error?: string;
+};
+
 export default function SettingsPage() {
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [name, setName] = useState("");
   const [model, setModel] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingModel, setSavingModel] = useState(false);
+  const [composerProviders, setComposerProviders] = useState<ComposerProviderOption[]>([]);
+  const [composerProviderId, setComposerProviderId] = useState('huggingface');
+  const [composerModel, setComposerModel] = useState('');
+  const [composerBaseUrl, setComposerBaseUrl] = useState('');
+  const [composerKey, setComposerKey] = useState('');
+  const [composerKeySet, setComposerKeySet] = useState(false);
+  const [loadingComposer, setLoadingComposer] = useState(true);
+  const [savingComposer, setSavingComposer] = useState(false);
   const { data: session } = authClient.useSession();
   const connection = useFacebookConnection();
 
@@ -39,6 +67,48 @@ export default function SettingsPage() {
         setModel(data.aiModel ?? data.defaultModel ?? "");
       })
       .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/settings/llm', {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then(async (res) => {
+        const data = (await res.json()) as ComposerSettingsResponse;
+        if (!res.ok) {
+          throw new Error(data.error ?? 'Could not load composer LLM settings.');
+        }
+        return data;
+      })
+      .then((data) => {
+        const providers = Array.isArray(data.providers) ? data.providers : [];
+        setComposerProviders(providers);
+        const initialProvider =
+          providers.find((option) => option.id === data.provider) ??
+          providers.find((option) => option.id === 'huggingface') ??
+          providers[0];
+        if (initialProvider) {
+          setComposerProviderId(initialProvider.id);
+          setComposerModel(
+            data.model ??
+              initialProvider.models[0]?.id ??
+              ''
+          );
+        }
+        setComposerBaseUrl(data.baseUrl ?? '');
+        setComposerKeySet(data.keySet ?? false);
+      })
+      .catch((error) => {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        toast.error('Could not load composer settings', {
+          description:
+            error instanceof Error ? error.message : 'Please try again.',
+        });
+      })
+      .finally(() => setLoadingComposer(false));
     return () => controller.abort();
   }, []);
 
@@ -100,7 +170,57 @@ export default function SettingsPage() {
     }
   }
 
+  function changeComposerProvider(next: string) {
+    const provider = composerProviders.find((option) => option.id === next);
+    setComposerProviderId(next);
+    setComposerModel(provider?.models[0]?.id ?? '');
+    setComposerKey('');
+    setComposerKeySet(false);
+  }
+
+  async function saveComposerSettings(event: React.FormEvent) {
+    event.preventDefault();
+    if (!workspace || !isOwner) return;
+    setSavingComposer(true);
+    try {
+      const res = await fetch('/api/settings/llm', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: composerProviderId,
+          model: composerModel,
+          baseUrl: composerProviderId === 'custom' ? composerBaseUrl : undefined,
+          apiKey: composerKey,
+        }),
+      });
+      const data = (await res.json()) as {
+        provider?: string;
+        model?: string;
+        baseUrl?: string | null;
+        keySet?: boolean;
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? 'Could not save composer settings.');
+      setComposerProviderId(data.provider ?? composerProviderId);
+      setComposerModel(data.model ?? composerModel);
+      setComposerBaseUrl(data.baseUrl ?? '');
+      setComposerKeySet(data.keySet ?? false);
+      setComposerKey('');
+      toast.success('Video composer settings saved');
+    } catch (error) {
+      toast.error('Could not save composer settings', {
+        description:
+          error instanceof Error ? error.message : 'Please try again.',
+      });
+    } finally {
+      setSavingComposer(false);
+    }
+  }
+
   const isOwner = workspace?.role === "owner";
+  const selectedComposerProvider = composerProviders.find(
+    (option) => option.id === composerProviderId
+  );
 
   return (
     <AppFrame>
@@ -210,6 +330,147 @@ export default function SettingsPage() {
             {TEXT_MODELS.find((option) => option.id === model)?.detail ??
               "Served through the NVIDIA integrate API."}
           </p>
+        </section>
+
+        <section className="mt-3 rounded-xl border border-border bg-card p-4">
+          <h2 className="text-[13px] font-semibold">Video composer LLM</h2>
+          <p className="text-[10.5px] text-muted-foreground">
+            {isOwner
+              ? 'A dedicated model generates HTML compositions for Reels; it does not change your post-drafting model.'
+              : 'Only workspace owners can change the video composer provider.'}
+          </p>
+          <form onSubmit={saveComposerSettings} className="mt-3 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="composer-provider"
+                  className="eyebrow text-muted-foreground"
+                >
+                  Provider
+                </label>
+                <select
+                  id="composer-provider"
+                  value={composerProviderId}
+                  onChange={(event) => changeComposerProvider(event.target.value)}
+                  disabled={!isOwner || loadingComposer || savingComposer}
+                  className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+                >
+                  {composerProviders.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="composer-model"
+                  className="eyebrow text-muted-foreground"
+                >
+                  Model
+                </label>
+                {selectedComposerProvider?.freeTextModel ? (
+                  <input
+                    id="composer-model"
+                    value={composerModel}
+                    onChange={(event) => setComposerModel(event.target.value)}
+                    disabled={!isOwner || loadingComposer || savingComposer}
+                    placeholder="Model ID"
+                    className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+                  />
+                ) : (
+                  <select
+                    id="composer-model"
+                    value={composerModel}
+                    onChange={(event) => setComposerModel(event.target.value)}
+                    disabled={
+                      !isOwner ||
+                      loadingComposer ||
+                      savingComposer ||
+                      !selectedComposerProvider?.models.length
+                    }
+                    className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+                  >
+                    {selectedComposerProvider?.models.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+            {selectedComposerProvider?.freeTextModel && (
+              <div>
+                <label
+                  htmlFor="composer-base-url"
+                  className="eyebrow text-muted-foreground"
+                >
+                  Base URL
+                </label>
+                <input
+                  id="composer-base-url"
+                  type="url"
+                  value={composerBaseUrl}
+                  onChange={(event) => setComposerBaseUrl(event.target.value)}
+                  disabled={!isOwner || loadingComposer || savingComposer}
+                  placeholder="https://your-provider.example/v1"
+                  className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+                />
+              </div>
+            )}
+            <div>
+              <label
+                htmlFor="composer-api-key"
+                className="eyebrow text-muted-foreground"
+              >
+                API key
+              </label>
+              <input
+                id="composer-api-key"
+                type="password"
+                autoComplete="new-password"
+                value={composerKey}
+                onChange={(event) => setComposerKey(event.target.value)}
+                disabled={!isOwner || loadingComposer || savingComposer}
+                placeholder={composerKeySet ? 'Saved — leave blank to keep it' : 'Enter a provider key'}
+                className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+              />
+              <p className="mt-1 text-[10.5px] text-muted-foreground">
+                {composerKeySet
+                  ? 'A key is saved securely. It is never returned to the browser.'
+                  : selectedComposerProvider?.envKeyVar
+                    ? `No workspace key is saved. The server may use ${selectedComposerProvider.envKeyVar} as a fallback.`
+                    : 'No workspace key is saved yet.'}
+              </p>
+            </div>
+            {selectedComposerProvider?.detail && (
+              <p className="text-[10.5px] text-muted-foreground">
+                {selectedComposerProvider.detail}
+              </p>
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                type="submit"
+                size="sm"
+                variant="brand"
+                disabled={
+                  !isOwner ||
+                  loadingComposer ||
+                  savingComposer ||
+                  !composerProviderId ||
+                  !composerModel
+                }
+              >
+                {savingComposer ? 'Saving…' : 'Save composer settings'}
+              </Button>
+              {loadingComposer && (
+                <span className="text-[10.5px] text-muted-foreground">
+                  Loading settings…
+                </span>
+              )}
+            </div>
+          </form>
         </section>
 
         <section className="mt-3 rounded-xl border border-border bg-card p-4">

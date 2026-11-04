@@ -213,3 +213,12 @@
     text-wrap: pretty;
   }
 }
+
+@keyframes download-sweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}

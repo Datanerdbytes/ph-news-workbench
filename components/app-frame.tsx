@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronsUpDown,
+  Download,
   Film,
   FileText,
   Images,
@@ -56,6 +57,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/post", label: "Post", icon: PenLine },
       { href: "/photos", label: "Photos", icon: Images },
       { href: "/videos", label: "Videos", icon: Film },
+      { href: "/downloads", label: "Downloads", icon: Download },
       { href: "/reels", label: "Reels", icon: Video },
       { href: "/live", label: "Live", icon: Radio },
       { href: "/stories", label: "Stories", icon: Sparkles },
@@ -128,6 +130,7 @@ function pageLabel(pathname: string) {
   if (pathname.startsWith("/post")) return "Post";
   if (pathname.startsWith("/photos")) return "Photos";
   if (pathname.startsWith("/videos")) return "Videos";
+  if (pathname.startsWith("/downloads")) return "Downloads";
   if (pathname.startsWith("/reels")) return "Reels";
   if (pathname.startsWith("/live")) return "Live";
   if (pathname.startsWith("/stories")) return "Stories";
