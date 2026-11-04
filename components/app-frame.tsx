@@ -16,6 +16,7 @@ import {
   Newspaper,
   LogOut,
   Menu,
+  PenLine,
   Plus,
   Radio,
   Rss,
@@ -52,6 +53,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Publish",
     items: [
+      { href: "/post", label: "Post", icon: PenLine },
       { href: "/photos", label: "Photos", icon: Images },
       { href: "/videos", label: "Videos", icon: Film },
       { href: "/reels", label: "Reels", icon: Video },
@@ -77,6 +79,12 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
 ];
 
 const PUBLISH_LINKS = [
+  {
+    href: "/post",
+    label: "Post",
+    hint: "Standard text posts",
+    icon: PenLine,
+  },
   {
     href: "/photos",
     label: "Photos",
@@ -117,6 +125,7 @@ function pageLabel(pathname: string) {
   if (pathname.startsWith("/team")) return "Team";
   if (pathname.startsWith("/settings")) return "Settings";
   if (pathname.startsWith("/calendar")) return "Calendar";
+  if (pathname.startsWith("/post")) return "Post";
   if (pathname.startsWith("/photos")) return "Photos";
   if (pathname.startsWith("/videos")) return "Videos";
   if (pathname.startsWith("/reels")) return "Reels";
