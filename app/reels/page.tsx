@@ -34,6 +34,9 @@ type RenderStatus = 'queued' | 'rendering' | 'done' | 'failed';
 export default function ReelsPage() {
   const pages = useManagedPages();
   const [file, setFile] = useState<File | null>(null);
+  const [fileSource, setFileSource] = useState<'picked' | 'rendered' | null>(
+    null
+  );
   const [normalizing, setNormalizing] = useState(false);
   const [caption, setCaption] = useState('');
   const [scheduleOn, setScheduleOn] = useState(false);
@@ -69,6 +72,7 @@ export default function ReelsPage() {
    */
   async function handlePick(picked: File | null) {
     setFile(picked);
+    setFileSource(picked ? 'picked' : null);
     if (!picked) return;
     setNormalizing(true);
     try {
@@ -155,7 +159,10 @@ export default function ReelsPage() {
       form.append('brief', brief);
       form.append('durationSeconds', String(durationSeconds));
       if (compositionId) form.append('compositionId', String(compositionId));
-      if (footage) form.append('footage', footage);
+      // One attachment serves both tabs: a video picked on the Upload tab is
+      // the compose footage unless the compose picker has its own.
+      const footageFile = footage ?? (fileSource === 'picked' ? file : null);
+      if (footageFile) form.append('footage', footageFile);
       const res = await fetch('/api/hyperframes/compose', {
         method: 'POST',
         body: form,
@@ -242,6 +249,7 @@ export default function ReelsPage() {
           const blob = await fileRes.blob();
           if (!active) return;
           setFile(new File([blob], 'reel.mp4', { type: 'video/mp4' }));
+          setFileSource('rendered');
           toast.success('Rendered MP4 ready', {
             description: 'Review the final reel, then continue to publish.',
           });
@@ -419,7 +427,13 @@ export default function ReelsPage() {
             <FilePicker
               id="reel-footage"
               accept="video/mp4,video/quicktime"
-              label="Attach footage — the reel matches its length"
+              label={
+                footage
+                  ? footage.name
+                  : fileSource === 'picked' && file
+                    ? `Using "${file.name}" from the Upload tab`
+                    : 'Attach footage — or pick one on the Upload tab'
+              }
               hint="MP4/MOV · 100 MB max · kept across reloads"
               file={footage}
               onPick={setFootage}
