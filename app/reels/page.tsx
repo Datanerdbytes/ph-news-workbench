@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FinalReelPreview, type ReelRenderState } from '@/components/publishing/final-reel-preview';
+import { clearFootage, loadFootage, saveFootage } from '@/lib/hyperframes/footage-store';
 import { Button } from '@/components/ui/button';
 import {
   ComposerCard,
@@ -33,6 +34,7 @@ type RenderStatus = 'queued' | 'rendering' | 'done' | 'failed';
 export default function ReelsPage() {
   const pages = useManagedPages();
   const [file, setFile] = useState<File | null>(null);
+  const [normalizing, setNormalizing] = useState(false);
   const [caption, setCaption] = useState('');
   const [scheduleOn, setScheduleOn] = useState(false);
   const [scheduledFor, setScheduledFor] = useState(defaultScheduleValue);
@@ -42,7 +44,61 @@ export default function ReelsPage() {
   const [activeTab, setActiveTab] = useState<'upload' | 'compose'>('upload');
   const [brief, setBrief] = useState('');
   const [durationSeconds, setDurationSeconds] = useState(30);
-  const [footage, setFootage] = useState<File | null>(null);
+  const [footage, setFootageState] = useState<File | null>(null);
+
+  // Restore the attached footage across page reloads.
+  useEffect(() => {
+    loadFootage()
+      .then((stored) => {
+        if (stored) setFootageState(stored);
+      })
+      .catch(() => {});
+  }, []);
+
+  const setFootage = (file: File | null) => {
+    setFootageState(file);
+    if (file) void saveFootage(file);
+    else void clearFootage();
+  };
+
+  /**
+   * Picked videos are normalized to H.264 1080×1920 before anything else:
+   * Safari cannot preview AV1/HEVC downloads, and Facebook prefers standard
+   * encodings. Falls back to the original file when normalization is
+   * unavailable (non-local runtime).
+   */
+  async function handlePick(picked: File | null) {
+    setFile(picked);
+    if (!picked) return;
+    setNormalizing(true);
+    try {
+      const form = new FormData();
+      form.append('video', picked);
+      const res = await fetch('/api/reels/prepare', {
+        method: 'POST',
+        body: form,
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(data?.error ?? 'The video could not be normalized.');
+      }
+      const blob = await res.blob();
+      const base = picked.name.replace(/\.[^.]+$/, '');
+      setFile(new File([blob], `${base}.mp4`, { type: 'video/mp4' }));
+      toast.success('Video normalized', {
+        description: 'Converted to H.264 1080×1920 — previews everywhere and uploads cleanly.',
+      });
+    } catch (error) {
+      toast.warning('Using the original video', {
+        description:
+          error instanceof Error ? error.message : 'Normalization failed.',
+      });
+    } finally {
+      setNormalizing(false);
+    }
+  }
   const [compositionId, setCompositionId] = useState<number | null>(null);
   const [compositionHtml, setCompositionHtml] = useState('');
   const [compositionError, setCompositionError] = useState<string | null>(null);
@@ -284,10 +340,15 @@ export default function ReelsPage() {
               label="Choose an MP4 or MOV"
               hint="3–90s"
               file={file}
-              onPick={setFile}
+              onPick={handlePick}
               onClear={() => setFile(null)}
               icon={<Video className="size-3.5" />}
             />
+            {normalizing && (
+              <p className="text-[10.5px] text-muted-foreground">
+                Normalizing the video to H.264 1080×1920… (a few seconds)
+              </p>
+            )}
 
             <div>
               <FieldLabel htmlFor="reel-caption" hint={`${caption.length}/2200`}>
@@ -359,7 +420,7 @@ export default function ReelsPage() {
               id="reel-footage"
               accept="video/mp4,video/quicktime"
               label="Attach footage — the reel matches its length"
-              hint="MP4/MOV · 100 MB max"
+              hint="MP4/MOV · 100 MB max · kept across reloads"
               file={footage}
               onPick={setFootage}
               onClear={() => setFootage(null)}

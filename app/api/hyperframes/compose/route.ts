@@ -346,11 +346,24 @@ export async function POST(request: Request) {
   }
 
   const requestedDuration = Number(form.get('durationSeconds'));
-
-  // Footage upload: probe, then transcode to a normalized 1080×1920 H.264
-  // asset. The reel matches the footage length, overriding the target.
   const footage = form.get('footage');
+
+  // A brief that asks for footage but arrives without one makes the model
+  // invent a CSS illustration instead of the real video — reject early.
+  const mentionsFootage = /\bfootage\b|\buploaded\s+(video|clip)\b|\bmy\s+(video|clip)\b/i.test(
+    brief
+  );
   const hasFootage = footage instanceof File && footage.size > 0;
+  if (mentionsFootage && !hasFootage) {
+    return NextResponse.json(
+      {
+        error:
+          'Your brief asks for video footage, but none is attached. Choose your video with the "Attach footage" picker above the brief (re-attach after every page reload), then generate again.',
+      },
+      { status: 400 }
+    );
+  }
+
   let footageTempPath: string | null = null;
   let durationSeconds: number;
   let cleanupFootage: () => void = () => {};

@@ -69,12 +69,14 @@ export function FinalReelPreview({
 
             <div className="mt-3">
               {videoUrl ? (
-                <video
-                  src={videoUrl}
-                  controls
-                  playsInline
-                  className="max-h-[420px] w-full rounded-sm bg-black object-contain"
-                />
+                <div className="mx-auto aspect-[9/16] max-h-[420px] overflow-hidden rounded-sm bg-black">
+                  <video
+                    src={videoUrl}
+                    controls
+                    playsInline
+                    className="h-full w-full object-contain"
+                  />
+                </div>
               ) : renderState === 'queued' || renderState === 'rendering' ? (
                 <div className="flex aspect-[9/16] max-h-[420px] w-full flex-col items-center justify-center gap-2 rounded-sm bg-neutral-100 text-neutral-400">
                   <RefreshCw className="size-4 animate-spin" aria-hidden />
