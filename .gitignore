@@ -14,7 +14,6 @@
 /out/
 
 # local HyperFrames projects and renders
-/.hyperframes-workbench/
 
 # production
 /build

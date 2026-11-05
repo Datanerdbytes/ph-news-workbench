@@ -5,29 +5,19 @@ import {
   MessageCircle,
   MoreHorizontal,
   Play,
-  RefreshCw,
   Share2,
   ThumbsUp,
 } from 'lucide-react';
 import { FacebookMark } from '@/components/facebook-mark';
-import { Button } from '@/components/ui/button';
-
-export type ReelRenderState = 'idle' | 'queued' | 'rendering' | 'done' | 'failed';
 
 export function FinalReelPreview({
   videoUrl,
-  renderState,
-  renderError,
   caption,
   pageName = 'Philippine News',
-  onContinue,
 }: {
   videoUrl: string | null;
-  renderState: ReelRenderState;
-  renderError?: string | null;
   caption: string;
   pageName?: string;
-  onContinue?: () => void;
 }) {
   const ready = Boolean(videoUrl);
 
@@ -77,26 +67,11 @@ export function FinalReelPreview({
                     className="h-full w-full object-contain"
                   />
                 </div>
-              ) : renderState === 'queued' || renderState === 'rendering' ? (
-                <div className="flex aspect-[9/16] max-h-[420px] w-full flex-col items-center justify-center gap-2 rounded-sm bg-neutral-100 text-neutral-400">
-                  <RefreshCw className="size-4 animate-spin" aria-hidden />
-                  <p className="text-[11px] font-semibold">
-                    {renderState === 'queued' ? 'Render queued…' : 'Rendering MP4…'}
-                  </p>
-                </div>
-              ) : renderState === 'failed' ? (
-                <div className="flex aspect-[9/16] max-h-[420px] w-full flex-col items-center justify-center gap-2 rounded-sm bg-neutral-100 px-4 text-center">
-                  <p className="text-[11px] font-semibold text-destructive">Render failed</p>
-                  <p className="break-words text-[10.5px] text-neutral-500">
-                    {renderError ?? 'Check the render log on the compose tab.'}
-                  </p>
-                </div>
               ) : (
                 <div className="flex aspect-[9/16] max-h-[420px] w-full flex-col items-center justify-center gap-1.5 rounded-sm bg-neutral-100 px-4 text-center text-neutral-400">
                   <Play className="size-5" aria-hidden />
                   <p className="text-[10.5px] font-medium leading-relaxed">
-                    The final reel appears here once you attach or render a
-                    video.
+                    The final reel appears here once you attach a video.
                   </p>
                 </div>
               )}
@@ -126,18 +101,6 @@ export function FinalReelPreview({
             </div>
           </div>
         </div>
-
-        {onContinue && ready && (
-          <Button
-            type="button"
-            variant="brand"
-            size="sm"
-            className="mt-3 w-full"
-            onClick={onContinue}
-          >
-            Continue to publish
-          </Button>
-        )}
       </div>
     </section>
   );

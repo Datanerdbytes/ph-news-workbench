@@ -54,7 +54,7 @@ export async function probeVideoDurationSeconds(
 }
 
 /**
- * Normalize uploaded footage to what the renderer and preview expect:
+ * Normalize uploaded reel videos to what Facebook and every browser expect:
  * H.264/AAC, exactly 1080×1920 (cover-cropped), faststart MP4.
  */
 export async function transcodeToReelFootage(
@@ -94,4 +94,17 @@ export async function transcodeToReelFootage(
       `Could not process the footage: ${output.slice(-300) || 'ffmpeg failed'}`
     );
   }
+}
+
+/**
+ * FFmpeg transcoding spawns local processes — only ever legal where the app
+ * runs on the user's own machine, never on Vercel. Dev runs qualify;
+ * production requires an explicit opt-in.
+ */
+export function localRuntimeEnabled(): boolean {
+  return (
+    process.env.NODE_ENV === 'development' ||
+    process.env.ENABLE_LOCAL_VIDEO_PROCESSING === '1' ||
+    process.env.HYPERFRAMES_ENABLE_RENDER === '1'
+  );
 }

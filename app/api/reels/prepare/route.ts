@@ -3,10 +3,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { NextResponse } from 'next/server';
 import {
+  localRuntimeEnabled,
   probeVideoDurationSeconds,
   transcodeToReelFootage,
-} from '@/lib/hyperframes/media';
-import { localRuntimeEnabled } from '@/lib/hyperframes/project';
+} from '@/lib/reels/media';
 import { requireWorkspace, unauthorized } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
