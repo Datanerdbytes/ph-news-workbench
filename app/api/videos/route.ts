@@ -9,6 +9,7 @@ import { facebookErrorResponse } from '@/lib/publishing/errors';
 import { readPageIds, readText } from '@/lib/publishing/request';
 import { parseScheduledPublishTime } from '@/lib/publishing/schedule';
 import { MAX_VIDEO_BYTES, publishPageVideo } from '@/lib/publishing/videos';
+import { recordNativeSchedule } from '@/lib/schedule-mirror';
 import { readMp4DurationSeconds } from '@/lib/reel-meta';
 
 export const dynamic = 'force-dynamic';
@@ -136,6 +137,15 @@ export async function POST(request: Request) {
           feedTargeting,
           scheduledPublishTime: schedule.unix,
         }),
+    });
+
+    await recordNativeSchedule({
+      workspaceId: access.workspace.id,
+      userId: access.user.id,
+      kind: 'video',
+      text: title,
+      scheduledFor: schedule.unix ? new Date(schedule.unix * 1000) : null,
+      results,
     });
 
     return crosspostResponse(results, {

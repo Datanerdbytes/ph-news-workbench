@@ -1,0 +1,44 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/hyperframes.json",
+  "registry": "https://raw.githubusercontent.com/heygen-com/hyperframes/main/registry",
+  "paths": {
+    "blocks": "compositions",
+    "components": "compositions/components",
+    "assets": "assets"
+  },
+  "media": {
+    "autoProxy": true
+  },
+  "registryItems": [
+    {
+      "name": "yt-camera-move",
+      "type": "hyperframes:component",
+      "target": "compositions/components/yt-camera-move.html"
+    },
+    {
+      "name": "text-stagger",
+      "type": "hyperframes:component",
+      "target": "compositions/components/text-stagger.html"
+    },
+    {
+      "name": "badge-pop",
+      "type": "hyperframes:component",
+      "target": "compositions/components/badge-pop.html"
+    },
+    {
+      "name": "terminal-simulator",
+      "type": "hyperframes:component",
+      "target": "compositions/components/terminal-simulator.html"
+    },
+    {
+      "name": "grain-overlay",
+      "type": "hyperframes:component",
+      "target": "compositions/components/grain-overlay.html"
+    },
+    {
+      "name": "cinematic-zoom",
+      "type": "hyperframes:block",
+      "target": "compositions/cinematic-zoom.html"
+    }
+  ]
+}

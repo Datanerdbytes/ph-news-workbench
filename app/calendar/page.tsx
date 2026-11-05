@@ -14,8 +14,18 @@ type ScheduledPost = {
   text: string;
   scheduled_for: string;
   status: string;
+  kind: string;
+  source: string;
   news_title: string | null;
   error_message: string | null;
+};
+
+const KIND_LABELS: Record<string, string> = {
+  post: "Post",
+  photo: "Photo",
+  video: "Video",
+  reel: "Reel",
+  live: "Live",
 };
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -102,6 +112,9 @@ export default function CalendarPage() {
   const overdue = posts.filter(
     (post) =>
       post.status === "scheduled" &&
+      // Facebook publishes its own schedules, so "publish now" only applies
+      // to the posts this workspace executes itself.
+      post.source !== "facebook" &&
       new Date(post.scheduled_for).getTime() <= Date.now()
   );
 
@@ -157,7 +170,12 @@ export default function CalendarPage() {
   async function cancelPost(id: number) {
     const res = await fetch(`/api/schedule/${id}`, { method: "DELETE" });
     if (!res.ok) {
-      toast.error("Could not cancel the post");
+      const data = await res.json().catch(() => null);
+      toast.error("Could not cancel the post", {
+        description:
+          data?.error ??
+          "The post could not be cancelled. Please try again.",
+      });
       return;
     }
     setPosts((current) => current.filter((post) => post.id !== id));
@@ -174,8 +192,9 @@ export default function CalendarPage() {
             </p>
             <h1 className="page-title mt-1.5">Calendar</h1>
             <p className="mt-1.5 max-w-2xl text-[12.5px] leading-relaxed text-muted-foreground">
-              Scheduled posts publish automatically from the workspace&rsquo;s
-              connected Facebook Page.
+              Everything scheduled in this workspace — drafts queued by the
+              Story Queue and posts, photos, videos, reels and live streams
+              scheduled on Facebook.
             </p>
           </div>
 
@@ -295,6 +314,10 @@ export default function CalendarPage() {
                           )}
                         >
                           {timeLabel(post.scheduled_for)} ·{" "}
+                          <span className="font-semibold uppercase tracking-wide">
+                            {KIND_LABELS[post.kind] ?? post.kind}
+                          </span>
+                          {" · "}
                           {post.news_title ?? post.text}
                         </div>
                       ))}
@@ -344,6 +367,14 @@ export default function CalendarPage() {
                               <Clock className="size-3" aria-hidden />
                               {late ? "Overdue · " : ""}
                               {formatDateTime(post.scheduled_for)}
+                            </p>
+                            <p className="mt-1 flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.12em] text-brand">
+                              {KIND_LABELS[post.kind] ?? post.kind}
+                              <span className="font-medium normal-case tracking-normal text-muted-foreground">
+                                {post.source === "facebook"
+                                  ? "· published by Facebook"
+                                  : "· published by this workspace"}
+                              </span>
                             </p>
                             <p className="mt-1 line-clamp-2 text-[12px] leading-snug">
                               {post.news_title ?? post.text}

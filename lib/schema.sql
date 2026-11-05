@@ -80,7 +80,12 @@ CREATE TABLE IF NOT EXISTS scheduled_posts (
   image_url TEXT,
   scheduled_for TIMESTAMPTZ NOT NULL,
   status TEXT NOT NULL DEFAULT 'scheduled',
+  kind TEXT NOT NULL DEFAULT 'post',
+  source TEXT NOT NULL DEFAULT 'local',
   facebook_post_id TEXT,
+  facebook_post_ids JSONB,
+  page_id TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
   error_message TEXT,
   created_by TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -89,6 +94,27 @@ CREATE TABLE IF NOT EXISTS scheduled_posts (
 
 CREATE INDEX IF NOT EXISTS scheduled_workspace_time_idx ON scheduled_posts (workspace_id, scheduled_for);
 CREATE INDEX IF NOT EXISTS scheduled_due_idx ON scheduled_posts (status, scheduled_for);
+CREATE INDEX IF NOT EXISTS scheduled_native_idx ON scheduled_posts (source, status, scheduled_for);
+
+CREATE TABLE IF NOT EXISTS scheduled_post_events (
+  id BIGSERIAL PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  scheduled_post_id INTEGER NOT NULL,
+  news_item_id INTEGER,
+  event TEXT NOT NULL,
+  source TEXT NOT NULL,
+  actor_user_id TEXT,
+  facebook_post_id TEXT,
+  error_message TEXT,
+  metadata JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS scheduled_post_events_post_idx
+  ON scheduled_post_events (scheduled_post_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS scheduled_post_events_workspace_idx
+  ON scheduled_post_events (workspace_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS usage_daily (
   day DATE PRIMARY KEY,

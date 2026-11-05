@@ -37,5 +37,17 @@ export function startLocalScheduler() {
   console.log(
     JSON.stringify({ route: "scheduler", event: "started", intervalMs: INTERVAL_MS })
   );
+
+  if (process.env.NODE_ENV === "production" && !process.env.CRON_SECRET?.trim()) {
+    console.warn(
+      JSON.stringify({
+        route: "scheduler",
+        event: "cron_secret_missing",
+        message:
+          "CRON_SECRET is not set. A hosted cron cannot authenticate against /api/schedule/run, so scheduled posts will only publish while this in-process timer is running.",
+      })
+    );
+  }
+
   void tick();
 }

@@ -4,6 +4,7 @@ export type ScheduleEvent =
   | "scheduled"
   | "canceled"
   | "claimed"
+  | "retrying"
   | "published"
   | "failed";
 

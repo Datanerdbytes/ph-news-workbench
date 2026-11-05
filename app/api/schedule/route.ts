@@ -13,13 +13,14 @@ export async function GET(request: Request) {
 
   const rows = await sql`
     SELECT s.id, s.news_item_id, s.draft_id, s.text, s.image_url, s.image_urls,
-           s.scheduled_for, s.status, s.facebook_post_id, s.error_message,
+           s.scheduled_for, s.status, s.kind, s.source, s.page_id,
+           s.facebook_post_id, s.attempts, s.error_message,
            s.created_at, n.title AS news_title
     FROM scheduled_posts s
     LEFT JOIN news_items n ON n.id = s.news_item_id
     WHERE s.workspace_id = ${access.workspace.id}
-    ORDER BY s.scheduled_for ASC
-    LIMIT 200`;
+    ORDER BY (s.status = 'scheduled') DESC, s.scheduled_for ASC
+    LIMIT 500`;
 
   return NextResponse.json(rows, {
     headers: { "cache-control": "no-store" },

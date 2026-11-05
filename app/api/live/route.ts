@@ -9,6 +9,7 @@ import {
 } from '@/lib/publishing/live';
 import { readText } from '@/lib/publishing/request';
 import { parseScheduledPublishTime } from '@/lib/publishing/schedule';
+import { recordNativeSchedule } from '@/lib/schedule-mirror';
 
 export const dynamic = 'force-dynamic';
 
@@ -174,6 +175,25 @@ export async function POST(request: Request) {
       RETURNING id, facebook_video_id, title, description, status, stream_key,
                 secure_stream_url, permalink_url, planned_start_time, created_at
     `) as unknown as StreamRow[];
+
+    // A planned live stream is held by Facebook until its start time. Mirror
+    // it so the Calendar and Analytics can see it alongside every other
+    // scheduled item.
+    await recordNativeSchedule({
+      workspaceId: access.workspace.id,
+      userId: access.user.id,
+      kind: 'live',
+      text: live.title,
+      scheduledFor: schedule.unix ? new Date(schedule.unix * 1000) : null,
+      results: [
+        {
+          page: { id: connection.pageId, name: connection.pageName },
+          ok: true,
+          id: live.id,
+          permalink: live.permalink ?? null,
+        },
+      ],
+    });
 
     return NextResponse.json(
       {

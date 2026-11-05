@@ -1,0 +1,308 @@
+<template id="beat-error-template">
+  <div
+    id="root"
+    data-composition-id="beat-error"
+    data-start="0"
+    data-duration="3"
+    data-width="1080"
+    data-height="1920"
+  >
+    <!-- Same bottom scrim as beat 1, so the seam is invisible -->
+    <div
+      id="err-scrim"
+      class="clip"
+      data-start="0"
+      data-duration="3"
+      data-track-index="0"
+    >
+      <div id="err-scrim-layer"></div>
+    </div>
+
+    <!-- Whip streak -->
+    <div
+      id="err-streak"
+      class="clip"
+      data-start="0"
+      data-duration="0.5"
+      data-track-index="1"
+    >
+      <div id="err-streak-bar"></div>
+    </div>
+
+    <!-- Extra dim for the card beat -->
+    <div
+      id="err-veil"
+      class="clip"
+      data-start="0"
+      data-duration="3"
+      data-track-index="2"
+    >
+      <div id="err-veil-layer"></div>
+    </div>
+
+    <!-- System dialog -->
+    <div
+      id="err-card"
+      class="clip"
+      data-start="0"
+      data-duration="3"
+      data-track-index="3"
+    >
+      <div id="err-card-inner">
+        <div id="err-chrome">
+          <span id="err-dots"><i></i><i></i><i></i></span>
+          <span id="err-app-title" data-var-text="appTitle">monday.exe</span>
+          <span id="err-close">×</span>
+        </div>
+        <div id="err-body">
+          <div id="err-line-err">
+            <span class="prompt">&gt;</span>
+            <span class="err-text" data-var-text="errLine">ERROR: motivation not found</span>
+          </div>
+          <div id="err-line-load">
+            <span class="prompt">&gt;</span>
+            <span class="load-text">loading motivation…</span>
+            <span id="err-caret"></span>
+          </div>
+          <div id="err-bar">
+            <span id="err-bar-fill"></span>
+          </div>
+          <div id="err-bar-meta">
+            <span>12%</span>
+            <span>retrying since 9:02 am</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      #root {
+        position: absolute;
+        inset: 0;
+      }
+      #err-scrim-layer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 1240px;
+        background: linear-gradient(
+          to top,
+          rgba(5, 7, 15, 0.96) 0%,
+          rgba(5, 7, 15, 0.9) 30%,
+          rgba(5, 7, 15, 0.78) 55%,
+          rgba(5, 7, 15, 0.5) 75%,
+          rgba(5, 7, 15, 0.15) 90%,
+          rgba(5, 7, 15, 0) 100%
+        );
+      }
+      #err-streak {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 940px;
+        height: 18px;
+        overflow: hidden;
+      }
+      #err-streak-bar {
+        position: absolute;
+        left: -60%;
+        top: 0;
+        width: 220%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0) 0%,
+          rgba(255, 255, 255, 0.42) 45%,
+          rgba(255, 182, 39, 0.72) 52%,
+          rgba(255, 255, 255, 0.42) 58%,
+          rgba(255, 255, 255, 0) 100%
+        );
+        opacity: 0;
+      }
+      #err-veil-layer {
+        position: absolute;
+        inset: 0;
+        background: rgba(5, 7, 15, 0.44);
+        opacity: 0;
+      }
+      #err-card {
+        position: absolute;
+        left: 72px;
+        top: 840px;
+        width: 936px;
+      }
+      #err-card-inner {
+        border-radius: 30px;
+        background: rgba(10, 14, 28, 0.84);
+        border: 1px solid rgba(246, 241, 231, 0.14);
+        backdrop-filter: blur(22px);
+        -webkit-backdrop-filter: blur(22px);
+        box-shadow: 0 46px 110px rgba(0, 0, 0, 0.55);
+        font-family: "Space Mono", "JetBrains Mono", monospace;
+      }
+      #err-chrome {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 22px 30px;
+        border-bottom: 1px solid rgba(246, 241, 231, 0.12);
+        font-size: 28px;
+        letter-spacing: 0.08em;
+        color: rgba(246, 241, 231, 0.66);
+      }
+      #err-dots {
+        display: inline-flex;
+        gap: 9px;
+      }
+      #err-dots i {
+        width: 13px;
+        height: 13px;
+        border-radius: 999px;
+        background: rgba(246, 241, 231, 0.28);
+      }
+      #err-dots i:first-child {
+        background: #ff5f57;
+      }
+      #err-dots i:nth-child(2) {
+        background: #febc2e;
+      }
+      #err-dots i:nth-child(3) {
+        background: #28c840;
+      }
+      #err-app-title {
+        flex: 1;
+      }
+      #err-close {
+        color: rgba(246, 241, 231, 0.45);
+      }
+      #err-body {
+        padding: 34px 32px 30px;
+      }
+      #err-line-err,
+      #err-line-load {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        font-size: 38px;
+        line-height: 1.25;
+        white-space: nowrap;
+      }
+      #err-line-err .err-text {
+        color: #ff7a6b;
+        font-weight: 700;
+      }
+      #err-line-load .load-text {
+        color: var(--paper, #f6f1e7);
+      }
+      .prompt {
+        color: rgba(246, 241, 231, 0.4);
+      }
+      #err-caret {
+        display: inline-block;
+        width: 20px;
+        height: 38px;
+        margin-left: 2px;
+        background: var(--accent, #ffb627);
+        vertical-align: -6px;
+      }
+      #err-bar {
+        margin-top: 30px;
+        height: 14px;
+        border-radius: 999px;
+        background: rgba(246, 241, 231, 0.14);
+        overflow: hidden;
+      }
+      #err-bar-fill {
+        display: block;
+        width: 14%;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #ffb627, #ffe0a3);
+        transform-origin: left center;
+      }
+      #err-bar-meta {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 16px;
+        font-size: 28px;
+        letter-spacing: 0.06em;
+        color: rgba(246, 241, 231, 0.62);
+      }
+    </style>
+
+    <script>
+      (function () {
+        const tl = gsap.timeline({ paused: true });
+
+        // Whip: a bright streak crosses the frame, the card lands blurred and sharpens
+        tl.fromTo(
+          "#err-streak-bar",
+          { opacity: 0, xPercent: -18 },
+          { opacity: 1, xPercent: 18, duration: 0.26, ease: "power3.out" },
+          0,
+        );
+        tl.to("#err-streak-bar", { opacity: 0, duration: 0.14, ease: "power2.in" }, 0.26);
+
+        tl.fromTo(
+          "#err-card-inner",
+          { opacity: 0, x: 300, filter: "blur(18px)" },
+          { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.34, ease: "power4.out" },
+          0.06,
+        );
+
+        tl.fromTo(
+          "#err-veil-layer",
+          { opacity: 0 },
+          { opacity: 1, duration: 0.16, ease: "power2.out" },
+          0,
+        );
+
+        tl.fromTo(
+          "#err-chrome",
+          { opacity: 0, y: 10 },
+          { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" },
+          0.3,
+        );
+        tl.fromTo(
+          "#err-line-err",
+          { opacity: 0, y: 12 },
+          { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" },
+          0.4,
+        );
+        tl.fromTo(
+          "#err-line-load",
+          { opacity: 0, y: 12 },
+          { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" },
+          0.52,
+        );
+
+        // One CRT flicker on the error line
+        tl.to("#err-line-err", { opacity: 0.25, duration: 0.06, ease: "none" }, 1.02);
+        tl.to("#err-line-err", { opacity: 1, duration: 0.08, ease: "none" }, 1.1);
+
+        // The bar crawls, then stalls
+        tl.fromTo(
+          "#err-bar-fill",
+          { scaleX: 0.42 },
+          { scaleX: 0.93, duration: 2.1, ease: "power1.out" },
+          0.6,
+        );
+        tl.to("#err-bar-fill", { scaleX: 1, duration: 0.6, ease: "none" }, 2.7);
+
+        // Blinking caret
+        tl.to("#err-caret", { opacity: 0, duration: 0.08, repeat: 5, yoyo: true, repeatDelay: 0.26 }, 0.92);
+
+        // Exit
+        tl.to(
+          "#err-card-inner",
+          { scale: 0.965, filter: "blur(10px)", opacity: 0, duration: 0.26, ease: "power2.in" },
+          2.62,
+        );
+        tl.to("#err-veil-layer", { opacity: 0, duration: 0.18, ease: "power2.in" }, 2.8);
+
+        window.__timelines["beat-error"] = tl;
+      })();
+    </script>
+  </div>
+</template>

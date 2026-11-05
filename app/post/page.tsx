@@ -67,12 +67,7 @@ export default function PostPage() {
   }
 
   return (
-    <PublishPage
-      eyebrow="Publishing"
-      title="Post"
-      description="Standard text posts published straight to the Page feed. Optionally attach a link — Facebook renders its preview automatically."
-      endpoint="POST /feed"
-    >
+    <PublishPage eyebrow="Publishing" title="Post">
       <ComposerCard
         icon={<PenLine className="size-4" />}
         title="New post"

@@ -65,12 +65,7 @@ export default function StoriesPage() {
   }
 
   return (
-    <PublishPage
-      eyebrow="Publishing"
-      title="Stories"
-      description="Photo and video Stories published to the Page's Story tray. Stories are short-lived by design and cannot be scheduled, so publish is immediate."
-      endpoint="POST /photo_stories · /video_stories"
-    >
+    <PublishPage eyebrow="Publishing" title="Stories">
       <ComposerCard
         icon={<Sparkles className="size-4" />}
         title="New story"

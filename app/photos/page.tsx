@@ -257,12 +257,7 @@ export default function PhotosPage() {
   );
 
   return (
-    <PublishPage
-      eyebrow="Publishing"
-      title="Photos"
-      description="Single photos, multi-image feed posts, and Page albums. Scheduling and crossposting apply to feed posts, which use Facebook's native publish queue."
-      endpoint="POST /photos · /feed · /albums"
-    >
+    <PublishPage eyebrow="Publishing" title="Photos">
       <div className="mb-4 flex gap-1 rounded-lg border border-border bg-surface-2 p-1 text-xs font-semibold">
         {(
           [

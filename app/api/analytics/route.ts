@@ -69,6 +69,7 @@ export async function GET(request: Request) {
              0, 0, count(*)
       FROM scheduled_posts
       WHERE workspace_id = ${workspaceId}
+        AND status = 'scheduled'
         AND scheduled_for >= now() - interval '14 days'
       GROUP BY 1
     ) buckets

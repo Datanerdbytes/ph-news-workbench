@@ -20,6 +20,24 @@ export function statusMeta(status: string) {
         dot: "bg-destructive",
         pill: "border-destructive/20 bg-destructive/10 text-destructive",
       };
+    case "canceled":
+      return {
+        label: "Canceled",
+        dot: "bg-amber-600",
+        pill: "border-amber-600/20 bg-amber-600/10 text-amber-700",
+      };
+    case "scheduled":
+      return {
+        label: "Scheduled",
+        dot: "bg-brand",
+        pill: "border-brand/25 bg-brand/10 text-brand",
+      };
+    case "retrying":
+      return {
+        label: "Retrying",
+        dot: "bg-amber-500",
+        pill: "border-amber-500/20 bg-amber-500/10 text-amber-700",
+      };
     default:
       return {
         label: "Pending",

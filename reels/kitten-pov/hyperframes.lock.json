@@ -1,0 +1,8 @@
+{
+  "compositions/cinematic-zoom.html": "fd166bab4f2de159513ad061bf48878f797944c80ede49a11a264394ffedb7bc",
+  "compositions/components/badge-pop.html": "7b3f813eedab71b59e45598a48dd398c6931a00751845fe2c258fbcd62b743f0",
+  "compositions/components/grain-overlay.html": "97a0da8f26feca9574abcf08b8186cef10ea4819b2aeabc30547ae16ed9ae80d",
+  "compositions/components/terminal-simulator.html": "c0ac45edf9d3493e2303052a79ecc650ee03d21d9fda4680b20577333edb08ef",
+  "compositions/components/text-stagger.html": "00b5f9203d219b8a451db70c10c0518013914cdf715714047367183bd3c69128",
+  "compositions/components/yt-camera-move.html": "f58d4c2fc7165cf49a701f55f80fcd88eccab5c582cf8c2ae00259523810d58a"
+}

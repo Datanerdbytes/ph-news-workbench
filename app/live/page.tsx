@@ -115,12 +115,7 @@ export default function LivePage() {
   }
 
   return (
-    <PublishPage
-      eyebrow="Publishing"
-      title="Live video"
-      description="Create an RTMP/RTMPS stream for the Page, update its details or schedule, read live comments, and end the broadcast."
-      endpoint="POST /live_videos"
-    >
+    <PublishPage eyebrow="Publishing" title="Live video">
       <div className="space-y-4">
         <ComposerCard
           icon={<Radio className="size-4" />}

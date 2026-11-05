@@ -1,0 +1,185 @@
+{
+  "ok": false,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "filesScanned": 5
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "duration": 9,
+    "samples": [
+      0.5,
+      1.5,
+      2.5,
+      3.5,
+      4.5,
+      5.5,
+      6.5,
+      7.5,
+      8.5
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 0,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": false,
+    "errorCount": 1,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "contrast_aa_failure",
+        "severity": "error",
+        "message": "Contrast is 2.65:1; WCAG AA requires 3:1.",
+        "text": "so anyway…",
+        "fg": "rgb(194,185,167)",
+        "bg": "rgb(121,108,78)",
+        "ratio": 2.65,
+        "requiredRatio": 3,
+        "suggestedColor": "rgb(204,197,181)",
+        "large": true,
+        "selector": "#punch-chip",
+        "dataAttributes": {
+          "data-var-text": "punchChip"
+        },
+        "sourceFile": "compositions/beat-punch.html",
+        "bbox": {
+          "x": 72,
+          "y": 922,
+          "width": 936,
+          "height": 48
+        },
+        "time": 6.5,
+        "times": [
+          6.5,
+          8.5
+        ]
+      }
+    ],
+    "enabled": true,
+    "samples": [
+      0.5,
+      2.5,
+      4.5,
+      6.5,
+      8.5
+    ],
+    "checked": 35,
+    "passed": 33
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 2,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 2 text elements stay under it for 0.5 s or more, the smallest \"12%\" at 25 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "12%",
+        "selector": "#err-bar-meta > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/beat-error.html",
+        "bbox": {
+          "x": 113.49,
+          "y": 962,
+          "width": 50.41,
+          "height": 37
+        },
+        "time": 3.25,
+        "times": [
+          3.25,
+          3.25
+        ],
+        "fontPx": 24.93,
+        "floorPx": 28,
+        "seconds": 2.625,
+        "elements": [
+          {
+            "selector": "#err-bar-meta > span:nth-of-type(1)",
+            "text": "12%",
+            "fontPx": 24.93,
+            "time": 3.25,
+            "seconds": 2.625
+          },
+          {
+            "selector": "#err-bar-meta > span:nth-of-type(2)",
+            "text": "retrying since 9:02 am",
+            "fontPx": 24.93,
+            "time": 3.25,
+            "seconds": 2.625
+          }
+        ]
+      },
+      {
+        "code": "line_unread",
+        "severity": "warning",
+        "message": "The film's last line \"MENTALLY. OBVIOUSLY.\" (2 words) is on screen 1.67 s (±0.01 s), under the 2.00 s a closing line needs: hold it about 0.5 s + 0.3 s a word and at least 2 s before the film ends; see references/motion.md.",
+        "text": "MENTALLY. OBVIOUSLY.",
+        "selector": "#punch-sub",
+        "dataAttributes": {},
+        "sourceFile": "compositions/beat-punch.html",
+        "bbox": {
+          "x": 72,
+          "y": 1246.51,
+          "width": 453.8399999999999,
+          "height": 46
+        },
+        "time": 7.336,
+        "words": 2,
+        "seconds": 1.668,
+        "floorSeconds": 2
+      }
+    ],
+    "enabled": true,
+    "step": 0.125,
+    "samples": 72
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

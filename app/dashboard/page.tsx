@@ -6,7 +6,9 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Circle,
+  Clock,
   FileText,
+  Loader2,
   Newspaper,
   RefreshCw,
   TriangleAlert,
@@ -18,9 +20,10 @@ import { PlatformMark } from "@/components/platform-mark";
 import { StatusPill } from "@/components/status-pill";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useFacebookConnection } from "@/components/facebook-connection";
+import { TimeAgo } from "@/components/time-ago";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "cn";
-import { formatLongDate, timeAgo } from "@/lib/format";
+import { formatLongDate } from "@/lib/format";
 
 type Draft = {
   id: number;
@@ -35,6 +38,24 @@ type Story = {
   status: string;
   created_at: string;
   draft_id: number | null;
+};
+
+type Activity = {
+  id: string | number;
+  type: "schedule" | "draft";
+  event: string;
+  source: string;
+  displayTitle: string;
+  displayTime: string;
+  kind?: string | null;
+  scheduleSource?: string | null;
+  status?: string;
+  facebookPostId?: string | null;
+  errorMessage?: string | null;
+  correlationId?: string;
+  newsItemId?: number | null;
+  scheduledPostId?: number | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 const PLANNED = [
@@ -56,17 +77,19 @@ export default function DashboardPage() {
   const { data: session } = authClient.useSession();
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [draftsRes, itemsRes] = await Promise.all([
+      const [draftsRes, itemsRes, activitiesRes] = await Promise.all([
         fetch("/api/drafts", { cache: "no-store" }),
         fetch("/api/items", { cache: "no-store" }),
+        fetch("/api/activity?mergeByStory=true", { cache: "no-store" }),
       ]);
 
-      if (!draftsRes.ok || !itemsRes.ok) {
+      if (!draftsRes.ok || !itemsRes.ok || !activitiesRes.ok) {
         throw new Error("Could not load the workspace.");
       }
 
@@ -74,10 +97,12 @@ export default function DashboardPage() {
       const storyData = (await itemsRes.json()) as
         | Story[]
         | { rows?: Story[] };
+      const activityData = (await activitiesRes.json()) as Activity[];
       setDrafts(Array.isArray(draftData) ? draftData : []);
       setStories(
         Array.isArray(storyData) ? storyData : (storyData.rows ?? [])
       );
+      setActivities(Array.isArray(activityData) ? activityData : []);
     } catch (error) {
       toast.error("Could not load the dashboard", {
         description:
@@ -106,6 +131,12 @@ export default function DashboardPage() {
   ).length;
   const recent = drafts.slice(0, 5);
   const firstName = session?.user?.name?.split(/\s+/)[0];
+
+  // Activity stats
+  const scheduledCount = activities.filter((a) => a.type === "schedule" && a.event === "scheduled").length;
+  const publishedCount = activities.filter((a) => a.type === "schedule" && a.event === "published").length;
+  const draftCount = activities.filter((a) => a.type === "draft").length;
+  const failedCount = activities.filter((a) => a.type === "schedule" && a.event === "failed").length;
 
   const steps = [
     {
@@ -264,7 +295,7 @@ export default function DashboardPage() {
         <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
           <section className="panel overflow-hidden">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-              <h2 className="text-[12.5px] font-semibold">Recent drafts</h2>
+              <h2 className="text-[12.5px] font-semibold">Activity log</h2>
               <Link
                 href="/status"
                 className="text-[11px] font-semibold text-brand hover:text-[#8a4b0f]"
@@ -275,49 +306,86 @@ export default function DashboardPage() {
 
             {loading ? (
               <div className="divide-y divide-border">
-                {Array.from({ length: 4 }).map((_, index) => (
+                {Array.from({ length: 5 }).map((_, index) => (
                   <div key={index} className="animate-pulse px-4 py-3.5">
-                    <div className="h-2 w-16 rounded bg-muted" />
+                    <div className="h-2 w-20 rounded bg-muted" />
                     <div className="mt-2.5 h-3.5 w-2/3 rounded bg-muted" />
+                    <div className="mt-2 h-2.5 w-1/3 rounded bg-muted" />
                   </div>
                 ))}
               </div>
-            ) : recent.length ? (
+            ) : activities.length ? (
               <div className="divide-y divide-border">
-                {recent.map((draft) => (
-                  <Link
-                    key={draft.id}
-                    href={`/drafts/${draft.id}`}
-                    className="group flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <StatusPill status={draft.status} />
-                        <span className="text-[10.5px] tabular-nums text-muted-foreground">
-                          {timeAgo(draft.created_at)}
-                        </span>
+                {activities.map((activity) => {
+                  const isSchedule = activity.type === "schedule";
+                  const isDraft = activity.type === "draft";
+                  const kind = activity.kind ?? (isDraft ? "draft" : "post");
+                  const scheduleSource = activity.scheduleSource ?? "local";
+                  const status = activity.status ?? activity.event;
+
+                  // Determine status variant for StatusPill
+                  let pillStatus: string = status;
+                  if (isDraft) {
+                    pillStatus = status;
+                  } else if (activity.event === "published") {
+                    pillStatus = "published";
+                  } else if (activity.event === "failed") {
+                    pillStatus = "failed";
+                  } else if (activity.event === "canceled") {
+                    pillStatus = "canceled";
+                  } else if (activity.event === "scheduled") {
+                    pillStatus = "scheduled";
+                  }
+
+                  return (
+                    <Link
+                      key={`${activity.type}-${activity.id}`}
+                      href={isSchedule
+                        ? `/calendar?post=${activity.scheduledPostId}`
+                        : `/drafts/${activity.id}`}
+                      className="group flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <StatusPill status={pillStatus} />
+                          <TimeAgo
+                            date={activity.displayTime}
+                            className="text-[10.5px] tabular-nums text-muted-foreground"
+                          />
+                          {isSchedule && kind && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-faint px-1.5 py-0.5 rounded bg-surface-2">
+                              {kind.toUpperCase()}
+                            </span>
+                          )}
+                          {isSchedule && scheduleSource === "facebook" && (
+                            <span className="text-[9px] font-medium text-brand px-1.5 py-0.5 rounded bg-brand-soft">
+                              FB
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1.5 line-clamp-2 font-heading text-[15.5px] leading-snug">
+                          {activity.displayTitle}
+                        </p>
+                        {(activity.errorMessage || (isDraft && activity.status === "failed")) && (
+                          <p className="mt-1.5 line-clamp-2 text-xs text-destructive">
+                            {activity.errorMessage ?? "Failed to publish"}
+                          </p>
+                        )}
                       </div>
-                      <p className="mt-1.5 line-clamp-2 font-heading text-[15.5px] leading-snug">
-                        {draft.news_title ?? `Draft #${draft.id}`}
-                      </p>
-                    </div>
-                    <ArrowUpRight
-                      className="mt-1 size-3.5 shrink-0 text-faint transition-colors group-hover:text-foreground"
-                      aria-hidden
-                    />
-                  </Link>
-                ))}
+                      <ArrowUpRight
+                        className="mt-1 size-3.5 shrink-0 text-faint transition-colors group-hover:text-foreground"
+                        aria-hidden
+                      />
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
               <div className="px-4 py-12 text-center">
-                <FileText
-                  className="mx-auto size-5 text-faint"
-                  aria-hidden
-                />
-                <p className="mt-2 text-[12.5px] font-semibold">No drafts yet</p>
+                <Clock className="mx-auto size-5 text-faint" aria-hidden />
+                <p className="mt-2 text-[12.5px] font-semibold">No activity yet</p>
                 <p className="mx-auto mt-1 max-w-[260px] text-[11px] leading-relaxed text-muted-foreground">
-                  Open a story from the story queue and generate a post to see
-                  it here.
+                  Scheduled posts, published content, and drafts will appear here.
                 </p>
                 <Link
                   href="/"

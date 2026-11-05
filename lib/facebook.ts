@@ -132,6 +132,44 @@ export async function graphRequest<T>(
   return body;
 }
 
+/**
+ * DELETE a Graph node. Used to cancel a post that Facebook itself is
+ * holding in its scheduled queue.
+ */
+export async function graphDelete(
+  path: string,
+  accessToken: string
+): Promise<{ success?: boolean }> {
+  const url = new URL(
+    `https://graph.facebook.com/${facebookGraphVersion()}/${path}`
+  );
+  url.searchParams.set('access_token', accessToken);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'DELETE',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch {
+    throw new FacebookApiError('Facebook could not be reached.');
+  }
+
+  const body = (await response.json().catch(() => null)) as
+    | ({ success?: boolean } & GraphErrorBody)
+    | null;
+
+  if (!response.ok || body?.error) {
+    throw new FacebookApiError(
+      body?.error?.message ?? `Facebook request failed (${response.status}).`,
+      body?.error?.code
+    );
+  }
+
+  return body ?? {};
+}
+
 export async function exchangeCodeForToken(code: string): Promise<string> {
   const body = await graphRequest<TokenResponse>('oauth/access_token', {
     client_id: process.env.FACEBOOK_APP_ID!.trim(),
@@ -287,6 +325,137 @@ export function toArrayBuffer(bytes: Buffer): ArrayBuffer {
     bytes.byteOffset,
     bytes.byteOffset + bytes.byteLength
   ) as ArrayBuffer;
+}
+
+export async function graphGet<T>(
+  path: string,
+  params: Record<string, string>,
+  accessToken: string,
+  timeoutMs = TIMEOUT_MS
+): Promise<T> {
+  const query = new URLSearchParams({
+    ...params,
+    access_token: accessToken,
+  });
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://graph.facebook.com/${facebookGraphVersion()}/${path}?${query}`,
+      {
+        method: 'GET',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(timeoutMs),
+      }
+    );
+  } catch {
+    throw new FacebookApiError('Facebook could not be reached.');
+  }
+
+  const body = (await response.json().catch(() => null)) as
+    | (T & GraphErrorBody)
+    | null;
+
+  if (!response.ok || body?.error) {
+    throw new FacebookApiError(
+      body?.error?.message ?? `Facebook request failed (${response.status}).`,
+      body?.error?.code
+    );
+  }
+  if (!body) {
+    throw new FacebookApiError('Facebook returned an empty response.');
+  }
+  return body;
+}
+
+/**
+ * Whether a Facebook-scheduled reel video has actually gone live. Facebook
+ * stays the executor for source='facebook' scheduled rows; this only reads
+ * status so the local record can mirror it.
+ */
+export async function isFacebookVideoPublished(
+  videoId: string,
+  accessToken: string
+): Promise<boolean | null> {
+  try {
+    const body = await graphGet<{
+      is_published?: boolean;
+      status?: { video_status?: string };
+    }>(videoId, { fields: 'is_published,status.video_status' }, accessToken);
+    if (typeof body.is_published === 'boolean') return body.is_published;
+    const videoStatus = body.status?.video_status;
+    if (videoStatus === 'error') return false;
+    if (videoStatus === 'ready' || videoStatus === 'complete') return true;
+    return null;
+  } catch (error) {
+    if (error instanceof FacebookApiError && error.code === 100) {
+      // Unknown fields for this node version — cannot tell.
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Whether a Page post that was scheduled on Facebook has gone live. Facebook
+ * holds the post unpublished until its scheduled time, then flips `published`
+ * to true.
+ */
+export async function isFacebookPostPublished(
+  postId: string,
+  accessToken: string
+): Promise<boolean | null> {
+  try {
+    const body = await graphGet<{ published?: boolean }>(
+      postId,
+      { fields: 'published' },
+      accessToken
+    );
+    if (typeof body.published === 'boolean') return body.published;
+    return null;
+  } catch (error) {
+    if (error instanceof FacebookApiError && error.code === 100) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Whether a scheduled live video has started (or already ended). Facebook
+ * keeps a planned stream in UNPUBLISHED/SCHEDULED until its start time.
+ */
+export async function isFacebookLiveStarted(
+  liveVideoId: string,
+  accessToken: string
+): Promise<boolean | null> {
+  try {
+    const body = await graphGet<{ status?: string }>(
+      liveVideoId,
+      { fields: 'status' },
+      accessToken
+    );
+    const status = (body.status ?? '').toUpperCase();
+    if (!status) return null;
+    if (status === 'LIVE_NOW' || status === 'VOD') return true;
+    if (status === 'ERROR' || status === 'FAILED') return false;
+    // UNPUBLISHED / SCHEDULED / WAITING — still pending.
+    return false;
+  } catch (error) {
+    if (error instanceof FacebookApiError && error.code === 100) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Cancel a post that Facebook is holding in its scheduled queue.
+ */
+export async function cancelFacebookScheduledPost(
+  postId: string,
+  accessToken: string
+): Promise<void> {
+  await graphDelete(postId, accessToken);
 }
 
 export type GraphUploadFile = {

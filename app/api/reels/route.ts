@@ -9,6 +9,7 @@ import {
 import { facebookErrorResponse } from '@/lib/publishing/errors';
 import { readPageIds } from '@/lib/publishing/request';
 import { parseScheduledPublishTime } from '@/lib/publishing/schedule';
+import { recordNativeSchedule } from '@/lib/schedule-mirror';
 import { readMp4DurationSeconds } from '@/lib/reel-meta';
 
 export const dynamic = 'force-dynamic';
@@ -93,6 +94,19 @@ export async function POST(request: Request) {
           },
           scheduledPublishTime: schedule.unix,
         }),
+    });
+
+    // The reel exists on Facebook now; mirror it into scheduled_posts so the
+    // Calendar and Analytics see it. Facebook stays the executor (including
+    // native scheduling) — the local scheduler syncs these rows' status
+    // instead of publishing them.
+    await recordNativeSchedule({
+      workspaceId: access.workspace.id,
+      userId: access.user.id,
+      kind: 'reel',
+      text: caption,
+      scheduledFor: schedule.unix ? new Date(schedule.unix * 1000) : null,
+      results,
     });
 
     return crosspostResponse(results, {

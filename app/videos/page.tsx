@@ -86,12 +86,7 @@ export default function VideosPage() {
   }
 
   return (
-    <PublishPage
-      eyebrow="Publishing"
-      title="Videos"
-      description="Long-form Page video through the standard Video API: resumable chunked uploads, custom thumbnail, title and description, audience targeting, native scheduling, and crossposting."
-      endpoint="POST /videos"
-    >
+    <PublishPage eyebrow="Publishing" title="Videos">
       <ComposerCard
         icon={<Film className="size-4" />}
         title="New video"

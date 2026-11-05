@@ -1,0 +1,198 @@
+<template id="beat-punch-template">
+  <div
+    id="root"
+    data-composition-id="beat-punch"
+    data-start="0"
+    data-duration="3.6"
+    data-width="1080"
+    data-height="1920"
+  >
+    <!-- Same bottom scrim as beats 1 and 2 -->
+    <div
+      id="punch-scrim"
+      class="clip"
+      data-start="0"
+      data-duration="3.4"
+      data-track-index="0"
+    >
+      <div id="punch-scrim-layer"></div>
+    </div>
+
+    <!-- Dip cut: the frame darkens for three frames on the seam -->
+    <div
+      id="punch-veil"
+      class="clip"
+      data-start="0"
+      data-duration="0.5"
+      data-track-index="1"
+    >
+      <div id="punch-veil-layer"></div>
+    </div>
+
+    <!-- Dark backing behind the punch title so it reads over the kitten -->
+    <div
+      id="punch-backing"
+      class="clip"
+      data-start="0"
+      data-duration="3.6"
+      data-track-index="1"
+    >
+      <div id="punch-backing-layer"></div>
+    </div>
+
+    <!-- Punchline -->
+    <div
+      id="punch-block"
+      class="clip"
+      data-start="0.3"
+      data-duration="3.3"
+      data-track-index="2"
+    >
+      <div id="punch-chip" data-var-text="punchChip">so anyway…</div>
+      <div id="punch-title-inner">
+        <div class="hero-line">
+          <span class="w">and</span> <span class="w">I&rsquo;m</span>
+          <span class="w">already</span>
+        </div>
+        <div class="hero-line">
+          <span class="w accent">clocked</span> <span class="w accent">out</span>
+        </div>
+        <div id="punch-rule"></div>
+      </div>
+      <div id="punch-sub" data-var-text="punchSub">mentally. obviously.</div>
+    </div>
+
+    <style>
+      #root {
+        position: absolute;
+        inset: 0;
+      }
+      #punch-scrim-layer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 1240px;
+        background: linear-gradient(
+          to top,
+          rgba(5, 7, 15, 0.96) 0%,
+          rgba(5, 7, 15, 0.9) 30%,
+          rgba(5, 7, 15, 0.78) 55%,
+          rgba(5, 7, 15, 0.5) 75%,
+          rgba(5, 7, 15, 0.15) 90%,
+          rgba(5, 7, 15, 0) 100%
+        );
+      }
+      #punch-veil-layer {
+        position: absolute;
+        inset: 0;
+        background: #05070f;
+        opacity: 0;
+      }
+      #punch-backing-layer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 540px;
+        height: 520px;
+        background: #000000;
+        opacity: 1;
+      }
+      #punch-block {
+        position: absolute;
+        left: 72px;
+        top: 560px;
+        width: 936px;
+        z-index: 2;
+      }
+      #punch-chip {
+        font-family: "Space Mono", monospace;
+        font-size: 32px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: rgba(246, 241, 231, 0.78);
+        margin-bottom: 26px;
+      }
+      #punch-title-inner {
+        font-family: "Archivo Black", "Inter", sans-serif;
+        font-size: 104px;
+        line-height: 0.9;
+        letter-spacing: -0.038em;
+        color: var(--paper, #f6f1e7);
+        text-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
+      }
+      .hero-line {
+        display: block;
+        white-space: nowrap;
+      }
+      .w {
+        display: inline-block;
+      }
+      .w.accent {
+        color: var(--accent, #ffb627);
+      }
+      #punch-rule {
+        width: 620px;
+        height: 9px;
+        margin-top: 26px;
+        background: var(--accent, #ffb627);
+        transform-origin: left center;
+        border-radius: 999px;
+      }
+      #punch-sub {
+        margin-top: 26px;
+        font-family: "Space Mono", monospace;
+        font-size: 31px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(246, 241, 231, 0.78);
+      }
+    </style>
+
+    <script>
+      (function () {
+        const tl = gsap.timeline({ paused: true });
+
+        // Dip cut on the seam
+        tl.fromTo(
+          "#punch-veil-layer",
+          { opacity: 0 },
+          { opacity: 0.58, duration: 0.1, ease: "power2.in" },
+          0,
+        );
+        tl.to("#punch-veil-layer", { opacity: 0, duration: 0.18, ease: "power2.out" }, 0.1);
+
+        tl.fromTo(
+          "#punch-chip",
+          { opacity: 0, y: 16 },
+          { opacity: 1, y: 0, duration: 0.36, ease: "power2.out" },
+          0.32,
+        );
+
+        // Per-word blur-in, no translate (motion.md title pattern)
+        tl.fromTo(
+          "#punch-title-inner .w",
+          { opacity: 0, filter: "blur(10px)" },
+          { opacity: 1, filter: "blur(0px)", duration: 0.42, stagger: 0.05, ease: "power3.out" },
+          0.4,
+        );
+
+        tl.fromTo(
+          "#punch-rule",
+          { scaleX: 0, opacity: 0 },
+          { scaleX: 1, opacity: 1, duration: 0.36, ease: "power3.out" },
+          1.05,
+        );
+
+        tl.fromTo(
+          "#punch-sub",
+          { opacity: 0, y: 14 },
+          { opacity: 1, y: 0, duration: 0.36, ease: "power2.out" },
+          1.15,
+        );
+
+        window.__timelines["beat-punch"] = tl;
+      })();
+    </script>
+  </div>
+</template>

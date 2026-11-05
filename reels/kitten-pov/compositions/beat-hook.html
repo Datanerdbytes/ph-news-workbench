@@ -1,0 +1,206 @@
+<template id="beat-hook-template">
+  <div
+    id="root"
+    data-composition-id="beat-hook"
+    data-start="0"
+    data-duration="3"
+    data-width="1080"
+    data-height="1920"
+  >
+    <!-- Scrim: keeps the caption legible over the bright desk papers -->
+    <div
+      id="hook-scrim"
+      class="clip"
+      data-start="0"
+      data-duration="3.2"
+      data-track-index="0"
+    >
+      <div id="hook-scrim-layer"></div>
+    </div>
+
+    <!-- Kicker -->
+    <div
+      id="hook-kicker"
+      class="clip"
+      data-start="0.02"
+      data-duration="2.9"
+      data-track-index="1"
+    >
+      <span class="chip" data-var-text="kicker">POV:</span>
+    </div>
+
+    <!-- Hero title -->
+    <div
+      id="hook-title"
+      class="clip"
+      data-start="0.12"
+      data-duration="2.7"
+      data-track-index="2"
+    >
+      <div id="hook-title-inner">
+        <div class="hero-line">
+          <span class="w">me</span> <span class="w">coming</span>
+          <span class="w">back</span>
+        </div>
+        <div class="hero-line">
+          <span class="w">to</span> <span class="w">work</span>
+          <span class="w">after</span> <span class="w">a</span>
+        </div>
+        <div class="hero-line">
+          <span class="w accent">long</span> <span class="w accent">weekend</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timestamp -->
+    <div
+      id="hook-stamp"
+      class="clip"
+      data-start="0.95"
+      data-duration="2"
+      data-track-index="3"
+    >
+      <span class="stamp"><i class="dot"></i><span data-var-text="stamp">monday · 9:02 am</span></span>
+    </div>
+
+    <style>
+      #root {
+        position: absolute;
+        inset: 0;
+      }
+      #hook-scrim-layer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 1240px;
+        background: linear-gradient(
+          to top,
+          rgba(5, 7, 15, 0.96) 0%,
+          rgba(5, 7, 15, 0.9) 30%,
+          rgba(5, 7, 15, 0.78) 55%,
+          rgba(5, 7, 15, 0.5) 75%,
+          rgba(5, 7, 15, 0.15) 90%,
+          rgba(5, 7, 15, 0) 100%
+        );
+      }
+      #hook-kicker {
+        position: absolute;
+        left: 72px;
+        top: 400px;
+      }
+      .chip {
+        display: inline-block;
+        font-family: "Space Mono", monospace;
+        font-weight: 700;
+        font-size: 32px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #0a0e1c;
+        background: var(--accent, #ffb627);
+        padding: 12px 22px 10px 26px;
+        border-radius: 999px;
+        box-shadow: 0 10px 34px rgba(255, 182, 39, 0.28);
+      }
+      #hook-title {
+        position: absolute;
+        left: 72px;
+        top: 490px;
+        width: 936px;
+      }
+      #hook-title-inner {
+        font-family: "Archivo Black", "Inter", sans-serif;
+        font-size: 104px;
+        line-height: 0.9;
+        letter-spacing: -0.038em;
+        color: var(--paper, #f6f1e7);
+        text-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
+      }
+      .hero-line {
+        display: block;
+        white-space: nowrap;
+      }
+      .w {
+        display: inline-block;
+      }
+      .w.accent {
+        color: var(--accent, #ffb627);
+      }
+      #hook-stamp {
+        position: absolute;
+        left: 72px;
+        top: 800px;
+      }
+      .stamp {
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        font-family: "Space Mono", monospace;
+        font-size: 30px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(246, 241, 231, 0.82);
+      }
+      .stamp .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--accent, #ffb627);
+      }
+    </style>
+
+    <script>
+      (function () {
+        const tl = gsap.timeline({ paused: true });
+
+        tl.fromTo(
+          "#hook-scrim-layer",
+          { opacity: 0 },
+          { opacity: 1, duration: 0.5, ease: "power2.out" },
+          0,
+        );
+
+        tl.fromTo(
+          "#hook-kicker .chip",
+          { opacity: 0, y: 22, scale: 0.86 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "back.out(1.7)" },
+          0.02,
+        );
+
+        // Title: per-word blur-in, no translate (motion.md title pattern)
+        tl.fromTo(
+          "#hook-title-inner .w",
+          { opacity: 0, filter: "blur(10px)" },
+          { opacity: 1, filter: "blur(0px)", duration: 0.42, stagger: 0.05, ease: "power3.out" },
+          0.12,
+        );
+
+        tl.fromTo(
+          "#hook-stamp .stamp",
+          { opacity: 0, y: 16 },
+          { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" },
+          0.95,
+        );
+
+        // Exit into the whip: one move, shorter than the entrances
+        tl.to(
+          "#hook-title-inner",
+          { x: -80, filter: "blur(12px)", opacity: 0, duration: 0.26, ease: "power3.in" },
+          2.6,
+        );
+        tl.to(
+          "#hook-kicker .chip",
+          { opacity: 0, x: -50, duration: 0.24, ease: "power2.in" },
+          2.64,
+        );
+        tl.to(
+          "#hook-stamp .stamp",
+          { opacity: 0, duration: 0.22, ease: "power2.in" },
+          2.68,
+        );
+
+        window.__timelines["beat-hook"] = tl;
+      })();
+    </script>
+  </div>
+</template>

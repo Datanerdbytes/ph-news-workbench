@@ -14,6 +14,7 @@ import {
 } from '@/lib/publishing/photos';
 import { readPageIds } from '@/lib/publishing/request';
 import { parseScheduledPublishTime } from '@/lib/publishing/schedule';
+import { recordNativeSchedule } from '@/lib/schedule-mirror';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,6 +128,15 @@ export async function POST(request: Request) {
           images,
           scheduledPublishTime: schedule.unix,
         }),
+    });
+
+    await recordNativeSchedule({
+      workspaceId: access.workspace.id,
+      userId: access.user.id,
+      kind: 'photo',
+      text: message,
+      scheduledFor: schedule.unix ? new Date(schedule.unix * 1000) : null,
+      results,
     });
 
     return crosspostResponse(results, {

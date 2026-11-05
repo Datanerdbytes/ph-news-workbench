@@ -11,14 +11,10 @@ import { cn } from 'cn';
 export function PublishPage({
   eyebrow,
   title,
-  description,
-  endpoint,
   children,
 }: {
   eyebrow: string;
   title: string;
-  description?: string;
-  endpoint?: string;
   children: React.ReactNode;
 }) {
   const connection = useFacebookConnection();
@@ -26,23 +22,13 @@ export function PublishPage({
   return (
     <AppFrame>
       <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-8">
-        <header className="flex flex-col gap-3 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <header className="border-b border-border pb-5">
           <div>
             <p className="eyebrow text-brand">{eyebrow}</p>
             <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight">
               {title}
             </h1>
-            {description && (
-              <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
-                {description}
-              </p>
-            )}
           </div>
-          {endpoint && (
-            <code className="self-start rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-secondary-foreground">
-              {endpoint}
-            </code>
-          )}
         </header>
 
         {connection.loading ? (
