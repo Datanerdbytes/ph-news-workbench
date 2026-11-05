@@ -382,7 +382,7 @@ export default function DownloadsPage() {
 
         <section className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.42fr)_minmax(330px,0.78fr)]">
           <div className="panel overflow-hidden">
-            <div className="relative isolate overflow-hidden border-b border-border bg-[linear-gradient(115deg,#fffaf2_0%,#fff_55%,#f6f7fb_100%)] px-5 py-5 sm:px-7 sm:py-6">
+            <div className="relative isolate overflow-hidden border-b border-border bg-[linear-gradient(115deg,#fafbfc_0%,#fff_55%,#f6f7fb_100%)] px-5 py-5 sm:px-7 sm:py-6">
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute -right-10 -top-20 -z-10 size-64 rounded-full border border-brand/10"
@@ -393,7 +393,7 @@ export default function DownloadsPage() {
               />
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-brand/15 bg-white/80 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-[#8a4b0f]">
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-brand/15 bg-white/80 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-brand-strong">
                     <Sparkles className="size-3" aria-hidden="true" />
                     Simple by design
                   </div>
@@ -595,11 +595,11 @@ export default function DownloadsPage() {
           >
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -right-24 -top-28 -z-10 size-[310px] rounded-full bg-[radial-gradient(circle,rgba(190,122,53,.28),transparent_68%)]"
+              className="pointer-events-none absolute -right-24 -top-28 -z-10 size-[310px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
             />
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
-                <span className="size-1.5 rounded-full bg-[#f0b770]" />
+                <span className="size-1.5 rounded-full bg-white/70" />
                 Local-first
               </span>
               <span className="font-mono text-[9px] text-white/35">01 / 03</span>
@@ -608,7 +608,7 @@ export default function DownloadsPage() {
             <div className="relative mx-auto my-6 flex h-[112px] w-full max-w-[310px] items-center justify-center">
               <div className="absolute left-[12%] top-4 h-[76px] w-[56px] -rotate-[13deg] rounded-lg border border-white/10 bg-white/[0.04]" />
               <div className="absolute right-[12%] top-4 h-[76px] w-[56px] rotate-[13deg] rounded-lg border border-white/10 bg-white/[0.04]" />
-              <div className="relative grid h-[104px] w-[76px] -rotate-2 place-items-center overflow-hidden rounded-xl border border-white/15 bg-[linear-gradient(155deg,#43313a,#252c3d_58%,#283e3e)] shadow-[0_14px_35px_-16px_rgba(0,0,0,.7)]">
+              <div className="relative grid h-[104px] w-[76px] -rotate-2 place-items-center overflow-hidden rounded-xl border border-white/15 bg-[linear-gradient(155deg,#343b46,#252c3d_58%,#2c3540)] shadow-[0_14px_35px_-16px_rgba(0,0,0,.7)]">
                 <div
                   aria-hidden="true"
                   className="absolute -right-4 -top-3 size-14 rounded-full border border-white/15"
@@ -620,7 +620,7 @@ export default function DownloadsPage() {
                   VIDEO
                 </span>
               </div>
-              <span className="absolute right-[23%] top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full border border-[#f0b770]/25 bg-[#f0b770]/10 text-[#f0b770]">
+              <span className="absolute right-[23%] top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full border border-white/25 bg-white/10 text-white/85">
                 <ArrowDown className="size-3.5" aria-hidden="true" />
               </span>
             </div>

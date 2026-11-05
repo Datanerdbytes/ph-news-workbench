@@ -453,7 +453,7 @@ export default function AccountsPage() {
           Connection status refreshes when you move between pages.
           <Link
             href="/dashboard"
-            className="ml-auto inline-flex items-center gap-1 font-semibold text-brand hover:text-[#8a4b0f]"
+            className="ml-auto inline-flex items-center gap-1 font-semibold text-brand hover:text-brand-strong"
           >
             Back to dashboard
             <ArrowRight className="size-3.5" aria-hidden />

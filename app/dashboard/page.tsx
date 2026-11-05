@@ -298,7 +298,7 @@ export default function DashboardPage() {
               <h2 className="text-[12.5px] font-semibold">Activity log</h2>
               <Link
                 href="/status"
-                className="text-[11px] font-semibold text-brand hover:text-[#8a4b0f]"
+                className="text-[11px] font-semibold text-brand hover:text-brand-strong"
               >
                 View all
               </Link>
@@ -407,7 +407,7 @@ export default function DashboardPage() {
                 <h2 className="text-[12.5px] font-semibold">Channels</h2>
                 <Link
                   href="/accounts"
-                  className="text-[11px] font-semibold text-brand hover:text-[#8a4b0f]"
+                  className="text-[11px] font-semibold text-brand hover:text-brand-strong"
                 >
                   Manage
                 </Link>

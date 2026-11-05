@@ -267,7 +267,7 @@ export function AppFrame({
 
           <Link
             href="/"
-            className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-brand text-[12.5px] font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-[#8a4b0f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-brand text-[12.5px] font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             <Plus className="size-4" aria-hidden />
             New post
@@ -311,7 +311,7 @@ export function AppFrame({
                       className={cn(
                         "flex items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
                         active
-                          ? "bg-brand-soft font-semibold text-[#8a4b0f] shadow-[inset_2px_0_0_var(--brand)]"
+                          ? "bg-brand-soft font-semibold text-brand-strong shadow-[inset_2px_0_0_var(--brand)]"
                           : "text-secondary-foreground hover:bg-surface-3 hover:text-foreground"
                       )}
                     >
@@ -487,7 +487,7 @@ function StoryQueueQuickLink() {
       className={cn(
         "flex items-center gap-1.5 rounded-[7px] px-2 py-1.5 text-[11.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         active
-          ? "bg-brand-soft text-[#8a4b0f]"
+          ? "bg-brand-soft text-brand-strong"
           : "text-muted-foreground hover:bg-surface-3 hover:text-foreground"
       )}
     >
@@ -542,7 +542,7 @@ function PublishQuickNav() {
               className={cn(
                 "flex items-center gap-1.5 rounded-[7px] px-2 py-1.5 text-[11.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
                 active
-                  ? "bg-brand-soft text-[#8a4b0f]"
+                  ? "bg-brand-soft text-brand-strong"
                   : "text-muted-foreground hover:bg-surface-3 hover:text-foreground"
               )}
             >
@@ -586,7 +586,7 @@ function PublishQuickNav() {
                 className={cn(
                   "flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
                   active
-                    ? "bg-brand-soft text-[#8a4b0f]"
+                    ? "bg-brand-soft text-brand-strong"
                     : "text-secondary-foreground hover:bg-surface-3 hover:text-foreground"
                 )}
               >

@@ -310,7 +310,7 @@ export default function CalendarPage() {
                               ? "bg-success-soft text-success"
                               : post.status === "failed"
                                 ? "bg-destructive/10 text-destructive"
-                                : "bg-brand-soft text-[#8a4b0f]"
+                                : "bg-brand-soft text-brand-strong"
                           )}
                         >
                           {timeLabel(post.scheduled_for)} ·{" "}

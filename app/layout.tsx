@@ -1,23 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Newsreader } from "next/font/google";
+import { Geist_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 import { FacebookConnectionProvider } from "@/components/facebook-connection";
 import { SessionProvider } from "@/components/session-provider";
 import { Toaster } from "@/components/ui/sonner";
 
-const geist = Geist({
+const manrope = Manrope({
   subsets: ["latin"],
-  variable: "--font-geist",
+  variable: "--font-manrope",
   display: "swap",
 });
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-geist-mono",
-  display: "swap",
-});
-const newsreader = Newsreader({
-  subsets: ["latin"],
-  variable: "--font-newsreader",
   display: "swap",
 });
 
@@ -32,7 +27,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f6f3eb",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
 };
@@ -45,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${geistMono.variable} ${newsreader.variable}`}
+      className={`${manrope.variable} ${geistMono.variable}`}
     >
       <body className="min-h-dvh font-sans antialiased">
         <SessionProvider>

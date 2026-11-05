@@ -185,7 +185,7 @@ export default function TeamPage() {
                       className={cn(
                         "rounded-full border px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider",
                         member.role === "owner"
-                          ? "border-brand/25 bg-brand-soft text-[#8a4b0f]"
+                          ? "border-brand/25 bg-brand-soft text-brand-strong"
                           : "border-border bg-surface-2 text-muted-foreground"
                       )}
                     >
