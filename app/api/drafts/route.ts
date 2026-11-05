@@ -30,6 +30,22 @@ export async function DELETE(req: Request) {
     DELETE FROM drafts
     WHERE news_item_id = ${newsItemId} AND workspace_id = ${access.workspace.id}
     RETURNING id`;
+  if (!rows.length) {
+    return NextResponse.json({ error: 'No draft found for this story.' }, { status: 404 });
+  }
 
-  return NextResponse.json({ deleted: rows.length });
+  // The story goes back to the queue only if nothing else marks it as having
+  // a draft (e.g. a second drafted copy) or a published post.
+  const item = await sql`
+    UPDATE news_items
+    SET status = 'pending'
+    WHERE id = ${newsItemId}
+      AND status = 'drafted'
+      AND NOT EXISTS (
+        SELECT 1 FROM drafts
+        WHERE news_item_id = ${newsItemId} AND workspace_id = ${access.workspace.id}
+      )
+    RETURNING id`;
+
+  return NextResponse.json({ deleted: rows.length, reset: item.length });
 }
