@@ -73,7 +73,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Manage",
     items: [
-      { label: "Sources", icon: Rss },
+      { href: "/sources", label: "Sources", icon: Rss },
       { href: "/team", label: "Team", icon: UserPlus },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
@@ -134,6 +134,7 @@ function pageLabel(pathname: string) {
   if (pathname.startsWith("/reels")) return "Reels";
   if (pathname.startsWith("/live")) return "Live";
   if (pathname.startsWith("/stories")) return "Stories";
+  if (pathname.startsWith("/sources")) return "Sources";
   return "Workspace";
 }
 

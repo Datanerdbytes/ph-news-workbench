@@ -46,6 +46,7 @@ export async function GET(request: Request) {
                ELSE 'pending'
              END AS status
       FROM news_items n
+      WHERE n.workspace_id = ${access.workspace.id}
     )
     SELECT * FROM stories
     WHERE id < COALESCE(${before}, 2147483647)
@@ -73,6 +74,7 @@ export async function GET(request: Request) {
                ELSE 'pending'
              END AS status
       FROM news_items n
+      WHERE n.workspace_id = ${access.workspace.id}
     ) stories
   `) as unknown as {
     total: number;

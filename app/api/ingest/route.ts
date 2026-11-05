@@ -1,49 +1,120 @@
 import { NextResponse } from 'next/server';
-import Parser from 'rss-parser';
 import { sql } from '@/lib/db';
 import { requireUser, unauthorized } from '@/lib/session';
 import { isCronRequest } from '@/lib/cron';
-import crypto from 'crypto';
+import { ingestFeed } from '@/lib/feeds';
 import { randomUUID } from 'crypto';
-
-const parser = new Parser();
-const FEEDS = [
-  'https://www.inquirer.net/fullfeed',
-  'https://www.rappler.com/feed/',
-  'https://www.philstar.com/rss/headlines',
-];
 
 export async function POST(request: Request) {
   if (!isCronRequest(request) && !(await requireUser(request))) {
     return unauthorized();
   }
+
   const correlationId = randomUUID();
-  let ingested = 0;
-  let skipped = 0;
-  console.log(JSON.stringify({ route: 'ingest', correlationId, event: 'start', feeds: FEEDS.length }));
-  for (const url of FEEDS) {
-    try {
-      const feed = await parser.parseURL(url);
-      const feedRow = await sql`INSERT INTO feeds (url) VALUES (${url}) ON CONFLICT (url) DO UPDATE SET url=EXCLUDED.url RETURNING id`;
-      const feedId = feedRow[0].id;
-      for (const item of feed.items ?? []) {
-        const link = item.link ?? '';
-        const title = item.title ?? '';
-        const guid = item.guid ?? link;
-        const dedupHash = crypto.createHash('sha256').update(`${link}|${title}`).digest('hex');
-        const res = await sql`
-          INSERT INTO news_items (feed_id, guid, link, title, summary, published_at, raw_payload, dedup_hash)
-          VALUES (${feedId}, ${guid}, ${link}, ${title}, ${item.contentSnippet ?? ''}, ${item.pubDate ? new Date(item.pubDate) : null}, ${JSON.stringify(item)}, ${dedupHash})
-          ON CONFLICT (feed_id, dedup_hash) DO NOTHING
-          RETURNING id`;
-        if (res.length) ingested++; else skipped++;
+  let totalIngested = 0;
+  let totalSkipped = 0;
+  let totalErrors = 0;
+
+  console.log(JSON.stringify({ route: 'ingest', correlationId, event: 'start' }));
+
+  try {
+    // Get all workspaces that have enabled feeds
+    const workspacesWithFeeds = await sql`
+      SELECT DISTINCT f.workspace_id
+      FROM feeds f
+      WHERE f.enabled = true
+    `;
+
+    console.log(JSON.stringify({
+      route: 'ingest',
+      correlationId,
+      event: 'workspaces_found',
+      count: workspacesWithFeeds.length,
+    }));
+
+    // Process each workspace's feeds
+    for (const ws of workspacesWithFeeds) {
+      const workspaceId = ws.workspace_id;
+      let workspaceIngested = 0;
+      let workspaceSkipped = 0;
+      let workspaceErrors = 0;
+
+      // Get enabled feeds for this workspace
+      const feeds = await sql`
+        SELECT id, url, title
+        FROM feeds
+        WHERE workspace_id = ${workspaceId} AND enabled = true
+        ORDER BY id
+      `;
+
+      console.log(JSON.stringify({
+        route: 'ingest',
+        correlationId,
+        event: 'workspace_start',
+        workspaceId,
+        feedCount: feeds.length,
+      }));
+
+      // Process feeds sequentially per workspace to respect rate limits
+      for (const feed of feeds) {
+        try {
+          const { ingested: feedIngested, skipped: feedSkipped } = await ingestFeed(
+            { id: feed.id, workspace_id: workspaceId, url: feed.url, title: feed.title },
+            { correlationId, trigger: 'cron' },
+          );
+
+          workspaceIngested += feedIngested;
+          workspaceSkipped += feedSkipped;
+        } catch {
+          // ingestFeed already recorded the error on the feed row and logged it
+          workspaceErrors++;
+        }
       }
-      await sql`UPDATE feeds SET last_fetched_at = now() WHERE id = ${feedId}`;
-      console.log(JSON.stringify({ route: 'ingest', correlationId, event: 'feed_ok', url, ingested, skipped }));
-    } catch (e) {
-      console.error(JSON.stringify({ route: 'ingest', correlationId, event: 'feed_error', url, error: e instanceof Error ? e.message : String(e) }));
+
+      totalIngested += workspaceIngested;
+      totalSkipped += workspaceSkipped;
+      totalErrors += workspaceErrors;
+
+      console.log(JSON.stringify({
+        route: 'ingest',
+        correlationId,
+        event: 'workspace_done',
+        workspaceId,
+        ingested: workspaceIngested,
+        skipped: workspaceSkipped,
+        errors: workspaceErrors,
+      }));
     }
+
+    console.log(JSON.stringify({
+      route: 'ingest',
+      correlationId,
+      event: 'done',
+      ingested: totalIngested,
+      skipped: totalSkipped,
+      errors: totalErrors,
+    }));
+
+    return NextResponse.json({
+      ingested: totalIngested,
+      skipped: totalSkipped,
+      errors: totalErrors,
+      correlationId,
+    });
+  } catch (error) {
+    console.error(JSON.stringify({
+      route: 'ingest',
+      correlationId,
+      event: 'fatal_error',
+      error: error instanceof Error ? error.message : String(error),
+    }));
+
+    return NextResponse.json({
+      error: 'Ingestion failed',
+      ingested: totalIngested,
+      skipped: totalSkipped,
+      errors: totalErrors + 1,
+      correlationId,
+    }, { status: 500 });
   }
-  console.log(JSON.stringify({ route: 'ingest', correlationId, event: 'done', ingested, skipped }));
-  return NextResponse.json({ ingested, skipped, correlationId });
 }

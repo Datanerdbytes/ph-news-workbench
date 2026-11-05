@@ -30,16 +30,22 @@ CREATE INDEX IF NOT EXISTS workspace_invites_workspace_idx ON workspace_invites 
 
 CREATE TABLE IF NOT EXISTS feeds (
   id SERIAL PRIMARY KEY,
-  url TEXT NOT NULL UNIQUE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  title TEXT,
   etag TEXT,
   last_modified TEXT,
   last_fetched_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now()
+  error_message TEXT,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (workspace_id, url)
 );
 
 CREATE TABLE IF NOT EXISTS news_items (
   id SERIAL PRIMARY KEY,
-  feed_id INTEGER REFERENCES feeds(id) ON DELETE CASCADE,
+  feed_id INTEGER REFERENCES feeds(id) ON DELETE SET NULL,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   guid TEXT,
   link TEXT NOT NULL,
   title TEXT NOT NULL,
@@ -49,8 +55,12 @@ CREATE TABLE IF NOT EXISTS news_items (
   dedup_hash TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE (feed_id, dedup_hash)
+  UNIQUE (workspace_id, dedup_hash)
 );
+
+CREATE INDEX IF NOT EXISTS feeds_workspace_idx ON feeds (workspace_id);
+CREATE INDEX IF NOT EXISTS news_items_workspace_idx ON news_items (workspace_id);
+CREATE INDEX IF NOT EXISTS news_items_feed_idx ON news_items (feed_id);
 
 CREATE TABLE IF NOT EXISTS drafts (
   id SERIAL PRIMARY KEY,
