@@ -65,9 +65,28 @@ export async function POST(request: Request) {
     .filter((value: unknown): value is string => typeof value === "string" && value.length > 0)
     .slice(0, MAX_POST_IMAGES);
 
+  // Optional target page — validated against the workspace's connected pages;
+  // null lets the executor fall back to the default (primary) page.
+  const requestedPageId =
+    typeof body?.pageId === "string" && body.pageId ? body.pageId : null;
+  let scheduledPageId: string | null = null;
+  if (requestedPageId) {
+    const pageRows = (await sql`
+      SELECT page_id FROM facebook_pages
+      WHERE workspace_id = ${access.workspace.id} AND page_id = ${requestedPageId}
+    `) as unknown as { page_id: string }[];
+    if (!pageRows.length) {
+      return NextResponse.json(
+        { error: "That Page is not connected to this workspace." },
+        { status: 404 }
+      );
+    }
+    scheduledPageId = requestedPageId;
+  }
+
   const rows = (await sql`
     INSERT INTO scheduled_posts
-      (workspace_id, news_item_id, draft_id, text, image_url, image_urls, scheduled_for, created_by)
+      (workspace_id, news_item_id, draft_id, text, image_url, image_urls, scheduled_for, page_id, created_by)
     VALUES
       (${access.workspace.id},
        ${Number.isInteger(newsItemId) && newsItemId > 0 ? newsItemId : null},
@@ -75,7 +94,7 @@ export async function POST(request: Request) {
        ${text},
        ${imageUrls[0] ?? null},
        ${imageUrls.length ? JSON.stringify(imageUrls) : null}::jsonb,
-       ${scheduledFor.toISOString()}, ${access.user.id})
+       ${scheduledFor.toISOString()}, ${scheduledPageId}, ${access.user.id})
     RETURNING id, news_item_id, scheduled_for, status`) as unknown as {
     id: number;
     news_item_id: number | null;

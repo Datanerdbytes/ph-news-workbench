@@ -65,12 +65,21 @@ export async function POST(request: Request) {
     const outputPath = path.join(workDir, 'output.mp4');
     await writeFile(inputPath, Buffer.from(await video.arrayBuffer()));
 
-    const duration = await probeVideoDurationSeconds(inputPath);
+    let duration = await probeVideoDurationSeconds(inputPath);
+    let transcoded = false;
     if (duration === null) {
-      return NextResponse.json(
-        { error: 'Could not read the video. Is it a valid video file?' },
-        { status: 400 }
-      );
+      // MediaRecorder WebM (browser-baked animation reels) carries no Duration
+      // header, so ffprobe cannot read it up front. Transcode first — the
+      // H.264 MP4 output is well-formed — and probe that instead.
+      await transcodeToReelFootage(inputPath, outputPath);
+      transcoded = true;
+      duration = await probeVideoDurationSeconds(outputPath);
+      if (duration === null) {
+        return NextResponse.json(
+          { error: 'Could not read the video. Is it a valid video file?' },
+          { status: 400 }
+        );
+      }
     }
     if (duration < MIN_DURATION || duration > MAX_DURATION) {
       return NextResponse.json(
@@ -81,7 +90,9 @@ export async function POST(request: Request) {
       );
     }
 
-    await transcodeToReelFootage(inputPath, outputPath);
+    if (!transcoded) {
+      await transcodeToReelFootage(inputPath, outputPath);
+    }
     const buffer = await readFile(outputPath);
 
     return new NextResponse(new Uint8Array(buffer), {

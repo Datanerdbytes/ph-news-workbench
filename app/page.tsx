@@ -23,6 +23,10 @@ import { AssistantChat } from '@/components/assistant-chat';
 import { FacebookMark } from '@/components/facebook-mark';
 import { useFacebookConnection } from '@/components/facebook-connection';
 import { FacebookPreview } from '@/components/facebook-preview';
+import {
+  PageSelector,
+  useManagedPages,
+} from '@/components/publishing/publish-page';
 import { StatusPill, statusMeta } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -117,6 +121,8 @@ function EmptyWorkspace({ onRefresh }: { onRefresh: () => void }) {
 
 export default function Home() {
   const facebook = useFacebookConnection();
+  const pages = useManagedPages();
+  const selectedPage = pages.pages.find((page) => page.id === pages.selected[0]);
   const [items, setItems] = useState<Item[]>([]);
   const [selected, setSelected] = useState<Item | null>(null);
   const [draft, setDraft] = useState('');
@@ -403,6 +409,7 @@ export default function Home() {
           text: draft,
           imageUrls: images,
           scheduledFor: when.toISOString(),
+          pageId: pages.selected[0],
         }),
       });
       const data = await res.json();
@@ -478,6 +485,7 @@ export default function Home() {
           newsItemId: selected.id,
           message: draft,
           imageUrls: images,
+          pageId: pages.selected[0],
         }),
       });
       const data = await res.json().catch(() => null);
@@ -996,6 +1004,14 @@ export default function Home() {
                       </div>
 
                       <div className="flex flex-wrap items-end justify-between gap-3 border-t border-border/60 bg-muted/30 px-5 py-3">
+                        <div className="w-full -mb-1">
+                          <PageSelector
+                            pages={pages.pages}
+                            selected={pages.selected}
+                            onSelect={pages.selectOne}
+                            loading={pages.loading}
+                          />
+                        </div>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] tabular-nums text-muted-foreground">
                           {stats ? (
                             <>
@@ -1055,6 +1071,7 @@ export default function Home() {
                               disabled={
                                 !draft ||
                                 !facebook.connected ||
+                                !pages.selected.length ||
                                 publishing ||
                                 selected?.status === 'published'
                               }
@@ -1071,6 +1088,7 @@ export default function Home() {
                               disabled={
                                 !draft ||
                                 !facebook.connected ||
+                                !pages.selected.length ||
                                 selected?.status === 'published'
                               }
                               aria-expanded={scheduleOpen}
@@ -1160,7 +1178,10 @@ export default function Home() {
                         text={stripMarkdown(draft)}
                         imageUrls={images}
                         connected={facebook.connected}
-                        pageName={facebook.page?.name}
+                        pageName={
+                          selectedPage?.name ?? facebook.page?.name
+                        }
+                        pagePicture={selectedPage?.picture}
                       />
                     </div>
 

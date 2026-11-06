@@ -225,7 +225,7 @@ function AddFeedDialog({
             </p>
           )}
           <p className="text-[10.5px] text-muted-foreground">
-            Enter the URL of an RSS or Atom feed. We'll fetch the title and preview the latest stories.
+            Enter the URL of an RSS or Atom feed. We&apos;ll fetch the title and preview the latest stories.
           </p>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>

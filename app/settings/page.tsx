@@ -98,6 +98,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [savingModel, setSavingModel] = useState(false);
   const [theme, setTheme] = useState<ThemeId>("ink-white");
+  // The <html> data-theme attribute derives from the saved preference state —
+  // one writer, covering initial load, optimistic switches, and reverts.
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
   const [savingTheme, setSavingTheme] = useState(false);
   const { data: session } = authClient.useSession();
   const connection = useFacebookConnection();
@@ -123,7 +128,6 @@ export default function SettingsPage() {
       .then((data) => {
         if (data && isThemeId(data.theme)) {
           setTheme(data.theme);
-          document.documentElement.dataset.theme = data.theme;
         }
       })
       .catch(() => {});
@@ -134,7 +138,6 @@ export default function SettingsPage() {
     if (next === theme || savingTheme) return;
     const previous = theme;
     setTheme(next);
-    document.documentElement.dataset.theme = next;
     setSavingTheme(true);
     try {
       const res = await fetch("/api/preferences", {
@@ -149,7 +152,6 @@ export default function SettingsPage() {
       });
     } catch (error) {
       setTheme(previous);
-      document.documentElement.dataset.theme = previous;
       toast.error("Could not save", {
         description: error instanceof Error ? error.message : "Please try again.",
       });

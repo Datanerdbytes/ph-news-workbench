@@ -7,12 +7,14 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 import { FacebookMark } from "@/components/facebook-mark";
+import { PageAvatar } from "@/components/publishing/page-selection";
 import { imageSrc } from "@/lib/format";
 
 type FacebookPreviewProps = {
   text: string;
   imageUrls?: string[];
   pageName?: string;
+  pagePicture?: string | null;
   connected?: boolean;
 };
 
@@ -20,6 +22,7 @@ export function FacebookPreview({
   text,
   imageUrls = [],
   pageName = "Philippine News",
+  pagePicture,
   connected = false,
 }: FacebookPreviewProps) {
   return (
@@ -48,9 +51,10 @@ export function FacebookPreview({
         <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white text-neutral-900 shadow-sm">
           <div className="p-3.5">
             <div className="flex items-start gap-2.5">
-              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ink font-heading text-sm text-paper">
-                PH
-              </span>
+              <PageAvatar
+                page={{ name: pageName, picture: pagePicture }}
+                className="size-10 text-sm"
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold leading-tight">
                   {pageName}

@@ -50,6 +50,9 @@ export default function CalendarPage() {
   });
   const [loading, setLoading] = useState(true);
   const [runningDue, setRunningDue] = useState(false);
+  // One shared clock for every "is it due yet?" comparison in the render —
+  // refreshed on the same minute cadence as load().
+  const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async (quiet = false) => {
     try {
@@ -68,8 +71,15 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => {
+    // TODO: move the initial fetch out of the effect (react-hooks
+    // set-state-in-effect) — same load-then-setState pattern as the other
+    // pages; refactoring to loaders is tracked as follow-up work.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-    const timer = setInterval(() => void load(true), 60_000);
+    const timer = setInterval(() => {
+      setNow(Date.now());
+      void load(true);
+    }, 60_000);
     return () => clearInterval(timer);
   }, [load]);
 
@@ -115,14 +125,14 @@ export default function CalendarPage() {
       // Facebook publishes its own schedules, so "publish now" only applies
       // to the posts this workspace executes itself.
       post.source !== "facebook" &&
-      new Date(post.scheduled_for).getTime() <= Date.now()
+      new Date(post.scheduled_for).getTime() <= now
   );
 
   const upcoming = posts
     .filter(
       (post) =>
         post.status === "scheduled" &&
-        new Date(post.scheduled_for).getTime() > Date.now()
+        new Date(post.scheduled_for).getTime() > now
     )
     .slice(0, 6);
 
@@ -351,7 +361,7 @@ export default function CalendarPage() {
                 <ul className="divide-y divide-border">
                   {queued.map((post) => {
                     const late =
-                      new Date(post.scheduled_for).getTime() <= Date.now();
+                      new Date(post.scheduled_for).getTime() <= now;
                     return (
                       <li key={post.id} className="group px-4 py-3">
                         <div className="flex items-start justify-between gap-2">

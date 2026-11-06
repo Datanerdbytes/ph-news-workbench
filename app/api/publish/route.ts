@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { requireWorkspace, unauthorized } from '@/lib/session';
-import { decryptToken } from '@/lib/facebook-token';
+import { resolvePageTargets } from '@/lib/publishing/connection';
 import { stripMarkdown } from '@/lib/format';
 import {
   FacebookApiError,
@@ -13,9 +13,6 @@ import {
 export const dynamic = 'force-dynamic';
 
 type ConnectionRow = {
-  page_id: string;
-  page_name: string;
-  access_token: string;
   scopes: string | null;
 };
 
@@ -23,13 +20,13 @@ export async function POST(request: Request) {
   const access = await requireWorkspace(request);
   if (!access) return unauthorized();
 
-  const rows = (await sql`
-    SELECT page_id, page_name, access_token, scopes
+  const connectionRows = (await sql`
+    SELECT scopes
     FROM facebook_connections
     WHERE workspace_id = ${access.workspace.id}
   `) as unknown as ConnectionRow[];
 
-  const connection = rows[0];
+  const connection = connectionRows[0];
   if (!connection) {
     return NextResponse.json(
       { error: 'Connect your Facebook Page before publishing.', code: 'not_connected' },
@@ -64,16 +61,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'newsItemId is required.' }, { status: 400 });
   }
 
+  // Optional target page — falls back to the workspace default (primary)
+  // page, then to the legacy connection, matching every other composer.
+  const requestedPageId =
+    typeof body?.pageId === 'string' && body.pageId ? body.pageId : null;
+  const targets = await resolvePageTargets(
+    access.workspace.id,
+    requestedPageId ? [requestedPageId] : []
+  );
+  const target = targets[0];
+  if (!target) {
+    return NextResponse.json(
+      {
+        error: requestedPageId
+          ? 'That Page is not connected to this workspace.'
+          : 'Connect your Facebook Page before publishing.',
+        code: 'not_connected',
+      },
+      { status: 409 }
+    );
+  }
+
   try {
-    const accessToken = decryptToken(connection.access_token);
     const imageUrls = Array.isArray(body?.imageUrls)
       ? body.imageUrls
       : typeof body?.imageUrl === 'string'
         ? [body.imageUrl]
         : [];
     const post = await publishPagePost({
-      pageId: connection.page_id,
-      accessToken,
+      pageId: target.id,
+      accessToken: target.accessToken,
       message,
       images: parseImages(imageUrls),
     });
@@ -89,7 +106,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       id: post.id,
       permalink: post.permalink,
-      page: { id: connection.page_id, name: connection.page_name },
+      page: { id: target.id, name: target.name },
     });
   } catch (error) {
     if (error instanceof FacebookApiError) {

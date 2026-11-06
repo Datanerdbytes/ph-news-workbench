@@ -205,13 +205,37 @@ export async function exchangeForLongLivedToken(
 export async function fetchPages(
   userAccessToken: string
 ): Promise<ConnectedFacebookPage[]> {
-  const body = await graphRequest<{ data?: PageNode[] }>(
+  const body = await graphRequest<{
+    data?: PageNode[];
+    paging?: { next?: string };
+  }>(
     'me/accounts',
     { fields: 'id,name,access_token,picture.type(large)', limit: '100' },
     userAccessToken
   );
 
-  return (body.data ?? [])
+  // Follow Graph pagination cursors so accounts managing more than one page
+  // of results (100 per request) still get every page stored. Hard-capped to
+  // keep a misbehaving token from looping forever.
+  const nodes = [...(body.data ?? [])];
+  let next = body.paging?.next;
+  for (let extra = 0; next && extra < 4; extra += 1) {
+    try {
+      const res = await fetch(next);
+      if (!res.ok) break;
+      const page = (await res.json()) as {
+        data?: PageNode[];
+        paging?: { next?: string };
+      };
+      nodes.push(...(page.data ?? []));
+      next = page.paging?.next;
+    } catch {
+      // A failed extra page beats losing the whole connect — keep what we have.
+      break;
+    }
+  }
+
+  return nodes
     .filter((page) => page.access_token)
     .map((page) => ({
       id: page.id,
