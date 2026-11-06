@@ -386,9 +386,8 @@ export default function DashboardPage() {
                   }
 
                   return (
-                    <>
+                    <div key={`${activity.type}-${activity.id}`}>
                       <Link
-                        key={`${activity.type}-${activity.id}`}
                         href={isSchedule
                           ? `/calendar?post=${activity.scheduledPostId}`
                           : `/drafts/${activity.id}`}
@@ -435,7 +434,7 @@ export default function DashboardPage() {
                           onSuccess={() => load()}
                         />
                       )}
-                    </>
+                    </div>
                   );
                 })}
               </div>
