@@ -134,7 +134,7 @@ export default function DashboardPage() {
       const [draftsRes, itemsRes, activitiesRes] = await Promise.all([
         fetch("/api/drafts", { cache: "no-store" }),
         fetch("/api/items", { cache: "no-store" }),
-        fetch("/api/activity?mergeByStory=false", { cache: "no-store" }),
+        fetch("/api/activity?mergeByStory=false&dedupe=false", { cache: "no-store" }),
       ]);
 
       if (!draftsRes.ok || !itemsRes.ok || !activitiesRes.ok) {
@@ -400,7 +400,7 @@ export default function DashboardPage() {
                               date={activity.displayTime}
                               className="text-[10.5px] tabular-nums text-muted-foreground"
                             />
-                            {isSchedule && kind && (
+                            {kind && (
                               <span className="text-[9px] font-bold uppercase tracking-wider text-faint px-1.5 py-0.5 rounded bg-surface-2">
                                 {kind.toUpperCase()}
                               </span>

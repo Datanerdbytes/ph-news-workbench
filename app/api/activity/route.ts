@@ -78,6 +78,22 @@ export async function GET(request: Request) {
     FROM drafts d
     LEFT JOIN news_items n ON n.id = d.news_item_id
     WHERE d.workspace_id = ${access.workspace.id}
+      -- A published draft that a scheduled post already put on Facebook is the
+      -- same publish recorded twice (the worker flips this exact draft's
+      -- status); the event row wins. Draft-grained, not story-grained: a
+      -- regenerated draft republished through /api/publish records no event,
+      -- so it stays visible even if the story was published before.
+      AND NOT (
+        d.status = 'published'
+        AND EXISTS (
+          SELECT 1
+          FROM scheduled_post_events pe
+          JOIN scheduled_posts sp ON sp.id = pe.scheduled_post_id
+          WHERE sp.draft_id = d.id
+            AND pe.workspace_id = d.workspace_id
+            AND pe.event = 'published'
+        )
+      )
     ORDER BY d.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
