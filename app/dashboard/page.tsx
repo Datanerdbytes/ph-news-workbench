@@ -11,6 +11,7 @@ import {
   Loader2,
   Newspaper,
   RefreshCw,
+  RotateCcw,
   TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -70,6 +71,53 @@ function greeting() {
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
   return "Good evening";
+}
+
+function RetryButton({
+  scheduledPostId,
+  onSuccess,
+}: {
+  scheduledPostId: number;
+  activityId: string | number;
+  onSuccess: () => void;
+}) {
+  const [pending, setPending] = useState(false);
+
+  async function handleRetry() {
+    setPending(true);
+    try {
+      const res = await fetch(`/api/schedule/${scheduledPostId}/retry`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Retry failed");
+      toast.success("Post queued for retry", {
+        description: "The scheduler will pick it up shortly.",
+      });
+      onSuccess();
+    } catch (error) {
+      toast.error("Could not queue retry", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleRetry}
+      disabled={pending}
+      aria-busy={pending}
+      className="ml-2 h-7 rounded-[6px] px-2 text-[10.5px] border-muted-foreground/30 hover:bg-surface-2"
+    >
+      <RotateCcw className={`size-3.5 ${pending ? "animate-spin" : ""}`} aria-hidden />
+      <span className="ml-1">{pending ? "Retrying…" : "Retry"}</span>
+    </Button>
+  );
 }
 
 export default function DashboardPage() {
@@ -338,45 +386,56 @@ export default function DashboardPage() {
                   }
 
                   return (
-                    <Link
-                      key={`${activity.type}-${activity.id}`}
-                      href={isSchedule
-                        ? `/calendar?post=${activity.scheduledPostId}`
-                        : `/drafts/${activity.id}`}
-                      className="group flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <StatusPill status={pillStatus} />
-                          <TimeAgo
-                            date={activity.displayTime}
-                            className="text-[10.5px] tabular-nums text-muted-foreground"
-                          />
-                          {isSchedule && kind && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-faint px-1.5 py-0.5 rounded bg-surface-2">
-                              {kind.toUpperCase()}
-                            </span>
-                          )}
-                          {isSchedule && scheduleSource === "facebook" && (
-                            <span className="text-[9px] font-medium text-brand px-1.5 py-0.5 rounded bg-brand-soft">
-                              FB
-                            </span>
+                    <>
+                      <Link
+                        key={`${activity.type}-${activity.id}`}
+                        href={isSchedule
+                          ? `/calendar?post=${activity.scheduledPostId}`
+                          : `/drafts/${activity.id}`}
+                        className="group flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusPill status={pillStatus} />
+                            <TimeAgo
+                              date={activity.displayTime}
+                              className="text-[10.5px] tabular-nums text-muted-foreground"
+                            />
+                            {isSchedule && kind && (
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-faint px-1.5 py-0.5 rounded bg-surface-2">
+                                {kind.toUpperCase()}
+                              </span>
+                            )}
+                            {isSchedule && scheduleSource === "facebook" && (
+                              <span className="text-[9px] font-medium text-brand px-1.5 py-0.5 rounded bg-brand-soft">
+                                FB
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1.5 line-clamp-2 font-heading text-[15.5px] leading-snug">
+                            {activity.displayTitle}
+                          </p>
+                          {(activity.errorMessage || (isDraft && activity.status === "failed")) && (
+                            <p className="mt-1.5 line-clamp-2 text-xs text-destructive">
+                              {activity.errorMessage ?? "Failed to publish"}
+                            </p>
                           )}
                         </div>
-                        <p className="mt-1.5 line-clamp-2 font-heading text-[15.5px] leading-snug">
-                          {activity.displayTitle}
-                        </p>
-                        {(activity.errorMessage || (isDraft && activity.status === "failed")) && (
-                          <p className="mt-1.5 line-clamp-2 text-xs text-destructive">
-                            {activity.errorMessage ?? "Failed to publish"}
-                          </p>
-                        )}
-                      </div>
-                      <ArrowUpRight
-                        className="mt-1 size-3.5 shrink-0 text-faint transition-colors group-hover:text-foreground"
-                        aria-hidden
-                      />
-                    </Link>
+                        <ArrowUpRight
+                          className="mt-1 size-3.5 shrink-0 text-faint transition-colors group-hover:text-foreground"
+                          aria-hidden
+                        />
+                      </Link>
+                      {isSchedule &&
+                        activity.event === "failed" &&
+                        activity.scheduledPostId && (
+                        <RetryButton
+                          scheduledPostId={activity.scheduledPostId}
+                          activityId={activity.id}
+                          onSuccess={() => load()}
+                        />
+                      )}
+                    </>
                   );
                 })}
               </div>
