@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, UserPlus } from "lucide-react";
+import { Check, ChevronRight, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { useFacebookConnection } from "@/components/facebook-connection";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { textModelLabel, TEXT_MODELS } from "@/lib/models";
+import { isThemeId, THEMES, type ThemeId } from "@/lib/themes";
 
 type WorkspaceInfo = {
   id: string;
@@ -25,6 +26,8 @@ export default function SettingsPage() {
   const [model, setModel] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingModel, setSavingModel] = useState(false);
+  const [theme, setTheme] = useState<ThemeId>("ink-white");
+  const [savingTheme, setSavingTheme] = useState(false);
   const { data: session } = authClient.useSession();
   const connection = useFacebookConnection();
 
@@ -41,6 +44,48 @@ export default function SettingsPage() {
       .catch(() => {});
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/preferences", { signal: controller.signal, cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && isThemeId(data.theme)) {
+          setTheme(data.theme);
+          document.documentElement.dataset.theme = data.theme;
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  async function changeTheme(next: ThemeId) {
+    if (next === theme || savingTheme) return;
+    const previous = theme;
+    setTheme(next);
+    document.documentElement.dataset.theme = next;
+    setSavingTheme(true);
+    try {
+      const res = await fetch("/api/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not save the theme.");
+      toast.success("Theme updated", {
+        description: `Now using ${THEMES.find((option) => option.id === next)?.label}.`,
+      });
+    } catch (error) {
+      setTheme(previous);
+      document.documentElement.dataset.theme = previous;
+      toast.error("Could not save", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setSavingTheme(false);
+    }
+  }
 
   async function saveWorkspace(event: React.FormEvent) {
     event.preventDefault();
@@ -174,6 +219,58 @@ export default function SettingsPage() {
               </dd>
             </div>
           </dl>
+        </section>
+
+        <section className="mt-3 rounded-xl border border-border bg-card p-4">
+          <h2 className="text-[13px] font-semibold">Appearance</h2>
+          <p className="text-[10.5px] text-muted-foreground">
+            Color combination for your account. Applies everywhere you sign in.
+          </p>
+          <div
+            className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+            role="radiogroup"
+            aria-label="Theme"
+          >
+            {THEMES.map((option) => {
+              const selected = option.id === theme;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  disabled={savingTheme}
+                  onClick={() => void changeTheme(option.id)}
+                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60 ${
+                    selected
+                      ? "border-ring bg-brand-soft/60 ring-2 ring-ring/30"
+                      : "border-border hover:bg-surface-2"
+                  }`}
+                >
+                  <span className="flex shrink-0 items-center -space-x-1">
+                    <span
+                      className="size-5 rounded-full border border-border"
+                      style={{ background: option.background }}
+                    />
+                    <span
+                      className="size-5 rounded-full border border-white/60"
+                      style={{ background: option.brand }}
+                    />
+                    <span
+                      className="size-5 rounded-full border border-white/60"
+                      style={{ background: option.accent }}
+                    />
+                  </span>
+                  <span className="min-w-0 flex-1 text-[12px] font-medium">
+                    {option.label}
+                  </span>
+                  {selected && (
+                    <Check className="size-4 shrink-0 text-brand-accent" aria-hidden />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <section className="mt-3 rounded-xl border border-border bg-card p-4">

@@ -5,6 +5,12 @@ CREATE TABLE IF NOT EXISTS workspaces (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS user_preferences (
+  user_id TEXT PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE,
+  theme TEXT NOT NULL DEFAULT 'ink-white',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS workspace_members (
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
