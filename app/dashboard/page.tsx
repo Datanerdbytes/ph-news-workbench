@@ -134,7 +134,7 @@ export default function DashboardPage() {
       const [draftsRes, itemsRes, activitiesRes] = await Promise.all([
         fetch("/api/drafts", { cache: "no-store" }),
         fetch("/api/items", { cache: "no-store" }),
-        fetch("/api/activity?mergeByStory=true", { cache: "no-store" }),
+        fetch("/api/activity?mergeByStory=false", { cache: "no-store" }),
       ]);
 
       if (!draftsRes.ok || !itemsRes.ok || !activitiesRes.ok) {
