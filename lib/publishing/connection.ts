@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { graphRequest } from '@/lib/facebook';
 import { decryptToken } from '@/lib/facebook-token';
 import { requireWorkspace, unauthorized } from '@/lib/session';
 
@@ -10,10 +11,14 @@ type ConnectionRow = {
   scopes: string | null;
 };
 
+/** Pages whose picture self-heal already ran in this server process. */
+const pictureSelfHealTried = new Set<string>();
+
 type ManagedPageRow = {
   page_id: string;
   page_name: string;
   access_token: string;
+  page_picture_url: string | null;
   is_primary: boolean;
 };
 
@@ -120,20 +125,50 @@ export async function requirePublishingConnection(
   }
 }
 
+export type ManagedPage = {
+  id: string;
+  name: string;
+  picture: string | null;
+  primary: boolean;
+};
+
 export async function listManagedPages(
   workspaceId: string
-): Promise<{ id: string; name: string; primary: boolean }[]> {
+): Promise<ManagedPage[]> {
   const rows = (await sql`
-    SELECT page_id, page_name, is_primary
+    SELECT page_id, page_name, access_token, page_picture_url, is_primary
     FROM facebook_pages
     WHERE workspace_id = ${workspaceId}
     ORDER BY is_primary DESC, page_name ASC
-  `) as unknown as { page_id: string; page_name: string; is_primary: boolean }[];
+  `) as unknown as ManagedPageRow[];
 
   if (rows.length) {
+    // Self-heal rows stored before page pictures existed: fetch the Graph
+    // picture once per page per server process and persist it, so later
+    // requests serve it from the DB (silhouette pages never converge, hence
+    // the one-attempt guard).
+    await Promise.all(
+      rows
+        .filter((row) => !row.page_picture_url)
+        .map(async (row) => {
+          const key = `${workspaceId}:${row.page_id}`;
+          if (pictureSelfHealTried.has(key)) return;
+          pictureSelfHealTried.add(key);
+          try {
+            const picture = await fetchPagePictureUrl(row.page_id, decryptToken(row.access_token));
+            if (!picture) return;
+            row.page_picture_url = picture;
+            await sql`UPDATE facebook_pages SET page_picture_url = ${picture} WHERE workspace_id = ${workspaceId} AND page_id = ${row.page_id}`;
+          } catch {
+            // Best effort — the UI falls back to initials when absent.
+          }
+        })
+    );
+
     return rows.map((row) => ({
       id: row.page_id,
       name: row.page_name,
+      picture: row.page_picture_url,
       primary: row.is_primary,
     }));
   }
@@ -147,8 +182,20 @@ export async function listManagedPages(
   return fallback.map((row) => ({
     id: row.page_id,
     name: row.page_name,
+    picture: null,
     primary: true,
   }));
+}
+
+/** Profile picture URL for one page via the Graph API (no extra permission needed). */
+async function fetchPagePictureUrl(
+  pageId: string,
+  pageToken: string
+): Promise<string | null> {
+  const body = await graphRequest<{
+    data?: { url?: string; is_silhouette?: boolean };
+  }>(`${pageId}/picture`, { redirect: 'false', type: 'large' }, pageToken);
+  return body.data?.url && !body.data.is_silhouette ? body.data.url : null;
 }
 
 export async function resolvePageTargets(

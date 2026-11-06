@@ -34,6 +34,7 @@ type PageNode = {
   id: string;
   name: string;
   access_token?: string;
+  picture?: { data?: { url?: string; is_silhouette?: boolean } };
 };
 
 type PermissionNode = {
@@ -49,6 +50,7 @@ export type ConnectedFacebookPage = {
   id: string;
   name: string;
   accessToken: string;
+  picture: string | null;
 };
 
 export function facebookConfigured(): boolean {
@@ -205,7 +207,7 @@ export async function fetchPages(
 ): Promise<ConnectedFacebookPage[]> {
   const body = await graphRequest<{ data?: PageNode[] }>(
     'me/accounts',
-    { fields: 'id,name,access_token', limit: '100' },
+    { fields: 'id,name,access_token,picture.type(large)', limit: '100' },
     userAccessToken
   );
 
@@ -215,6 +217,12 @@ export async function fetchPages(
       id: page.id,
       name: page.name,
       accessToken: page.access_token!,
+      // Default silhouettes are stored as null so the UI can fall back to
+      // initials instead of showing the generic gray avatar.
+      picture:
+        page.picture?.data?.url && !page.picture.data.is_silhouette
+          ? page.picture.data.url
+          : null,
     }));
 }
 export async function fetchGrantedScopes(

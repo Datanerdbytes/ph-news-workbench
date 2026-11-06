@@ -32,6 +32,10 @@ import { toast } from "sonner";
 import { cn } from "cn";
 import { FacebookMark } from "@/components/facebook-mark";
 import { useFacebookConnection } from "@/components/facebook-connection";
+import {
+  PageAvatar,
+  useManagedPages,
+} from "@/components/publishing/publish-page";
 import { authClient } from "@/lib/auth-client";
 
 type NavItem = {
@@ -164,6 +168,12 @@ export function AppFrame({
   const accountRef = useRef<HTMLDivElement>(null);
   const { data: session } = authClient.useSession();
   const connection = useFacebookConnection();
+  // The sidebar's Publishing card mirrors the page selection shared with the
+  // composers, so switching pages anywhere updates it live.
+  const { pages: managedPages, selected: selectedPageIds } = useManagedPages();
+  const activePublishingPage = managedPages.find(
+    (page) => page.id === selectedPageIds[0]
+  );
 
   const workspaceName =
     workspace?.name ?? connection.page?.name ?? "News Workbench";
@@ -243,17 +253,26 @@ export function AppFrame({
           aria-label="Workspace navigation"
         >
           <div className="flex items-center gap-2.5 rounded-[10px] border border-border bg-surface-2 px-2.5 py-2">
-            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink font-heading text-sm font-semibold text-paper">
-              {initials(workspaceName)}
-            </span>
+            {activePublishingPage ? (
+              <PageAvatar
+                page={activePublishingPage}
+                className="size-8 rounded-lg text-[11px]"
+              />
+            ) : (
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink font-heading text-sm font-semibold text-paper">
+                {initials(workspaceName)}
+              </span>
+            )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12.5px] font-semibold leading-tight">
-                {workspaceName}
+                {activePublishingPage?.name ?? workspaceName}
               </p>
               <p className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">
-                {workspace?.role === "editor"
-                  ? "Editor workspace"
-                  : "Owner workspace"}
+                {activePublishingPage
+                  ? `Publishing · ${workspaceName}`
+                  : workspace?.role === "editor"
+                    ? "Editor workspace"
+                    : "Owner workspace"}
               </p>
             </div>
             <button
@@ -340,13 +359,17 @@ export function AppFrame({
                 Publishing
               </p>
               <div className="mt-1.5 flex items-center gap-2">
-                <FacebookMark className="size-5" />
+                {activePublishingPage ? (
+                  <PageAvatar page={activePublishingPage} className="size-5 text-[8px]" />
+                ) : (
+                  <FacebookMark className="size-5" />
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[11px] font-semibold leading-tight">
                     {connection.loading
                       ? "Checking…"
                       : connection.connected
-                        ? connection.page?.name
+                        ? (activePublishingPage?.name ?? connection.page?.name)
                         : connection.configured
                           ? "Connect a Page"
                           : "Setup needed"}

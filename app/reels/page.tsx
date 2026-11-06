@@ -239,7 +239,7 @@ export default function ReelsPage() {
         <PageSelector
           pages={pages.pages}
           selected={pages.selected}
-          onToggle={pages.toggle}
+          onSelect={pages.selectOne}
           loading={pages.loading}
         />
 
@@ -289,6 +289,9 @@ export default function ReelsPage() {
             caption={caption}
             pageName={
               pages.pages.find((page) => page.id === pages.selected[0])?.name
+            }
+            pagePicture={
+              pages.pages.find((page) => page.id === pages.selected[0])?.picture
             }
             preset={preset}
             presetValues={preset ? presetValues[preset.id] : undefined}

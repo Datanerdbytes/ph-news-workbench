@@ -10,6 +10,7 @@ import {
   ThumbsUp,
 } from 'lucide-react';
 import { FacebookMark } from '@/components/facebook-mark';
+import { PageAvatar } from '@/components/publishing/page-selection';
 import { presetStart, type PresetValues, type ReelPreset } from '@/lib/reels/presets';
 
 const OVERLAY_W = 810; // 0.75× of the 1080×1920 design space
@@ -19,12 +20,14 @@ export function FinalReelPreview({
   videoUrl,
   caption,
   pageName = 'Philippine News',
+  pagePicture,
   preset,
   presetValues,
 }: {
   videoUrl: string | null;
   caption: string;
   pageName?: string;
+  pagePicture?: string | null;
   preset?: ReelPreset | null;
   presetValues?: PresetValues;
 }) {
@@ -87,9 +90,10 @@ export function FinalReelPreview({
         <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white text-neutral-900 shadow-sm">
           <div className="p-3.5">
             <div className="flex items-start gap-2.5">
-              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ink font-heading text-sm text-paper">
-                PH
-              </span>
+              <PageAvatar
+                page={{ name: pageName, picture: pagePicture }}
+                className="size-10 text-sm"
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold leading-tight">{pageName}</p>
                 <p className="mt-0.5 flex items-center gap-1 text-[11px] text-neutral-500">

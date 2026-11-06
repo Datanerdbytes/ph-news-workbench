@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FacebookMark } from '@/components/facebook-mark';
 import { AppFrame } from '@/components/app-frame';
@@ -87,42 +86,17 @@ function ConnectGate({
   );
 }
 
-export type ManagedPage = { id: string; name: string; primary: boolean };
+// Page identity, avatar, and the shared page-selection store live in
+// page-selection.tsx (a leaf module) — re-exported here so composer imports
+// keep working from one place.
+export { PageAvatar, useManagedPages } from '@/components/publishing/page-selection';
+export type { ManagedPage } from '@/components/publishing/page-selection';
 
-export function useManagedPages(enabled = true) {
-  const [pages, setPages] = useState<ManagedPage[]>([]);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [loading, setLoading] = useState(enabled);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const controller = new AbortController();
-    fetch('/api/facebook/pages', { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : { pages: [] }))
-      .then((data: { pages?: ManagedPage[] }) => {
-        const list = Array.isArray(data.pages) ? data.pages : [];
-        setPages(list);
-        setSelected((current) => {
-          if (current.length) return current;
-          const primary = list.find((page) => page.primary) ?? list[0];
-          return primary ? [primary.id] : [];
-        });
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-    return () => controller.abort();
-  }, [enabled]);
-
-  function toggle(id: string) {
-    setSelected((current) =>
-      current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id]
-    );
-  }
-
-  return { pages, selected, toggle, loading };
-}
+import {
+  PageAvatar,
+  useManagedPages,
+  type ManagedPage,
+} from '@/components/publishing/page-selection';
 
 export function ComposerCard({
   icon,
@@ -251,17 +225,19 @@ export function FilePicker({
 export function PageSelector({
   pages,
   selected,
-  onToggle,
+  onSelect,
   loading,
 }: {
   pages: ManagedPage[];
   selected: string[];
-  onToggle: (id: string) => void;
+  onSelect: (id: string) => void;
   loading: boolean;
 }) {
+  const selectedId = selected[0] ?? null;
+  const activePage = pages.find((page) => page.id === selectedId);
   return (
     <div>
-      <FieldLabel hint="Crosspost">Pages</FieldLabel>
+      <FieldLabel hint="One page per post">Pages</FieldLabel>
       {loading ? (
         <p className="mt-1.5 text-[11px] text-muted-foreground">
           Loading managed Pages…
@@ -271,26 +247,49 @@ export function PageSelector({
           Posting to {pages[0]?.name ?? 'the connected Page'}.
         </p>
       ) : (
-        <ul className="mt-1.5 space-y-1">
-          {pages.map((page) => (
-            <li key={page.id}>
-              <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background/60 px-2 py-1.5 text-xs">
-                <input
-                  type="checkbox"
-                  checked={selected.includes(page.id)}
-                  onChange={() => onToggle(page.id)}
-                  className="size-3.5 accent-[var(--brand)]"
-                />
-                <span className="min-w-0 flex-1 truncate">{page.name}</span>
-                {page.primary && (
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-faint">
-                    Primary
-                  </span>
-                )}
-              </label>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div
+            role="radiogroup"
+            aria-label="Publishing page"
+            className="mt-1.5 flex flex-wrap gap-1.5"
+          >
+            {pages.map((page) => {
+              const active = page.id === selectedId;
+              return (
+                <button
+                  key={page.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => onSelect(page.id)}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-xs font-semibold transition-colors',
+                    active
+                      ? 'border-ink bg-ink text-paper'
+                      : 'border-border bg-background/60 text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <PageAvatar page={page} className="size-[18px] text-[8px]" />
+                  <span className="max-w-[150px] truncate">{page.name}</span>
+                  {page.primary && (
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wider',
+                        active ? 'bg-white/15' : 'bg-secondary text-faint'
+                      )}
+                    >
+                      Default
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[10px] text-muted-foreground">
+            Posts to {activePage?.name ?? '…'} only. The Default badge marks the
+            page every composer starts on — change it in Settings → Publishing.
+          </p>
+        </>
       )}
     </div>
   );

@@ -109,10 +109,10 @@ export async function GET(request: NextRequest) {
         for (const managed of pages) {
           await sql`
             INSERT INTO facebook_pages
-              (workspace_id, page_id, page_name, access_token, is_primary, updated_at)
+              (workspace_id, page_id, page_name, access_token, page_picture_url, is_primary, updated_at)
             VALUES
               (${workspace.id}, ${managed.id}, ${managed.name},
-               ${encryptToken(managed.accessToken)}, ${managed.id === page.id}, now())
+               ${encryptToken(managed.accessToken)}, ${managed.picture}, ${managed.id === page.id}, now())
           `;
         }
 

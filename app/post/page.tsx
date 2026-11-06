@@ -123,7 +123,7 @@ export default function PostPage() {
         <PageSelector
           pages={pages.pages}
           selected={pages.selected}
-          onToggle={pages.toggle}
+          onSelect={pages.selectOne}
           loading={pages.loading}
         />
 

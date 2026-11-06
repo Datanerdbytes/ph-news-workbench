@@ -7,6 +7,11 @@ import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { useFacebookConnection } from "@/components/facebook-connection";
 import { Button } from "@/components/ui/button";
+import {
+  PageAvatar,
+  useManagedPages,
+} from "@/components/publishing/page-selection";
+import { cn } from "cn";
 import { authClient } from "@/lib/auth-client";
 import { textModelLabel, TEXT_MODELS } from "@/lib/models";
 import { isThemeId, THEMES, type ThemeId } from "@/lib/themes";
@@ -19,6 +24,72 @@ type WorkspaceInfo = {
   aiModel: string | null;
   defaultModel: string;
 };
+
+/**
+ * Picks which connected Page every composer starts on. Writes the workspace's
+ * `is_primary` flag through the shared page-selection store, so the sidebar
+ * and every composer reflect the change immediately.
+ */
+function DefaultPagePicker({ connected }: { connected: boolean }) {
+  const { pages, setPrimaryPage } = useManagedPages();
+  const [saving, setSaving] = useState(false);
+
+  async function choose(pageId: string) {
+    setSaving(true);
+    try {
+      await setPrimaryPage(pageId);
+      toast.success("Default publishing page updated");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save the default."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!connected || !pages.length) return null;
+
+  return (
+    <div className="mt-3">
+      <p className="text-[11px] font-semibold">Default publishing page</p>
+      <p className="mt-0.5 text-[10.5px] leading-relaxed text-muted-foreground">
+        Every composer starts on this page. Switch pages per post right inside
+        the composer.
+      </p>
+      <div
+        role="radiogroup"
+        aria-label="Default publishing page"
+        className="mt-2 flex flex-wrap gap-1.5"
+      >
+        {pages.map((page) => (
+          <button
+            key={page.id}
+            type="button"
+            role="radio"
+            aria-checked={page.primary}
+            disabled={saving}
+            onClick={() => void choose(page.id)}
+            className={cn(
+              "flex cursor-pointer items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-xs font-semibold transition-colors disabled:opacity-60",
+              page.primary
+                ? "border-ink bg-ink text-paper"
+                : "border-border bg-background text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <PageAvatar page={page} className="size-[18px] text-[8px]" />
+            <span className="max-w-[150px] truncate">{page.name}</span>
+            {page.primary && (
+              <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wider">
+                Default
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
@@ -353,6 +424,7 @@ export default function SettingsPage() {
               </Button>
             )}
           </div>
+          <DefaultPagePicker connected={connection.connected} />
         </section>
 
         <Link
