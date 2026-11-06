@@ -15,7 +15,10 @@ export const runtime = 'nodejs';
 const MIN_DURATION = 3;
 const MAX_DURATION = 90;
 const MAX_BYTES = 100 * 1024 * 1024;
-const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
+// WebM is accepted for reels baked in the browser (the GSAP animation overlay
+// is recorded to WebM by MediaRecorder) — it is transcoded to H.264 MP4 here
+// like every other input.
+const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
 
 /**
  * Normalize an uploaded reel to H.264/AAC 1080×1920 before preview or
@@ -43,7 +46,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Choose an MP4 or MOV video.' }, { status: 400 });
   }
   const looksLikeVideo =
-    VIDEO_TYPES.has(video.type) || (!video.type && /\.(mp4|mov)$/i.test(video.name));
+    VIDEO_TYPES.has(video.type) ||
+    (!video.type && /\.(mp4|mov|webm)$/i.test(video.name));
   if (!looksLikeVideo) {
     return NextResponse.json({ error: 'Upload an MP4 or MOV video.' }, { status: 400 });
   }

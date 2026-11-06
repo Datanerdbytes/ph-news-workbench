@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import {
   Globe2,
   MessageCircle,
@@ -9,17 +10,64 @@ import {
   ThumbsUp,
 } from 'lucide-react';
 import { FacebookMark } from '@/components/facebook-mark';
+import { presetStart, type PresetValues, type ReelPreset } from '@/lib/reels/presets';
+
+const OVERLAY_W = 810; // 0.75× of the 1080×1920 design space
+const OVERLAY_H = 1440;
 
 export function FinalReelPreview({
   videoUrl,
   caption,
   pageName = 'Philippine News',
+  preset,
+  presetValues,
 }: {
   videoUrl: string | null;
   caption: string;
   pageName?: string;
+  preset?: ReelPreset | null;
+  presetValues?: PresetValues;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const ready = Boolean(videoUrl);
+
+  // Live animation overlay: a transparent canvas above the video redraws the
+  // preset at the playhead's local time, so preview matches the baked result.
+  // Camera presets (scale) transform the video element itself.
+  const hasOverlay = Boolean(preset && (preset.draw || preset.scale) && videoUrl);
+  useEffect(() => {
+    if (!hasOverlay || !preset) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      const local = video.currentTime - presetStart(preset, duration);
+      const active = local >= 0 && local <= preset.duration;
+      if (preset.scale) {
+        const zoom = active ? preset.scale(local) : 1;
+        video.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
+      }
+      if (!preset.draw) return;
+      ctx.clearRect(0, 0, OVERLAY_W, OVERLAY_H);
+      if (active) {
+        ctx.save();
+        ctx.scale(OVERLAY_W / 1080, OVERLAY_H / 1920);
+        preset.draw(ctx, local, preset.duration, presetValues ?? {});
+        ctx.restore();
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      video.style.transform = '';
+    };
+  }, [hasOverlay, preset, presetValues, videoUrl]);
 
   return (
     <section className="overflow-hidden rounded-xl border border-border/80 bg-card paper-shadow-sm">
@@ -59,13 +107,23 @@ export function FinalReelPreview({
 
             <div className="mt-3">
               {videoUrl ? (
-                <div className="mx-auto aspect-[9/16] max-h-[420px] overflow-hidden rounded-sm bg-black">
+                <div className="relative mx-auto aspect-[9/16] max-h-[420px] overflow-hidden rounded-sm bg-black">
                   <video
+                    ref={videoRef}
                     src={videoUrl}
                     controls
                     playsInline
-                    className="h-full w-full object-contain"
+                    className="h-full w-full object-contain will-change-transform"
                   />
+                  {hasOverlay && (
+                    <canvas
+                      ref={canvasRef}
+                      width={OVERLAY_W}
+                      height={OVERLAY_H}
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 h-full w-full"
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="flex aspect-[9/16] max-h-[420px] w-full flex-col items-center justify-center gap-1.5 rounded-sm bg-neutral-100 px-4 text-center text-neutral-400">

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Video } from 'lucide-react';
 import { toast } from 'sonner';
+import { AnimationPicker } from '@/components/reels/animation-picker';
 import { FinalReelPreview } from '@/components/publishing/final-reel-preview';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,8 +19,45 @@ import {
   useManagedPages,
   type PublishResult,
 } from '@/components/publishing/publish-page';
+import { bakeReelAnimation } from '@/lib/reels/bake';
+import {
+  defaultPresetValues,
+  getPreset,
+  type PresetValues,
+} from '@/lib/reels/presets';
 
 const MAX_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Run a video blob through the normalizer (H.264 1080×1920). Returns the
+ * original blob wrapped as a File when normalization is unavailable, so every
+ * caller can keep going with a postable file either way.
+ */
+async function normalizeVideo(
+  blob: Blob,
+  name: string
+): Promise<{ file: File; normalized: boolean; error?: string }> {
+  const form = new FormData();
+  form.append('video', blob, name);
+  const res = await fetch('/api/reels/prepare', { method: 'POST', body: form });
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as
+      | { error?: string }
+      | null;
+    const base = name.replace(/\.[^.]+$/, '');
+    return {
+      file: new File([blob], name, { type: blob.type || 'video/mp4' }),
+      normalized: false,
+      error: data?.error ?? 'The video could not be normalized.',
+    };
+  }
+  const out = await res.blob();
+  const base = name.replace(/\.[^.]+$/, '');
+  return {
+    file: new File([out], `${base}.mp4`, { type: 'video/mp4' }),
+    normalized: true,
+  };
+}
 
 export default function ReelsPage() {
   const pages = useManagedPages();
@@ -32,6 +70,13 @@ export default function ReelsPage() {
   const [results, setResults] = useState<PublishResult[] | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  const [presetId, setPresetId] = useState<string | null>(null);
+  const [presetValues, setPresetValues] = useState<Record<string, PresetValues>>(
+    () => defaultPresetValues()
+  );
+  const [renderPct, setRenderPct] = useState<number | null>(null);
+  const preset = getPreset(presetId);
+
   /**
    * Picked videos are normalized to H.264 1080×1920 before anything else:
    * Safari cannot preview AV1/HEVC downloads, and Facebook prefers standard
@@ -43,21 +88,9 @@ export default function ReelsPage() {
     if (!picked) return;
     setNormalizing(true);
     try {
-      const form = new FormData();
-      form.append('video', picked);
-      const res = await fetch('/api/reels/prepare', {
-        method: 'POST',
-        body: form,
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as
-          | { error?: string }
-          | null;
-        throw new Error(data?.error ?? 'The video could not be normalized.');
-      }
-      const blob = await res.blob();
-      const base = picked.name.replace(/\.[^.]+$/, '');
-      setFile(new File([blob], `${base}.mp4`, { type: 'video/mp4' }));
+      const { file: normalized, error } = await normalizeVideo(picked, picked.name);
+      setFile(normalized);
+      if (error) throw new Error(error);
       toast.success('Video normalized', {
         description: 'Converted to H.264 1080×1920 — previews everywhere and uploads cleanly.',
       });
@@ -91,9 +124,38 @@ export default function ReelsPage() {
     }
     setBusy(true);
     setResults(null);
+    setRenderPct(null);
     try {
+      let uploadFile = file;
+      // Bake the selected animation into the footage first: record the video
+      // + GSAP overlay to WebM in the browser, then normalize back to MP4.
+      if (preset && preset.id !== 'none' && fileUrl) {
+        const webm = await bakeReelAnimation({
+          videoUrl: fileUrl,
+          presetId: preset.id,
+          values: presetValues[preset.id] ?? {},
+          onProgress: setRenderPct,
+        }).catch((error: unknown) => {
+          toast.warning('Posting without the animation', {
+            description:
+              error instanceof Error
+                ? error.message
+                : 'The animation could not be rendered in this browser.',
+          });
+          return null;
+        });
+        if (webm) {
+          const baked = await normalizeVideo(webm, 'baked-reel.webm');
+          if (baked.normalized) uploadFile = baked.file;
+          else
+            toast.warning('Posting without the animation', {
+              description: baked.error ?? 'The baked reel could not be normalized.',
+            });
+        }
+      }
+      setRenderPct(null);
       const form = new FormData();
-      form.append('video', file);
+      form.append('video', uploadFile);
       form.append('caption', caption);
       if (scheduleOn) form.append('scheduledFor', new Date(scheduledFor).toISOString());
       form.append('pageIds', JSON.stringify(pages.selected));
@@ -114,6 +176,7 @@ export default function ReelsPage() {
       });
     } finally {
       setBusy(false);
+      setRenderPct(null);
       window.setTimeout(
         () => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }),
         50
@@ -145,6 +208,18 @@ export default function ReelsPage() {
             Normalizing the video to H.264 1080×1920… (a few seconds)
           </p>
         )}
+
+        <AnimationPicker
+          value={presetId}
+          values={presetValues}
+          onSelect={setPresetId}
+          onFieldChange={(id, key, text) =>
+            setPresetValues((current) => ({
+              ...current,
+              [id]: { ...current[id], [key]: text },
+            }))
+          }
+        />
 
         <div>
           <FieldLabel htmlFor="reel-caption" hint={`${caption.length}/2200`}>
@@ -183,12 +258,22 @@ export default function ReelsPage() {
             disabled={!file || busy || !pages.selected.length}
           >
             <Video className="size-3.5" aria-hidden />
-            {busy ? 'Uploading…' : scheduleOn ? 'Schedule reel' : 'Post reel'}
+            {renderPct != null
+              ? `Rendering ${Math.round(renderPct * 100)}%…`
+              : busy
+                ? 'Uploading…'
+                : scheduleOn
+                  ? 'Schedule reel'
+                  : 'Post reel'}
           </Button>
           <span className="text-[10px] text-muted-foreground">
-            {scheduleOn
-              ? 'Facebook queues the reel and publishes it at the chosen time.'
-              : 'Publishes straight to the selected Page(s).'}
+            {renderPct != null
+              ? `Baking “${preset?.name}” into the footage — keep this tab open.`
+              : preset && preset.id !== 'none'
+                ? `“${preset.name}” is rendered into the reel when you post.`
+                : scheduleOn
+                  ? 'Facebook queues the reel and publishes it at the chosen time.'
+                  : 'Publishes straight to the selected Page(s).'}
           </span>
         </div>
 
@@ -205,6 +290,8 @@ export default function ReelsPage() {
             pageName={
               pages.pages.find((page) => page.id === pages.selected[0])?.name
             }
+            preset={preset}
+            presetValues={preset ? presetValues[preset.id] : undefined}
           />
         </div>
       </div>

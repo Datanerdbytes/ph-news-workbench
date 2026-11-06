@@ -43,14 +43,41 @@ export async function probeVideoDurationSeconds(
     ],
     15_000
   );
-  if (code !== 0) return null;
-  try {
-    const parsed = JSON.parse(output) as { format?: { duration?: string } };
-    const duration = Number(parsed.format?.duration);
-    return Number.isFinite(duration) && duration > 0 ? duration : null;
-  } catch {
-    return null;
+  if (code === 0) {
+    try {
+      const parsed = JSON.parse(output) as { format?: { duration?: string } };
+      const duration = Number(parsed.format?.duration);
+      if (Number.isFinite(duration) && duration > 0) return duration;
+    } catch {
+      // Fall through to the packet-timestamp probe below.
+    }
   }
+
+  // MediaRecorder writes Matroska/WebM without a duration in the header, so
+  // ffprobe reports "N/A" for baked reels. Recover the real length from the
+  // last packet timestamp of any stream.
+  const packets = await run(
+    'ffprobe',
+    [
+      '-v',
+      'error',
+      '-show_entries',
+      'packet=pts_time',
+      '-of',
+      'csv=p=0',
+      file,
+    ],
+    30_000
+  );
+  if (packets.code === 0) {
+    let longest = 0;
+    for (const line of packets.output.split('\n')) {
+      const value = Number(line.split(',')[0]);
+      if (Number.isFinite(value) && value > longest) longest = value;
+    }
+    if (longest > 0) return longest;
+  }
+  return null;
 }
 
 /**
