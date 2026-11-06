@@ -13,7 +13,7 @@ import {
   recordScheduleEvent,
   type ScheduleEventSource,
 } from "@/lib/schedule-events";
-import { resolvePageToken } from "@/lib/facebook-page-token";
+import { getPrimaryPage, resolvePageToken } from "@/lib/facebook-page-token";
 
 /** How many times the local executor will try a post before giving up. */
 const MAX_ATTEMPTS = 3;
@@ -93,8 +93,8 @@ export async function publishDuePosts(
     });
 
     try {
-      const token = await resolvePageToken(post.workspace_id, null);
-      if (!token) {
+      const primary = await getPrimaryPage(post.workspace_id);
+      if (!primary) {
         throw new Error("This workspace has no connected Facebook Page.");
       }
 
@@ -105,8 +105,8 @@ export async function publishDuePosts(
           : [];
 
       const result = await publishPagePost({
-        pageId: token, // resolvePageToken returns the token directly, not a page object
-        accessToken: token,
+        pageId: primary.pageId,
+        accessToken: primary.token,
         message: stripMarkdown(post.text),
         images: parseImages(storedImages),
       });
