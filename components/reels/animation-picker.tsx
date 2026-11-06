@@ -6,10 +6,10 @@ import {
   PRESET_CATEGORIES,
   REEL_PRESETS,
   getPreset,
-  mountPreset,
   type PresetValues,
   type ReelPreset,
 } from '@/lib/reels/presets';
+import { mountPreset } from '@/lib/reels/presets.preview';
 import { FieldLabel, inputClass } from '@/components/publishing/publish-page';
 import { cn } from 'cn';
 

@@ -120,24 +120,39 @@ export async function bakeReelAnimation(options: BakeOptions): Promise<Blob> {
   const effectStart = presetStart(preset, duration);
 
   await new Promise<void>((resolve) => {
+    const fps = 30;
+    const minFrameMs = 1000 / fps;
+    const start = performance.now();
+    let lastFrameTime = start;
     let raf = 0;
     const tick = () => {
-      const t = video.currentTime;
-      if (duration) onProgress?.(Math.min(1, t / duration));
-      const local = t - effectStart;
-      ctx.clearRect(0, 0, DESIGN_W, DESIGN_H);
-      const zoom =
-        preset.scale && local >= 0 && local <= preset.duration ? preset.scale(local) : 1;
-      drawFootage(ctx, video, zoom);
-      if (preset.draw && local >= 0 && local <= preset.duration) {
-        ctx.save();
-        preset.draw(ctx, local, preset.duration, values);
-        ctx.restore();
-      }
-      if (video.ended || (duration && t >= duration - 0.05)) {
+      const now = performance.now();
+      // Wall-clock time since the bake started — deterministic, independent of
+      // video.currentTime read jitter (was ~20–21 fps vs the 30 fps source).
+      const t = (now - start) / 1000;
+      if (t >= duration) {
         cancelAnimationFrame(raf);
         resolve();
         return;
+      }
+      // Produce one frame per 30 fps slot, seeking the video explicitly so each
+      // frame renders at a deterministic time instead of drifting with RAF.
+      if (now - lastFrameTime >= minFrameMs) {
+        lastFrameTime = now;
+        video.currentTime = Math.min(t, duration);
+        const local = video.currentTime - effectStart;
+        if (duration) onProgress?.(Math.min(1, video.currentTime / duration));
+        ctx.clearRect(0, 0, DESIGN_W, DESIGN_H);
+        const zoom =
+          preset.scale && local >= 0 && local <= preset.duration
+            ? preset.scale(local)
+            : 1;
+        drawFootage(ctx, video, zoom);
+        if (preset.draw && local >= 0 && local <= preset.duration) {
+          ctx.save();
+          preset.draw(ctx, local, preset.duration, values);
+          ctx.restore();
+        }
       }
       raf = requestAnimationFrame(tick);
     };
