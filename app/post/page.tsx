@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Link2, PenLine, SendHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
+import { AssistantChat } from '@/components/assistant-chat';
 import { Button } from '@/components/ui/button';
 import {
   ComposerCard,
@@ -153,6 +154,7 @@ export default function PostPage() {
 
         {results && <ResultList results={results} />}
       </ComposerCard>
+      <AssistantChat draft={message} onDraftChange={setMessage} />
     </PublishPage>
   );
 }

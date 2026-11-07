@@ -127,7 +127,7 @@ export default function LoginPage() {
               <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-brand" />
               <span>
                 <strong className="font-medium text-paper">An editorial voice.</strong>{" "}
-                English or Tagalog, refined in place by the desk assistant.
+                English or Tagalog, refined in place by the AI assistant.
               </span>
             </li>
             <li className="flex gap-3">

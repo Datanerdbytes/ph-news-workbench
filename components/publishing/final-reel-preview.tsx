@@ -73,20 +73,28 @@ export function FinalReelPreview({
   }, [hasOverlay, preset, presetValues, videoUrl]);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-border/80 bg-card paper-shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
-        <span className="eyebrow text-muted-foreground">Facebook preview</span>
-        <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <section className="relative isolate flex flex-col overflow-hidden rounded-xl bg-[#171923] p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-16 -top-20 -z-10 size-[220px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
+      />
+      <div className="flex items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
           <span
             className={
-              ready ? 'size-1.5 rounded-full bg-facebook' : 'size-1.5 rounded-full bg-brand'
+              ready
+                ? 'size-1.5 rounded-full bg-[#79d2ae]'
+                : 'size-1.5 rounded-full bg-white/70'
             }
           />
           {ready ? 'Ready to post' : 'Awaiting reel'}
         </span>
+        <span className="font-mono text-[9px] uppercase text-white/35">
+          Facebook
+        </span>
       </div>
 
-      <div className="p-4">
+      <div className="mt-4 min-w-0">
         <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white text-neutral-900 shadow-sm">
           <div className="p-3.5">
             <div className="flex items-start gap-2.5">
@@ -111,7 +119,7 @@ export function FinalReelPreview({
 
             <div className="mt-3">
               {videoUrl ? (
-                <div className="relative mx-auto aspect-[9/16] max-h-[420px] overflow-hidden rounded-sm bg-black">
+                <div className="relative mx-auto aspect-[9/16] max-h-[200px] overflow-hidden rounded-sm bg-black">
                   <video
                     ref={videoRef}
                     src={videoUrl}
@@ -130,7 +138,7 @@ export function FinalReelPreview({
                   )}
                 </div>
               ) : (
-                <div className="flex aspect-[9/16] max-h-[420px] w-full flex-col items-center justify-center gap-1.5 rounded-sm bg-neutral-100 px-4 text-center text-neutral-400">
+                <div className="flex aspect-[9/16] max-h-[200px] w-full flex-col items-center justify-center gap-1.5 rounded-sm bg-neutral-100 px-4 text-center text-neutral-400">
                   <Play className="size-5" aria-hidden />
                   <p className="text-[10.5px] font-medium leading-relaxed">
                     The final reel appears here once you attach a video.

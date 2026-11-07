@@ -5,6 +5,7 @@ import { Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimationPicker } from '@/components/reels/animation-picker';
 import { FinalReelPreview } from '@/components/publishing/final-reel-preview';
+import { AssistantChat } from '@/components/assistant-chat';
 import { Button } from '@/components/ui/button';
 import {
   ComposerCard,
@@ -298,6 +299,7 @@ export default function ReelsPage() {
           />
         </div>
       </div>
+      <AssistantChat draft={caption} onDraftChange={setCaption} />
     </PublishPage>
   );
 }

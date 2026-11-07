@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FolderPlus, Images, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { AssistantChat } from '@/components/assistant-chat';
 import { Button } from '@/components/ui/button';
 import { cn } from 'cn';
 import {
@@ -447,6 +448,7 @@ export default function PhotosPage() {
           </ComposerCard>
         </div>
       )}
+      <AssistantChat draft={message} onDraftChange={setMessage} />
     </PublishPage>
   );
 }

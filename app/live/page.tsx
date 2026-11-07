@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Copy, Radio, RefreshCw, Square, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
+import { AssistantChat } from '@/components/assistant-chat';
 import { Button } from '@/components/ui/button';
 import { cn } from 'cn';
 import {
@@ -257,6 +258,7 @@ export default function LivePage() {
           </div>
         </section>
       </div>
+      <AssistantChat draft={description} onDraftChange={setDescription} />
     </PublishPage>
   );
 }

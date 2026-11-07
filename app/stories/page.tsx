@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { ImagePlus, Sparkles, Video } from 'lucide-react';
+import { ImagePlus, Sparkles, TriangleAlert, Video } from 'lucide-react';
 import { toast } from 'sonner';
+import { AssistantChat } from '@/components/assistant-chat';
 import { Button } from '@/components/ui/button';
 import {
   ComposerCard,
@@ -23,9 +24,24 @@ export default function StoriesPage() {
   const [kind, setKind] = useState<Kind>('photo');
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState('');
+  const [photoBlobUrl, setPhotoBlobUrl] = useState<string | null>(null);
   const [video, setVideo] = useState<File | null>(null);
+  const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
+  const [brokenSource, setBrokenSource] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PublishResult[] | null>(null);
+
+  function applyStoryPhoto(next: File | null) {
+    if (photoBlobUrl) URL.revokeObjectURL(photoBlobUrl);
+    setPhoto(next);
+    setPhotoBlobUrl(next ? URL.createObjectURL(next) : null);
+  }
+
+  function applyStoryVideo(next: File | null) {
+    if (videoBlobUrl) URL.revokeObjectURL(videoBlobUrl);
+    setVideo(next);
+    setVideoBlobUrl(next ? URL.createObjectURL(next) : null);
+  }
 
   const canPublish =
     kind === 'photo'
@@ -52,9 +68,9 @@ export default function StoriesPage() {
       if (!res.ok) throw new Error(data?.error ?? 'The story could not be published.');
       setResults(data.results ?? []);
       toast.success('Story published', { description: data.warning });
-      setPhoto(null);
+      applyStoryPhoto(null);
       setPhotoUrl('');
-      setVideo(null);
+      applyStoryVideo(null);
     } catch (error) {
       toast.error('Story upload failed', {
         description: error instanceof Error ? error.message : undefined,
@@ -64,23 +80,136 @@ export default function StoriesPage() {
     }
   }
 
+  const storySource =
+    kind === 'photo'
+      ? photoBlobUrl ?? (photoUrl.trim() || null)
+      : videoBlobUrl;
+
+  const storyAside = (
+    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-[#171923] p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-16 -top-20 -z-10 size-[220px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
+      />
+      <div className="flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
+          <span
+            className={
+              storySource
+                ? 'size-1.5 rounded-full bg-[#79d2ae]'
+                : 'size-1.5 rounded-full bg-white/70'
+            }
+          />
+          {storySource ? 'Ready to publish' : 'Upload preview'}
+        </span>
+        <span className="font-mono text-[9px] uppercase text-white/35">Story</span>
+      </div>
+
+      <div className="relative mt-4 flex aspect-[9/16] max-h-[300px] w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
+        {storySource ? (
+          brokenSource === storySource ? (
+            <div className="flex flex-col items-center gap-1.5 px-4 text-center">
+              <TriangleAlert className="size-4 text-warning" aria-hidden />
+              <p className="text-[10px] font-semibold text-white/75">
+                Can’t preview this item
+              </p>
+              <p className="text-[9.5px] leading-relaxed text-white/40">
+                It can still be published as-is.
+              </p>
+            </div>
+          ) : kind === 'photo' ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={storySource}
+              src={storySource}
+              alt="Photo story preview"
+              onError={() => setBrokenSource(storySource)}
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <video
+              key={storySource}
+              src={storySource}
+              controls
+              playsInline
+              preload="metadata"
+              onError={() => setBrokenSource(storySource)}
+              className="h-full w-full object-contain"
+            />
+          )
+        ) : (
+          <div className="flex flex-col items-center gap-2 px-4 text-center text-white/35">
+            <span className="grid size-9 place-items-center rounded-full border border-white/25 bg-white/10">
+              {kind === 'photo' ? (
+                <ImagePlus className="size-3.5" aria-hidden />
+              ) : (
+                <Video className="size-3.5" aria-hidden />
+              )}
+            </span>
+            <p className="text-[9.5px] leading-relaxed">
+              {kind === 'photo'
+                ? 'The photo story preview appears here once you add an image.'
+                : 'The video story preview appears here once you choose an MP4 or MOV.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {kind === 'photo' && photo && (
+        <div className="mt-3 min-w-0">
+          <p className="truncate text-[12px] font-semibold text-white/90">
+            {photo.name}
+          </p>
+          <p className="mt-1 truncate font-mono text-[9px] text-white/40">
+            {(photo.size / (1024 * 1024)).toFixed(1)} MB · ready to publish
+          </p>
+        </div>
+      )}
+      {kind === 'photo' && !photo && photoUrl.trim() && (
+        <div className="mt-3 min-w-0">
+          <p className="truncate font-mono text-[9px] text-white/40">
+            {photoUrl.trim()}
+          </p>
+        </div>
+      )}
+      {kind === 'video' && video && (
+        <div className="mt-3 min-w-0">
+          <p className="truncate text-[12px] font-semibold text-white/90">
+            {video.name}
+          </p>
+          <p className="mt-1 truncate font-mono text-[9px] text-white/40">
+            {(video.size / (1024 * 1024)).toFixed(1)} MB · ready to publish
+          </p>
+        </div>
+      )}
+
+      <div className="mt-auto pt-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.045] p-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.07] text-white/70">
+              <Sparkles className="size-3.5" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold text-white/85">
+                How a story posts
+              </p>
+              <p className="mt-0.5 text-[9px] leading-relaxed text-white/45">
+                Vertical 9:16 assets fill the Story tray best.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <PublishPage eyebrow="Publishing" title="Stories">
       <ComposerCard
         icon={<Sparkles className="size-4" />}
         title="New story"
         badge="24 hours"
-        aside={
-          <>
-            <p className="font-semibold text-secondary-foreground">How a story posts</p>
-            <p>
-              Photo stories upload an unpublished photo and commit its photo_id to
-              /photo_stories. Video stories start a story upload, send the file to
-              Facebook&apos;s upload URL, then finish with video_state=PUBLISHED.
-            </p>
-            <p>Vertical 9:16 assets fill the Story tray best.</p>
-          </>
-        }
+        aside={storyAside}
       >
         <div className="flex gap-1 rounded-lg border border-border bg-surface-2 p-1 text-xs font-semibold">
           {(
@@ -113,8 +242,8 @@ export default function StoriesPage() {
               label="Choose a JPEG, PNG, or WebP"
               hint="20 MB max"
               file={photo}
-              onPick={setPhoto}
-              onClear={() => setPhoto(null)}
+              onPick={applyStoryPhoto}
+              onClear={() => applyStoryPhoto(null)}
               icon={<ImagePlus className="size-3.5" />}
             />
             <div>
@@ -138,8 +267,8 @@ export default function StoriesPage() {
             label="Choose an MP4 or MOV"
             hint="100 MB max"
             file={video}
-            onPick={setVideo}
-            onClear={() => setVideo(null)}
+            onPick={applyStoryVideo}
+            onClear={() => applyStoryVideo(null)}
             icon={<Video className="size-3.5" />}
           />
         )}
@@ -168,6 +297,7 @@ export default function StoriesPage() {
 
         {results && <ResultList results={results} />}
       </ComposerCard>
+      <AssistantChat />
     </PublishPage>
   );
 }

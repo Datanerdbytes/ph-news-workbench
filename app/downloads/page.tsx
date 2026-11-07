@@ -180,8 +180,17 @@ export default function DownloadsPage() {
   const [busy, setBusy] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewErrorId, setPreviewErrorId] = useState<string | null>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
   const detectedPlatform = useMemo(() => platformFromUrl(url), [url]);
+  const previewJob = useMemo(
+    () =>
+      downloads.find(
+        (job) => job.id === previewId && job.status === "done" && job.fileName
+      ) ?? null,
+    [downloads, previewId]
+  );
 
   useEffect(() => {
     let active = true;
@@ -202,6 +211,10 @@ export default function DownloadsPage() {
               job.status === "finalizing"
           );
           if (running) setActiveJobId(running.id);
+          const latestDone = jobs.find(
+            (job) => job.status === "done" && job.fileName
+          );
+          if (latestDone) setPreviewId(latestDone.id);
         }
       })
       .catch((error) => {
@@ -245,6 +258,7 @@ export default function DownloadsPage() {
             });
             notified = true;
           }
+          setPreviewId(job.id);
           setActiveJobId(null);
           return;
         }
@@ -342,7 +356,14 @@ export default function DownloadsPage() {
       if (!response.ok) {
         throw new Error(data?.error ?? "Could not remove this download record.");
       }
-      setDownloads((current) => current.filter((job) => job.id !== id));
+      const remaining = downloads.filter((job) => job.id !== id);
+      setDownloads(remaining);
+      if (previewId === id) {
+        const next = remaining.find(
+          (job) => job.status === "done" && job.fileName
+        );
+        setPreviewId(next?.id ?? null);
+      }
     } catch (error) {
       toast.error("Could not remove download history", {
         description: error instanceof Error ? error.message : undefined,
@@ -597,6 +618,78 @@ export default function DownloadsPage() {
               aria-hidden="true"
               className="pointer-events-none absolute -right-24 -top-28 -z-10 size-[310px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
             />
+            {previewJob ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
+                    <span className="size-1.5 rounded-full bg-[#79d2ae]" />
+                    Download complete
+                  </span>
+                  <span className="font-mono text-[9px] uppercase text-white/35">
+                    {previewJob.platform} · {previewJob.quality}
+                  </span>
+                </div>
+
+                <div className="relative mt-5 flex h-[280px] w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black sm:h-[320px]">
+                  {previewErrorId === previewJob.id ? (
+                    <div className="flex flex-col items-center gap-1.5 px-6 text-center">
+                      <TriangleAlert className="size-5 text-warning" aria-hidden="true" />
+                      <p className="text-[11.5px] font-semibold text-white/80">
+                        Preview unavailable
+                      </p>
+                      <p className="text-[10px] leading-relaxed text-white/45">
+                        The file may have been moved from your Downloads folder.
+                      </p>
+                    </div>
+                  ) : (
+                    <video
+                      key={previewJob.id}
+                      src={`/api/downloads/${previewJob.id}/file`}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      onError={() => setPreviewErrorId(previewJob.id)}
+                      className="h-full w-full object-contain"
+                    />
+                  )}
+                </div>
+
+                <div className="mt-4 min-w-0">
+                  <p className="truncate text-[13px] font-semibold text-white/90">
+                    {previewJob.fileName}
+                  </p>
+                  <p className="mt-1 truncate font-mono text-[9.5px] text-white/40">
+                    Saved to ~/Downloads/VideoDownloader/{previewJob.platform}
+                  </p>
+                </div>
+
+                <div className="mt-auto pt-4">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.045] p-3.5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-success/10 text-[#79d2ae]">
+                        <Check className="size-3.5" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-white/85">
+                          Ready on this device
+                        </p>
+                        <p className="mt-0.5 truncate text-[9.5px] text-white/45">
+                          {previewJob.quality === "best"
+                            ? "Best available quality"
+                            : `Up to ${previewJob.quality}p`}{" "}
+                          · MP4 · Local file
+                        </p>
+                      </div>
+                      <Download
+                        className="ml-auto size-3.5 shrink-0 text-white/35"
+                        aria-hidden="true"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
                 <span className="size-1.5 rounded-full bg-white/70" />
@@ -663,6 +756,8 @@ export default function DownloadsPage() {
                 last
               />
             </div>
+              </>
+            )}
           </aside>
         </section>
 
@@ -744,7 +839,10 @@ export default function DownloadsPage() {
             {downloads.map((job) => (
               <li
                 key={job.id}
-                className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5"
+                className={cn(
+                  "flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5",
+                  previewJob?.id === job.id && "bg-brand-soft/40"
+                )}
               >
                 <PlatformMark
                   platform={
@@ -752,18 +850,34 @@ export default function DownloadsPage() {
                     PLATFORMS[0]
                   }
                 />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-semibold text-foreground">
-                    {job.fileName ?? `${job.platform} video`}
-                  </p>
-                  <p className="mt-1 truncate text-[9.5px] text-muted-foreground">
-                    {job.status === "done"
-                      ? job.saveLocation
-                      : job.status === "failed"
-                        ? job.error
-                        : `Saving to ~/Downloads/VideoDownloader/${job.platform}`}
-                  </p>
-                </div>
+                {job.status === "done" && job.fileName ? (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewId(job.id)}
+                    aria-label={`Preview ${job.fileName} in the side panel`}
+                    className="min-w-0 flex-1 cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  >
+                    <p className="truncate text-[11px] font-semibold text-foreground">
+                      {job.fileName}
+                    </p>
+                    <p className="mt-1 truncate text-[9.5px] text-muted-foreground">
+                      {job.saveLocation}
+                    </p>
+                  </button>
+                ) : (
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-semibold text-foreground">
+                      {job.fileName ?? `${job.platform} video`}
+                    </p>
+                    <p className="mt-1 truncate text-[9.5px] text-muted-foreground">
+                      {job.status === "done"
+                        ? job.saveLocation
+                        : job.status === "failed"
+                          ? job.error
+                          : `Saving to ~/Downloads/VideoDownloader/${job.platform}`}
+                    </p>
+                  </div>
+                )}
                 <span
                   className={cn(
                     "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[9px] font-semibold",
