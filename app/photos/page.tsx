@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { FolderPlus, Images, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssistantChat } from '@/components/assistant-chat';
+import { FacebookPreview } from '@/components/facebook-preview';
+import { FacebookAlbumPreview } from '@/components/facebook-album-preview';
+import { useFacebookConnection } from '@/components/facebook-connection';
 import { Button } from '@/components/ui/button';
 import { cn } from 'cn';
 import {
@@ -21,7 +24,9 @@ import {
 } from '@/components/publishing/publish-page';
 
 const MAX_IMAGES = 10;
-const MAX_BYTES = 20 * 1024 * 1024;
+// Facebook rejects album photos above 10 MB — reject them here with a clear
+// message instead of at Facebook with a raw error.
+const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 type Album = {
@@ -57,8 +62,7 @@ export default function PhotosPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [albumsLoaded, setAlbumsLoaded] = useState(false);
   const [albumId, setAlbumId] = useState('');
-  const [albumName, setAlbumName] = useState('');
-  const [albumDescription, setAlbumDescription] = useState('');
+  const connection = useFacebookConnection();
 
   async function loadAlbums() {
     try {
@@ -91,7 +95,7 @@ export default function PhotosPage() {
         return false;
       }
       if (file.size > MAX_BYTES) {
-        toast.error(`${file.name} is larger than 20 MB.`);
+        toast.error(`${file.name} is larger than 10 MB.`);
         return false;
       }
       return true;
@@ -134,34 +138,6 @@ export default function PhotosPage() {
       restart();
     } catch (error) {
       toast.error('Photo post failed', {
-        description: error instanceof Error ? error.message : undefined,
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function createAlbum() {
-    setBusy(true);
-    try {
-      const res = await fetch('/api/photos', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'album-create',
-          name: albumName,
-          message: albumDescription,
-        }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? 'The album could not be created.');
-      toast.success('Album created', { description: data.name });
-      setAlbumName('');
-      setAlbumDescription('');
-      setAlbumsLoaded(false);
-      await loadAlbums();
-    } catch (error) {
-      toast.error('Album creation failed', {
         description: error instanceof Error ? error.message : undefined,
       });
     } finally {
@@ -251,11 +227,14 @@ export default function PhotosPage() {
         }}
       />
       <p className="mt-1 text-[10px] text-muted-foreground">
-        JPEG, PNG, or WebP under 20 MB. One image posts to /photos; several upload
+        JPEG, PNG, or WebP under 10 MB. One image posts to /photos; several upload
         unattached and publish through /feed with attached_media.
       </p>
     </div>
   );
+
+  const selectedPage = pages.pages.find((page) => page.id === pages.selected[0]);
+  const selectedAlbum = albums.find((album) => album.id === albumId);
 
   return (
     <PublishPage eyebrow="Publishing" title="Photos">
@@ -283,171 +262,160 @@ export default function PhotosPage() {
         ))}
       </div>
 
-      {tab === 'feed' ? (
-        <ComposerCard
-          icon={<Images className="size-4" />}
-          title="Photo post"
-          badge="1–10 images"
-          aside={
-            <>
-              <p className="font-semibold text-secondary-foreground">How it posts</p>
-              <p>
-                A single image goes straight to
-                <code className="mx-1 rounded bg-surface-3 px-1 py-0.5 text-[10px]">/photos</code>.
-                Multiple images are uploaded unpublished first, then attached to one
-                feed post.
-              </p>
-              <p>Scheduling uses published=false with scheduled_publish_time.</p>
-            </>
-          }
-        >
-          {imagePicker}
-          <div>
-            <FieldLabel htmlFor="photo-message" hint={`${message.length}/63206`}>
-              Message
-            </FieldLabel>
-            <textarea
-              id="photo-message"
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              rows={4}
-              maxLength={63206}
-              placeholder="Write the caption for this post…"
-              className={textareaClass}
-            />
-          </div>
-          <PageSelector
-            pages={pages.pages}
-            selected={pages.selected}
-            onSelect={pages.selectOne}
-            loading={pages.loading}
-          />
-          <ScheduleField
-            enabled={scheduleOn}
-            onEnabled={setScheduleOn}
-            value={scheduledFor}
-            onChange={setScheduledFor}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="brand"
-              size="sm"
-              onClick={publishPost}
-              disabled={!images.length || busy || !pages.selected.length}
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div>
+          {tab === 'feed' ? (
+            <ComposerCard
+              icon={<Images className="size-4" />}
+              title="Photo post"
+              badge="1–10 images"
+              aside={
+                <>
+                  <p className="font-semibold text-secondary-foreground">How it posts</p>
+                  <p>
+                    A single image goes straight to
+                    <code className="mx-1 rounded bg-surface-3 px-1 py-0.5 text-[10px]">/photos</code>.
+                    Multiple images are uploaded unpublished first, then attached to one
+                    feed post.
+                  </p>
+                  <p>Scheduling uses published=false with scheduled_publish_time.</p>
+                </>
+              }
             >
-              <ImagePlus className="size-3.5" aria-hidden />
-              {busy ? 'Publishing…' : scheduleOn ? 'Schedule post' : 'Publish post'}
-            </Button>
-            <span className="text-[10px] text-muted-foreground">
-              {images.length > 1
-                ? `${images.length} images in one carousel-style feed post.`
-                : 'Publishes to the selected Page(s).'}
-            </span>
-          </div>
-          {results && <ResultList results={results} />}
-        </ComposerCard>
-      ) : (
-        <div className="space-y-4">
-          <ComposerCard
-            icon={<FolderPlus className="size-4" />}
-            title="Create album"
-            aside={
-              <>
-                <p className="font-semibold text-secondary-foreground">Albums endpoint</p>
-                <p>
-                  Albums are created on the primary Page with a name and optional
-                  description. Photos are added afterwards.
-                </p>
-              </>
-            }
-          >
-            <div>
-              <FieldLabel htmlFor="album-name">Album name</FieldLabel>
-              <input
-                id="album-name"
-                value={albumName}
-                onChange={(event) => setAlbumName(event.target.value)}
-                maxLength={200}
-                placeholder="e.g. Behind the newsroom"
-                className={inputClass}
+              {imagePicker}
+              <div>
+                <FieldLabel htmlFor="photo-message" hint={`${message.length}/63206`}>
+                  Message
+                </FieldLabel>
+                <textarea
+                  id="photo-message"
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  rows={4}
+                  maxLength={63206}
+                  placeholder="Write the caption for this post…"
+                  className={textareaClass}
+                />
+              </div>
+              <PageSelector
+                pages={pages.pages}
+                selected={pages.selected}
+                onSelect={pages.selectOne}
+                loading={pages.loading}
               />
-            </div>
-            <div>
-              <FieldLabel htmlFor="album-description">Description</FieldLabel>
-              <textarea
-                id="album-description"
-                value={albumDescription}
-                onChange={(event) => setAlbumDescription(event.target.value)}
-                rows={2}
-                className={textareaClass}
+              <ScheduleField
+                enabled={scheduleOn}
+                onEnabled={setScheduleOn}
+                value={scheduledFor}
+                onChange={setScheduledFor}
               />
-            </div>
-            <Button
-              variant="brand"
-              size="sm"
-              onClick={createAlbum}
-              disabled={!albumName.trim() || busy}
-            >
-              <FolderPlus className="size-3.5" aria-hidden />
-              Create album
-            </Button>
-          </ComposerCard>
-
-          <ComposerCard
-            icon={<ImagePlus className="size-4" />}
-            title="Add photos to an album"
-            aside={
-              <>
-                <p className="font-semibold text-secondary-foreground">Album upload</p>
-                <p>
-                  Each photo is uploaded to the selected album. Albums belong to the
-                  primary Page, so crossposting does not apply here.
-                </p>
-              </>
-            }
-          >
-            <div>
-              <FieldLabel htmlFor="album-select" hint="Primary Page">
-                Album
-              </FieldLabel>
-              <select
-                id="album-select"
-                value={albumId}
-                onChange={(event) => setAlbumId(event.target.value)}
-                className={inputClass}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="brand"
+                  size="sm"
+                  onClick={publishPost}
+                  disabled={!images.length || busy || !pages.selected.length}
+                >
+                  <ImagePlus className="size-3.5" aria-hidden />
+                  {busy ? 'Publishing…' : scheduleOn ? 'Schedule post' : 'Publish post'}
+                </Button>
+                <span className="text-[10px] text-muted-foreground">
+                  {images.length > 1
+                    ? `${images.length} images in one carousel-style feed post.`
+                    : 'Publishes to the selected Page(s).'}
+                </span>
+              </div>
+              {results && <ResultList results={results} />}
+            </ComposerCard>
+          ) : (
+            <div className="space-y-4">
+              <ComposerCard
+                icon={<ImagePlus className="size-4" />}
+                title="Add photos to an album"
+                aside={
+                  <>
+                    <p className="font-semibold text-secondary-foreground">Album upload</p>
+                    <p>
+                      Each photo is uploaded to the selected album. Albums belong to the
+                      primary Page, so crossposting does not apply here.
+                    </p>
+                    <p>
+                      Meta removed album creation from the Graph API — create albums on
+                      Facebook directly and they will appear in this list.
+                    </p>
+                  </>
+                }
               >
-                <option value="">Choose an album…</option>
-                {albums.map((album) => (
-                  <option key={album.id} value={album.id}>
-                    {album.name}
-                    {album.count !== null ? ` (${album.count})` : ''}
-                  </option>
-                ))}
-              </select>
+                <div>
+                  <FieldLabel htmlFor="album-select" hint="Primary Page">
+                    Album
+                  </FieldLabel>
+                  <select
+                    id="album-select"
+                    value={albumId}
+                    onChange={(event) => setAlbumId(event.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Choose an album…</option>
+                    {albums.map((album) => (
+                      <option key={album.id} value={album.id}>
+                        {album.name}
+                        {album.count !== null ? ` (${album.count})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {imagePicker}
+                <div>
+                  <FieldLabel htmlFor="album-message">Caption</FieldLabel>
+                  <textarea
+                    id="album-message"
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    rows={3}
+                    className={textareaClass}
+                  />
+                </div>
+                <Button
+                  variant="brand"
+                  size="sm"
+                  onClick={addToAlbum}
+                  disabled={!albumId || !images.length || busy}
+                >
+                  <ImagePlus className="size-3.5" aria-hidden />
+                  {busy ? 'Uploading…' : 'Add photos'}
+                </Button>
+              </ComposerCard>
             </div>
-            {imagePicker}
-            <div>
-              <FieldLabel htmlFor="album-message">Caption</FieldLabel>
-              <textarea
-                id="album-message"
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                rows={3}
-                className={textareaClass}
-              />
-            </div>
-            <Button
-              variant="brand"
-              size="sm"
-              onClick={addToAlbum}
-              disabled={!albumId || !images.length || busy}
-            >
-              <ImagePlus className="size-3.5" aria-hidden />
-              {busy ? 'Uploading…' : 'Add photos'}
-            </Button>
-          </ComposerCard>
+          )}
         </div>
-      )}
+
+        <div className="self-start xl:sticky xl:top-5">
+          {tab === 'feed' ? (
+            <FacebookPreview
+              text={message}
+              imageUrls={images}
+              connected={connection.connected}
+              pageName={selectedPage?.name}
+              pagePicture={selectedPage?.picture}
+            />
+          ) : (
+            <FacebookAlbumPreview
+              albumName={selectedAlbum?.name}
+              description={message}
+              imageUrls={images}
+              connected={connection.connected}
+              pageName={selectedPage?.name}
+              pagePicture={selectedPage?.picture}
+              photoCount={
+                selectedAlbum?.count != null
+                  ? selectedAlbum.count + images.length
+                  : null
+              }
+            />
+          )}
+        </div>
+      </div>
       <AssistantChat
         draft={message}
         onDraftChange={setMessage}
