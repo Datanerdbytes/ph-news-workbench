@@ -1,0 +1,41 @@
+# The app's external executors, replacing the vercel.json crons (the Vercel
+# Hobby plan only allows daily crons). Both endpoints are POST and authorize
+# with `Authorization: Bearer $CRON_SECRET` — the same contract the local
+# scheduler warns about in lib/local-scheduler.ts.
+#
+# Schedule entries share one workflow; each job filters on the expression that
+# fired. Note GitHub's scheduler can lag a few minutes behind these times, and
+# scheduled workflows are auto-disabled after 60 days of repo inactivity.
+name: Cron
+
+on:
+  schedule:
+    - cron: "*/5 * * * *" # scheduling sweep — publish due posts, sync Facebook-native schedules
+    - cron: "0 * * * *" # feed ingest — pull new items from RSS sources
+
+concurrency:
+  group: cron-${{ github.event.schedule }}
+  cancel-in-progress: false
+
+jobs:
+  schedule-run:
+    if: github.event.schedule == '*/5 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger the scheduling sweep
+        run: |
+          curl -fsS --max-time 300 -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_URL || 'https://ph-news-workbench.vercel.app' }}/api/schedule/run"
+
+  ingest:
+    if: github.event.schedule == '0 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger the feed ingest
+        run: |
+          curl -fsS --max-time 300 -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_URL || 'https://ph-news-workbench.vercel.app' }}/api/ingest"
