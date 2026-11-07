@@ -119,7 +119,7 @@ export function FinalReelPreview({
 
             <div className="mt-3">
               {videoUrl ? (
-                <div className="relative mx-auto aspect-[9/16] max-h-[200px] overflow-hidden rounded-sm bg-black">
+                <div className="relative mx-auto aspect-[9/16] max-h-[300px] overflow-hidden rounded-sm bg-black">
                   <video
                     ref={videoRef}
                     src={videoUrl}
@@ -138,7 +138,7 @@ export function FinalReelPreview({
                   )}
                 </div>
               ) : (
-                <div className="flex aspect-[9/16] max-h-[200px] w-full flex-col items-center justify-center gap-1.5 rounded-sm bg-neutral-100 px-4 text-center text-neutral-400">
+                <div className="flex aspect-[9/16] max-h-[300px] w-full flex-col items-center justify-center gap-1.5 rounded-sm bg-neutral-100 px-4 text-center text-neutral-400">
                   <Play className="size-5" aria-hidden />
                   <p className="text-[10.5px] font-medium leading-relaxed">
                     The final reel appears here once you attach a video.
