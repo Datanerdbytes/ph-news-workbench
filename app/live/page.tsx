@@ -115,25 +115,105 @@ export default function LivePage() {
     }
   }
 
+  const hasTitle = Boolean(title.trim());
+
+  const liveAside = (
+    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-[#171923] p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-16 -top-20 -z-10 size-[220px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
+      />
+      <div className="flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
+          <span
+            className={
+              hasTitle
+                ? 'size-1.5 rounded-full bg-[#79d2ae]'
+                : 'size-1.5 rounded-full bg-white/70'
+            }
+          />
+          {hasTitle ? 'Ready to create' : 'Live preview'}
+        </span>
+        <span className="font-mono text-[9px] uppercase text-white/35">Live</span>
+      </div>
+
+      <div className="relative mt-4 flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
+        {hasTitle ? (
+          <>
+            <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded bg-black/50 px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.12em] text-white/85">
+              <span
+                className={cn(
+                  'size-1.5 rounded-full',
+                  scheduleOn ? 'bg-[#f0b429]' : 'bg-destructive animate-pulse'
+                )}
+                aria-hidden
+              />
+              {scheduleOn ? 'SCHEDULED' : 'LIVE'}
+            </span>
+            <div className="min-w-0 px-4 text-center">
+              <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-white/90">
+                {title}
+              </p>
+              {description.trim() && (
+                <p className="mt-1.5 line-clamp-2 text-[10px] leading-relaxed text-white/45">
+                  {description}
+                </p>
+              )}
+            </div>
+            <span className="absolute bottom-2 right-2.5 font-mono text-[8px] text-white/35">
+              {scheduleOn && !Number.isNaN(new Date(scheduledFor).getTime())
+                ? `Planned ${new Date(scheduledFor).toLocaleString()}`
+                : 'Goes live when the encoder connects'}
+            </span>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-2 px-4 text-center text-white/35">
+            <span className="grid size-9 place-items-center rounded-full border border-white/25 bg-white/10">
+              <Radio className="size-3.5" aria-hidden />
+            </span>
+            <p className="text-[9.5px] leading-relaxed">
+              The live preview appears here
+              <br />
+              once you add a title.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 min-w-0">
+        <p className="truncate font-mono text-[9px] text-white/40">
+          Title {title.length}/200 · Description {description.length}/5,000
+        </p>
+      </div>
+
+      <div className="mt-auto pt-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.045] p-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.07] text-white/70">
+              <Radio className="size-3.5" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold text-white/85">
+                Streaming endpoint
+              </p>
+              <p className="mt-0.5 text-[9px] leading-relaxed text-white/45">
+                Facebook returns an RTMPS server URL and stream key — paste both
+                into OBS or any RTMP encoder.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <PublishPage eyebrow="Publishing" title="Live video">
       <div className="space-y-4">
         <ComposerCard
           icon={<Radio className="size-4" />}
           title="Create live stream"
-          aside={
-            <>
-              <p className="font-semibold text-secondary-foreground">Streaming endpoint</p>
-              <p>
-                Facebook returns a secure RTMPS server URL and a unique stream key.
-                Paste both into OBS or any RTMP encoder.
-              </p>
-              <p>
-                Scheduled streams are created as UNPUBLISHED with a planned start
-                time; otherwise they go live immediately when the encoder connects.
-              </p>
-            </>
-          }
+          aside={liveAside}
         >
           <div>
             <FieldLabel htmlFor="live-title" hint={`${title.length}/200`}>
