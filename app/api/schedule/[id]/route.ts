@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireWorkspace, unauthorized } from "@/lib/session";
 import { recordScheduleEvent } from "@/lib/schedule-events";
-import { cancelFacebookScheduledPost } from "@/lib/facebook";
+import {
+  cancelFacebookScheduledPost,
+  isFacebookStillScheduled,
+} from "@/lib/facebook";
 import { resolvePageToken } from "@/lib/facebook-page-token";
 
 export const dynamic = "force-dynamic";
@@ -107,7 +110,7 @@ async function cancelOnFacebook(
     : [];
 
   const targets = perPage.length
-    ? perPage.map((entry) => ({ pageId: entry.page?.id, postId: entry.id! }))
+    ? perPage.map((entry) => ({ pageId: entry.page?.id ?? null, postId: entry.id! }))
     : row.facebook_post_id
       ? [{ pageId: row.page_id, postId: row.facebook_post_id }]
       : [];
@@ -131,7 +134,17 @@ async function cancelOnFacebook(
     }
 
     try {
-      await cancelFacebookScheduledPost(target.postId, token);
+      // Facebook may have already released this item — it published, or it
+      // was removed in Meta Business Suite. Deleting then would be refused,
+      // but there is nothing left to cancel, so clearing the local row is
+      // the correct outcome. When the queue edge can't be read, still try
+      // the delete (fail-safe).
+      const held = target.pageId
+        ? await isFacebookStillScheduled(target.pageId, target.postId, token)
+        : null;
+      if (held !== false) {
+        await cancelFacebookScheduledPost(target.postId, token, target.pageId);
+      }
     } catch (error) {
       return {
         ok: false,

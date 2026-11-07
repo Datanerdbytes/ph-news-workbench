@@ -3,6 +3,7 @@ import {
   FacebookApiError,
   isFacebookLiveStarted,
   isFacebookPostPublished,
+  isFacebookStillScheduled,
   isFacebookVideoPublished,
   parseImages,
   publishPagePost,
@@ -300,6 +301,47 @@ export async function syncNativeSchedules(): Promise<number> {
         });
         synced++;
         continue;
+      }
+
+      if (published === null && row.page_id) {
+        // Reel and video container nodes cannot be read at all (bare GETs are
+        // refused with code 12), so the probes above stay "unknown" for them.
+        // Ask Facebook's own queue instead: once the item leaves
+        // /{page}/scheduled_posts, Facebook has released it — past the slot
+        // that means it went out, before the slot that it was removed there.
+        const held = await isFacebookStillScheduled(
+          row.page_id,
+          postId,
+          token
+        );
+        if (held === false) {
+          const pastSlot =
+            Date.now() >= new Date(row.scheduled_for).getTime();
+          if (pastSlot) {
+            await sql`
+              UPDATE scheduled_posts
+              SET status = 'published', error_message = NULL, updated_at = now()
+              WHERE id = ${row.id} AND status = 'scheduled'`;
+            await recordScheduleEvent({
+              workspaceId: row.workspace_id,
+              scheduledPostId: row.id,
+              newsItemId: row.news_item_id,
+              event: "published",
+              source: "scheduler",
+              facebookPostId: postId,
+              metadata: { kind: row.kind, executor: "facebook", viaQueue: true },
+            });
+          } else {
+            await markNativeFailed(
+              row,
+              "The item was removed from Facebook before its scheduled time."
+            );
+          }
+          synced++;
+          continue;
+        }
+        // held === true (still queued) or null (edge unreadable) — fall
+        // through to the grace check below.
       }
 
       // Still unpublished. If it is well past its slot, Facebook is not going

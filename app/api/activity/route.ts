@@ -11,6 +11,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const limit = Math.min(Number(url.searchParams.get("limit") ?? "50"), 200);
   const offset = Number(url.searchParams.get("offset") ?? "0");
+  // Cursor pagination (same shape as /api/items): `before` is the epoch ms of
+  // the last row already shown. Inclusive on purpose — pages can share a
+  // timestamp, and the client dedupes by `${type}-${id}`.
+  const beforeMs = Number(url.searchParams.get("before") ?? "");
+  const before = Number.isFinite(beforeMs) && beforeMs > 0 ? beforeMs : null;
+  const pageSize = limit + 1; // one extra row powers hasMore
   const dedupe = url.searchParams.get("dedupe") !== "false"; // default true
   const mergeByStory = url.searchParams.get("mergeByStory") === "true"; // opt-in
 
@@ -37,7 +43,9 @@ export async function GET(request: Request) {
     LEFT JOIN scheduled_posts s ON s.id = e.scheduled_post_id
     LEFT JOIN news_items n ON n.id = e.news_item_id
     WHERE e.workspace_id = ${access.workspace.id}
+      ${before ? sql`AND e.created_at <= to_timestamp(${before} / 1000.0)` : sql``}
     ORDER BY e.created_at DESC
+    LIMIT ${pageSize}
   `;
 
   let events: typeof rawEvents = [];
@@ -78,6 +86,7 @@ export async function GET(request: Request) {
     FROM drafts d
     LEFT JOIN news_items n ON n.id = d.news_item_id
     WHERE d.workspace_id = ${access.workspace.id}
+      ${before ? sql`AND d.created_at <= to_timestamp(${before} / 1000.0)` : sql``}
       -- A published draft that a scheduled post already put on Facebook is the
       -- same publish recorded twice (the worker flips this exact draft's
       -- status); the event row wins. Draft-grained, not story-grained: a
@@ -95,12 +104,13 @@ export async function GET(request: Request) {
         )
       )
     ORDER BY d.created_at DESC
-    LIMIT ${limit} OFFSET ${offset}
+    LIMIT ${pageSize}
   `;
 
   type MergedEvent = {
   id: number | string;
   newsItemId: number | null;
+  scheduledPostId?: number | null;
   displayTime: string;
   type: "schedule" | "draft";
   event?: string; // schedule event type: scheduled, published, failed, canceled, retrying
@@ -122,6 +132,7 @@ export async function GET(request: Request) {
     ...events.map((e) => ({
       id: e.id,
       newsItemId: e.newsItemId,
+      scheduledPostId: e.scheduledPostId,
       type: "schedule" as const,
       event: e.event,
       status: e.status,
@@ -179,7 +190,14 @@ export async function GET(request: Request) {
       .sort((a, b) => new Date(b.displayTime).getTime() - new Date(a.displayTime).getTime());
   }
 
-  return NextResponse.json(allEvents.slice(0, limit), {
-    headers: { "cache-control": "no-store" },
-  });
+  const page = allEvents.slice(0, limit);
+  const hasMore = allEvents.length > limit;
+  const last = page.length ? page[page.length - 1] : null;
+  const nextCursor =
+    hasMore && last ? new Date(last.displayTime).getTime() : null;
+
+  return NextResponse.json(
+    { rows: page, nextCursor, hasMore },
+    { headers: { "cache-control": "no-store" } },
+  );
 }

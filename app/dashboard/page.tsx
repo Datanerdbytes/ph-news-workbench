@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   CheckCircle2,
+  ChevronDown,
   Circle,
   Clock,
   FileText,
@@ -128,13 +129,16 @@ export default function DashboardPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const [draftsRes, itemsRes, activitiesRes] = await Promise.all([
         fetch("/api/drafts", { cache: "no-store" }),
         fetch("/api/items", { cache: "no-store" }),
-        fetch("/api/activity?mergeByStory=false&dedupe=false", { cache: "no-store" }),
+        fetch("/api/activity?mergeByStory=false&dedupe=false&limit=10", { cache: "no-store" }),
       ]);
 
       if (!draftsRes.ok || !itemsRes.ok || !activitiesRes.ok) {
@@ -145,12 +149,27 @@ export default function DashboardPage() {
       const storyData = (await itemsRes.json()) as
         | Story[]
         | { rows?: Story[] };
-      const activityData = (await activitiesRes.json()) as Activity[];
+      const activityData = (await activitiesRes.json()) as
+        | Activity[]
+        | { rows?: Activity[]; nextCursor?: number | null; hasMore?: boolean };
       setDrafts(Array.isArray(draftData) ? draftData : []);
       setStories(
         Array.isArray(storyData) ? storyData : (storyData.rows ?? [])
       );
-      setActivities(Array.isArray(activityData) ? activityData : []);
+      setActivities(
+        Array.isArray(activityData) ? activityData : (activityData.rows ?? [])
+      );
+      if (!Array.isArray(activityData)) {
+        setNextCursor(
+          typeof activityData.nextCursor === "number"
+            ? activityData.nextCursor
+            : null
+        );
+        setHasMore(Boolean(activityData.hasMore));
+      } else {
+        setNextCursor(null);
+        setHasMore(false);
+      }
     } catch (error) {
       toast.error("Could not load the dashboard", {
         description:
@@ -160,6 +179,40 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(
+        `/api/activity?mergeByStory=false&dedupe=false&limit=10&before=${nextCursor}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) throw new Error("Could not load more activity");
+      const data = (await res.json()) as {
+        rows?: Activity[];
+        nextCursor?: number | null;
+        hasMore?: boolean;
+      };
+      const page = data.rows ?? [];
+      setActivities((prev) => {
+        const seen = new Set(prev.map((a) => `${a.type}-${a.id}`));
+        return [
+          ...prev,
+          ...page.filter((a) => !seen.has(`${a.type}-${a.id}`)),
+        ];
+      });
+      setNextCursor(typeof data.nextCursor === "number" ? data.nextCursor : null);
+      setHasMore(Boolean(data.hasMore));
+    } catch (error) {
+      toast.error("Could not load more activity", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore]);
 
   useEffect(() => {
     void load();
@@ -456,6 +509,35 @@ export default function DashboardPage() {
                   Open story queue
                 </Link>
               </div>
+            )}
+
+            {!loading && activities.length > 0 && (
+              <footer className="border-t border-border bg-card/60 px-3 py-2.5">
+                {hasMore ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void loadMore()}
+                    disabled={loadingMore}
+                    aria-busy={loadingMore}
+                    className="w-full"
+                  >
+                    {loadingMore ? (
+                      <RefreshCw
+                        className="size-3.5 animate-spin"
+                        aria-hidden
+                      />
+                    ) : (
+                      <ChevronDown className="size-3.5" aria-hidden />
+                    )}
+                    {loadingMore ? "Loading…" : "Load more activity"}
+                  </Button>
+                ) : (
+                  <p className="py-1 text-center text-[10.5px] text-muted-foreground">
+                    All activity loaded
+                  </p>
+                )}
+              </footer>
             )}
           </section>
 

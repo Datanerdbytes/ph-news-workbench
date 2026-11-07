@@ -485,9 +485,66 @@ export async function isFacebookLiveStarted(
  */
 export async function cancelFacebookScheduledPost(
   postId: string,
-  accessToken: string
+  accessToken: string,
+  pageId?: string | null
 ): Promise<void> {
+  // Reel and video container ids only resolve in their compound
+  // `{page-id}_{post-id}` form — a bare DELETE of the container id is refused
+  // with "(#12) singular statuses API is deprecated". Try the compound form
+  // first, then fall back to the bare id for kinds where only it exists.
+  if (pageId && !postId.includes('_')) {
+    let compoundError: unknown;
+    try {
+      await graphDelete(`${pageId}_${postId}`, accessToken);
+      return;
+    } catch (error) {
+      compoundError = error;
+    }
+    try {
+      await graphDelete(postId, accessToken);
+      return;
+    } catch {
+      // Nothing worked — surface the compound-form error, it is the
+      // meaningful one for reel/video containers.
+      throw compoundError;
+    }
+  }
   await graphDelete(postId, accessToken);
+}
+
+/**
+ * Whether Facebook is still holding a scheduled item in its own queue
+ * (`/{page-id}/scheduled_posts`). Reel and video container nodes cannot be
+ * read directly — a bare GET is refused with code 12, and the compound node
+ * stops existing once Facebook publishes — so membership of this edge is the
+ * only reliable signal for those kinds. `null` when the edge is unreadable.
+ */
+export async function isFacebookStillScheduled(
+  pageId: string,
+  postId: string,
+  accessToken: string
+): Promise<boolean | null> {
+  try {
+    const body = await graphGet<{ data?: Array<{ id?: string }> }>(
+      `${pageId}/scheduled_posts`,
+      { fields: 'id', limit: '100' },
+      accessToken
+    );
+    const compound = `${pageId}_${postId}`;
+    for (const entry of body.data ?? []) {
+      if (!entry.id) continue;
+      if (
+        entry.id === compound ||
+        entry.id === postId ||
+        entry.id.endsWith(`_${postId}`)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return null;
+  }
 }
 
 export type GraphUploadFile = {
