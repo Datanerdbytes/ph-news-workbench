@@ -13,6 +13,7 @@ import {
 } from "@/components/publishing/page-selection";
 import { cn } from "cn";
 import { authClient } from "@/lib/auth-client";
+import { validateNewPassword } from "@/lib/password";
 import { textModelLabel, TEXT_MODELS } from "@/lib/models";
 import { isThemeId, THEMES, type ThemeId } from "@/lib/themes";
 
@@ -104,6 +105,10 @@ export default function SettingsPage() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
   const [savingTheme, setSavingTheme] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
   const { data: session } = authClient.useSession();
   const connection = useFacebookConnection();
 
@@ -218,6 +223,38 @@ export default function SettingsPage() {
     }
   }
 
+  async function changePassword(event: React.FormEvent) {
+    event.preventDefault();
+    const validation = validateNewPassword(newPassword, confirmPassword);
+    if (validation) {
+      toast.error("Check the new password", { description: validation });
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const { error } = await authClient.changePassword({
+        currentPassword,
+        newPassword,
+        revokeOtherSessions: true,
+      });
+      if (error) throw new Error(error.message ?? "Could not update the password.");
+      toast.success("Password updated", {
+        description: "Other signed-in devices were signed out.",
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      toast.error("Could not update the password", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setSavingPassword(false);
+    }
+  }
+
   const isOwner = workspace?.role === "owner";
 
   return (
@@ -292,6 +329,63 @@ export default function SettingsPage() {
               </dd>
             </div>
           </dl>
+        </section>
+
+        <section className="mt-3 rounded-xl border border-border bg-card p-4">
+          <h2 className="text-[13px] font-semibold">Password</h2>
+          <p className="text-[10.5px] text-muted-foreground">
+            Changing the password signs out your other devices.
+          </p>
+          <form onSubmit={changePassword} className="mt-3 grid gap-2 sm:max-w-md">
+            <input
+              type="password"
+              name="current-password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              disabled={savingPassword}
+              required
+              placeholder="Current password"
+              className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+            />
+            <input
+              type="password"
+              name="new-password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              disabled={savingPassword}
+              required
+              minLength={8}
+              placeholder="New password (at least 8 characters)"
+              className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+            />
+            <input
+              type="password"
+              name="confirm-password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              disabled={savingPassword}
+              required
+              placeholder="Confirm new password"
+              className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+            />
+            <div>
+              <Button
+                type="submit"
+                disabled={
+                  savingPassword ||
+                  !currentPassword ||
+                  !newPassword ||
+                  !confirmPassword
+                }
+                className="h-9"
+              >
+                {savingPassword ? "Updating…" : "Update password"}
+              </Button>
+            </div>
+          </form>
         </section>
 
         <section className="mt-3 rounded-xl border border-border bg-card p-4">

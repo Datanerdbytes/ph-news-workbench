@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createAuthClient } from "better-auth/react";
+import { toast } from "sonner";
 import { AlertCircle, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FacebookMark } from "@/components/facebook-mark";
+import { AuthBrand } from "@/components/auth-brand";
 
 const authClient = createAuthClient();
 
@@ -20,6 +23,8 @@ export default function LoginPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [inviteToken, setInviteToken] = useState("");
   const [error, setError] = useState("");
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resending, setResending] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -62,13 +67,44 @@ export default function LoginPage() {
 
     const { error } = await authClient.signIn.email({ email, password });
     setLoading(false);
-    if (error) setError(error.message ?? "Login failed");
-    else await enter();
+    if (error) {
+      // Sign-in stays closed until the email is verified; offer a resend
+      // (the link lands in the server console — lib/mailer.ts).
+      if (error.code === "EMAIL_NOT_VERIFIED") {
+        setNeedsVerification(true);
+        setError(
+          "Your email isn't verified yet. Open the verification link that was sent when you signed up — it appears in the server console.",
+        );
+      } else {
+        setError(error.message ?? "Login failed");
+      }
+    } else {
+      await enter();
+    }
+  }
+
+  async function resendVerification() {
+    setResending(true);
+    const { error } = await authClient.sendVerificationEmail({
+      email,
+      callbackURL: "/login",
+    });
+    setResending(false);
+    if (error) {
+      setError(error.message ?? "Could not resend the verification email");
+    } else {
+      toast.success("Verification email generated", {
+        description: "The link appears in the server console.",
+      });
+      setNeedsVerification(false);
+      setError("");
+    }
   }
 
   function switchMode(next: "signin" | "signup") {
     setMode(next);
     setError("");
+    setNeedsVerification(false);
   }
 
   return (
@@ -148,20 +184,7 @@ export default function LoginPage() {
 
       <section className="flex flex-col items-center justify-center px-5 py-12 sm:px-10">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="relative grid size-9 place-items-center rounded-[7px] bg-ink text-paper">
-              <span className="font-heading text-[17px] leading-none">PH</span>
-              <span className="absolute inset-x-1.5 bottom-1 h-[3px] rounded-full bg-brand" />
-            </span>
-            <span className="flex flex-col">
-              <span className="font-heading text-lg leading-none">
-                News Workbench
-              </span>
-              <span className="mt-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                Philippine desk
-              </span>
-            </span>
-          </div>
+          <AuthBrand className="lg:hidden" />
 
           <p className="eyebrow text-brand">
             {mode === "signup" ? "Invite only" : "Welcome back"}
@@ -246,6 +269,18 @@ export default function LoginPage() {
               </div>
             )}
 
+            {needsVerification && (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 w-full"
+                disabled={resending}
+                onClick={() => void resendVerification()}
+              >
+                {resending ? "Sending…" : "Resend verification email"}
+              </Button>
+            )}
+
             <Button
               type="submit"
               variant="brand"
@@ -260,6 +295,17 @@ export default function LoginPage() {
                   ? "Create account"
                   : "Sign in"}
             </Button>
+
+            {mode === "signin" && (
+              <p className="text-center text-[11.5px] text-muted-foreground">
+                <Link
+                  href="/forgot-password"
+                  className="font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                >
+                  Forgot your password?
+                </Link>
+              </p>
+            )}
           </form>
 
           <p className="mt-4 text-center text-[11.5px] text-muted-foreground">
