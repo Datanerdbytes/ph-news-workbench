@@ -29,9 +29,12 @@ export function AssistantChat({
   /** Tells the model what it is editing, e.g. "reel caption (2,200 character limit)". */
   contextLabel?: string;
 }) {
-  // Without a draft target the assistant is a general chat: replies appear
-  // in the conversation instead of rewriting a text field.
-  const chatMode = !onDraftChange;
+  // Without a draft target — or before any draft text exists — the assistant
+  // is a general chat: replies appear in the conversation instead of
+  // rewriting a text field. Picking a fresh story used to strand the panel in
+  // "No draft yet" with a disabled input; now it flips back to draft mode as
+  // soon as the editor has text to revise.
+  const chatMode = !onDraftChange || !draft.trim();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -61,7 +64,7 @@ export function AssistantChat({
 
   async function send(message: string) {
     const text = message.trim();
-    if (!text || busy || (!chatMode && !draft)) return;
+    if (!text || busy) return;
 
     setMessages((history) => [...history, { role: 'user', content: text }]);
     setInput('');
@@ -153,16 +156,8 @@ export function AssistantChat({
                     AI assistant
                   </p>
                   <p className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    <span
-                      className={cn(
-                        'size-1.5 rounded-full',
-                        chatMode || draft
-                          ? 'bg-brand'
-                          : 'bg-muted-foreground/40'
-                      )}
-                      aria-hidden
-                    />
-                    {chatMode ? 'General chat' : draft ? 'Draft in context' : 'No draft yet'}
+                    <span className="size-1.5 rounded-full bg-brand" aria-hidden />
+                    {chatMode ? 'General chat' : 'Draft in context'}
                   </p>
                 </div>
               </div>
@@ -200,7 +195,7 @@ export function AssistantChat({
                         key={suggestion}
                         type="button"
                         onClick={() => send(suggestion)}
-                        disabled={(!chatMode && !draft) || busy}
+                        disabled={busy}
                         className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-brand/30 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
                       >
                         {suggestion}
@@ -235,7 +230,7 @@ export function AssistantChat({
                 <div className="flex justify-start">
                   <span className="inline-flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
                     <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                    Revising…
+                    {chatMode ? 'Thinking…' : 'Revising…'}
                   </span>
                 </div>
               )}
@@ -250,21 +245,23 @@ export function AssistantChat({
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   placeholder={
-                    draft
-                      ? 'Rewrite — shorter, warmer, add hashtags…'
-                      : chatMode
-                        ? 'Ask anything…'
-                        : 'Add some text first'
+                    chatMode
+                      ? 'Ask anything…'
+                      : 'Rewrite — shorter, warmer, add hashtags…'
                   }
-                  aria-label="Ask the assistant to revise the draft"
+                  aria-label={
+                    chatMode
+                      ? 'Message the assistant'
+                      : 'Ask the assistant to revise the draft'
+                  }
                   className="h-9 bg-background"
-                  disabled={busy || (!chatMode && !draft)}
+                  disabled={busy}
                 />
                 <Button
                   type="submit"
                   size="sm"
                   className="h-9 px-3"
-                  disabled={!input.trim() || busy || (!chatMode && !draft)}
+                  disabled={!input.trim() || busy}
                   aria-label="Send revision request"
                 >
                   {busy ? (
@@ -277,9 +274,7 @@ export function AssistantChat({
               <p className="mt-2 text-[10px] text-muted-foreground">
                 {chatMode
                   ? 'Replies stay in this chat. Nothing is sent to Facebook.'
-                  : draft
-                    ? 'Edits the text in place. Nothing is sent to Facebook.'
-                    : 'Add some text first, then ask the assistant to revise it.'}
+                  : 'Edits the text in place. Nothing is sent to Facebook.'}
               </p>
             </form>
           </section>
