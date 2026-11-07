@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Video } from 'lucide-react';
 import { toast } from 'sonner';
+import { upload } from '@vercel/blob/client';
 import { AnimationPicker } from '@/components/reels/animation-picker';
 import { FinalReelPreview } from '@/components/publishing/final-reel-preview';
 import { AssistantChat } from '@/components/assistant-chat';
@@ -76,6 +77,7 @@ export default function ReelsPage() {
     () => defaultPresetValues()
   );
   const [renderPct, setRenderPct] = useState<number | null>(null);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   const preset = getPreset(presetId);
 
   /**
@@ -155,12 +157,33 @@ export default function ReelsPage() {
         }
       }
       setRenderPct(null);
-      const form = new FormData();
-      form.append('video', uploadFile);
-      form.append('caption', caption);
-      if (scheduleOn) form.append('scheduledFor', new Date(scheduledFor).toISOString());
-      form.append('pageIds', JSON.stringify(pages.selected));
-      const res = await fetch('/api/reels', { method: 'POST', body: form });
+      // Stage the video straight to Blob from the browser — sidesteps the
+      // serverless request-body limit so full-size reels post from production.
+      // The server downloads it back and feeds the Facebook upload.
+      const staged = await upload(
+        `reels/${Date.now()}-${uploadFile.name.replace(/[^\w.-]+/g, '_')}`,
+        uploadFile,
+        {
+          access: 'public',
+          handleUploadUrl: '/api/blob',
+          contentType: uploadFile.type || 'video/mp4',
+          onUploadProgress: (progress) => setUploadPct(progress.percentage),
+        }
+      );
+      const res = await fetch('/api/reels', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          videoUrl: staged.url,
+          filename: uploadFile.name,
+          videoType: uploadFile.type || 'video/mp4',
+          caption,
+          pageIds: pages.selected,
+          ...(scheduleOn
+            ? { scheduledFor: new Date(scheduledFor).toISOString() }
+            : {}),
+        }),
+      });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? 'The reel could not be posted.');
       setResults(data.results ?? []);
@@ -178,6 +201,7 @@ export default function ReelsPage() {
     } finally {
       setBusy(false);
       setRenderPct(null);
+      setUploadPct(null);
       window.setTimeout(
         () => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }),
         50
@@ -259,16 +283,20 @@ export default function ReelsPage() {
             disabled={!file || busy || !pages.selected.length}
           >
             <Video className="size-3.5" aria-hidden />
-            {renderPct != null
-              ? `Rendering ${Math.round(renderPct * 100)}%…`
-              : busy
-                ? 'Uploading…'
-                : scheduleOn
-                  ? 'Schedule reel'
-                  : 'Post reel'}
+            {uploadPct != null
+              ? `Staging ${Math.round(uploadPct)}%…`
+              : renderPct != null
+                ? `Rendering ${Math.round(renderPct * 100)}%…`
+                : busy
+                  ? 'Publishing…'
+                  : scheduleOn
+                    ? 'Schedule reel'
+                    : 'Post reel'}
           </Button>
           <span className="text-[10px] text-muted-foreground">
-            {renderPct != null
+            {uploadPct != null
+              ? 'Uploading the video to storage — do not close this tab.'
+              : renderPct != null
               ? `Baking “${preset?.name}” into the footage — keep this tab open.`
               : preset && preset.id !== 'none'
                 ? `“${preset.name}” is rendered into the reel when you post.`

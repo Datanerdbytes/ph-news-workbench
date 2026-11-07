@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FolderPlus, Images, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { upload } from '@vercel/blob/client';
 import { AssistantChat } from '@/components/assistant-chat';
 import { FacebookPreview } from '@/components/facebook-preview';
 import { FacebookAlbumPreview } from '@/components/facebook-album-preview';
@@ -38,15 +39,6 @@ type Album = {
 };
 
 type Tab = 'feed' | 'albums';
-
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Could not read the image.'));
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function PhotosPage() {
   const pages = useManagedPages();
@@ -103,8 +95,46 @@ export default function PhotosPage() {
     if (picked.length > room) {
       toast.error(`Only ${room} more image${room === 1 ? '' : 's'} fit in one post.`);
     }
-    const sources = await Promise.all(accepted.map(readAsDataUrl));
-    setImages((current) => [...current, ...sources].slice(0, MAX_IMAGES));
+    // Stage straight to Blob — sidesteps the serverless request-body limit
+    // and lets Facebook fetch the photos by URL instead of base64 payloads.
+    try {
+      const staged: string[] = [];
+      for (const file of accepted) {
+        const blob = await upload(
+          `photos/${Date.now()}-${file.name.replace(/[^\w.-]+/g, '_')}`,
+          file,
+          {
+            access: 'public',
+            handleUploadUrl: '/api/blob',
+            contentType: file.type,
+          }
+        );
+        staged.push(blob.url);
+      }
+      setImages((current) => [...current, ...staged].slice(0, MAX_IMAGES));
+    } catch (error) {
+      toast.error('Upload failed', {
+        description:
+          error instanceof Error
+            ? error.message
+            : 'The image could not be staged.',
+      });
+    }
+  }
+
+  function removeImage(index: number) {
+    setImages((current) => {
+      const removed = current[index];
+      if (removed && removed.startsWith('http')) {
+        // Best-effort staging cleanup; the blob is transient either way.
+        void fetch('/api/blob', {
+          method: 'DELETE',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ url: removed }),
+        }).catch(() => {});
+      }
+      return current.filter((_, i) => i !== index);
+    });
   }
 
   function restart() {
@@ -193,9 +223,7 @@ export default function PhotosPage() {
             />
             <button
               type="button"
-              onClick={() =>
-                setImages((current) => current.filter((_, i) => i !== index))
-              }
+              onClick={() => removeImage(index)}
               aria-label={`Remove image ${index + 1}`}
               className="absolute right-0.5 top-0.5 rounded bg-ink/70 px-1 text-[10px] font-bold text-paper"
             >
