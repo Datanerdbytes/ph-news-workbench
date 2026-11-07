@@ -40,3 +40,8 @@ next-env.d.ts
 # ZCode local workspace
 .zcode/
 .env*
+
+# playwright (regression suite)
+/test-results
+/playwright-report
+/e2e/.auth
