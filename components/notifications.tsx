@@ -114,6 +114,13 @@ export function NotificationBell() {
   const [unread, setUnread] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Keep the polling fetch stable: the router comes from context and its
+  // push is only needed inside the toast action, so hold it in a ref instead
+  // of depending on the instance identity.
+  const routerRef = useRef(router);
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
   /** Highest notification id already seen — the watermark for toasting. */
   const maxSeenIdRef = useRef(0);
   const seededRef = useRef(false);
@@ -146,14 +153,14 @@ export function NotificationBell() {
         if (announce && !document.hidden) {
           toastArriving(
             data.rows.filter((row) => Number(row.id) > previousMax),
-            router
+            routerRef.current
           );
         }
       } catch {
         // Offline or restarting server — the next tick retries quietly.
       }
     },
-    [router]
+    [] // stable on purpose — reads the router through a ref
   );
 
   useEffect(() => {
