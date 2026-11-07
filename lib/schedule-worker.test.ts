@@ -1,0 +1,323 @@
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+
+vi.mock("@/lib/db", () => ({ sql: vi.fn() }));
+vi.mock("@/lib/schedule-events", () => ({ recordScheduleEvent: vi.fn() }));
+vi.mock("@/lib/facebook-page-token", () => ({
+  getPrimaryPage: vi.fn(),
+  resolvePageToken: vi.fn(),
+}));
+vi.mock("@/lib/facebook", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/facebook")>();
+  return {
+    ...actual,
+    publishPagePost: vi.fn(),
+    isFacebookVideoPublished: vi.fn(),
+    isFacebookPostPublished: vi.fn(),
+    isFacebookLiveStarted: vi.fn(),
+    isFacebookStillScheduled: vi.fn(),
+  };
+});
+
+import { sql } from "@/lib/db";
+import {
+  FacebookApiError,
+  isFacebookPostPublished,
+  isFacebookStillScheduled,
+  isFacebookVideoPublished,
+  publishPagePost,
+} from "@/lib/facebook";
+import { getPrimaryPage, resolvePageToken } from "@/lib/facebook-page-token";
+import { recordScheduleEvent } from "@/lib/schedule-events";
+import { publishDuePosts, syncNativeSchedules } from "./schedule-worker";
+
+const sqlMock = sql as unknown as Mock;
+const events = () =>
+  vi.mocked(recordScheduleEvent).mock.calls.map((call) => call[0]);
+
+/**
+ * Dispatch mocked query results by their static SQL text: the claim query,
+ * the stuck-publishing sweep, and the native-sync sweep each have a distinct
+ * marker; every UPDATE returns nothing.
+ */
+function useDb(overrides: {
+  claim?: unknown[];
+  stuck?: unknown[];
+  native?: unknown[];
+}) {
+  sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
+    const query = strings.join(" ");
+    if (query.includes("WITH due AS")) return overrides.claim ?? [];
+    if (query.includes("status = 'publishing'")) return overrides.stuck ?? [];
+    if (query.includes("source = 'facebook'")) return overrides.native ?? [];
+    return [];
+  });
+}
+
+const minutesAgo = (minutes: number) =>
+  new Date(Date.now() - minutes * 60_000).toISOString();
+
+function claimedRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    workspace_id: "ws1",
+    news_item_id: null,
+    draft_id: null,
+    text: "hello",
+    image_url: null,
+    image_urls: null,
+    attempts: 1,
+    ...overrides,
+  };
+}
+
+function nativeRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    workspace_id: "ws1",
+    news_item_id: null,
+    kind: "post",
+    facebook_post_id: "fb_1",
+    facebook_post_ids: null,
+    page_id: "pg1",
+    scheduled_for: minutesAgo(5),
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  useDb({});
+});
+
+describe("publishDuePosts", () => {
+  it("publishes a due post and records claimed + published events", async () => {
+    useDb({ claim: [claimedRow({ draft_id: 21 })] });
+    vi.mocked(getPrimaryPage).mockResolvedValue({
+      pageId: "pg1",
+      token: "tok",
+    });
+    vi.mocked(publishPagePost).mockResolvedValue({
+      id: "fb_1",
+      permalink: null,
+    });
+
+    await expect(publishDuePosts({ source: "scheduler" })).resolves.toEqual({
+      due: 1,
+      published: 1,
+      failed: 0,
+      synced: 0,
+    });
+
+    expect(publishPagePost).toHaveBeenCalledWith({
+      pageId: "pg1",
+      accessToken: "tok",
+      message: "hello",
+      images: [],
+    });
+    expect(events().map((event) => event.event)).toEqual([
+      "claimed",
+      "published",
+    ]);
+    expect(events()[1]).toMatchObject({
+      scheduledPostId: 1,
+      facebookPostId: "fb_1",
+      source: "scheduler",
+    });
+
+    const updateTexts = sqlMock.mock.calls.map((call) =>
+      (call[0] as TemplateStringsArray).join(" ")
+    );
+    expect(
+      updateTexts.some((text) => text.includes("SET status = 'published'"))
+    ).toBe(true);
+    expect(
+      updateTexts.some((text) => text.includes("UPDATE drafts"))
+    ).toBe(true);
+  });
+
+  it("requeues the post while attempts remain", async () => {
+    useDb({ claim: [claimedRow({ attempts: 1 })] });
+    vi.mocked(getPrimaryPage).mockResolvedValue({
+      pageId: "pg1",
+      token: "tok",
+    });
+    vi.mocked(publishPagePost).mockRejectedValue(
+      new FacebookApiError("token expired", 190)
+    );
+
+    await expect(publishDuePosts({ source: "scheduler" })).resolves.toMatchObject({
+      published: 0,
+      failed: 0,
+    });
+    expect(events().map((event) => event.event)).toEqual([
+      "claimed",
+      "retrying",
+    ]);
+    expect(events()[1]).toMatchObject({
+      errorMessage: "token expired",
+      metadata: { attempt: 1, maxAttempts: 3 },
+    });
+  });
+
+  it("fails the post once the attempt budget is exhausted", async () => {
+    useDb({ claim: [claimedRow({ attempts: 3 })] });
+    vi.mocked(getPrimaryPage).mockResolvedValue({
+      pageId: "pg1",
+      token: "tok",
+    });
+    vi.mocked(publishPagePost).mockRejectedValue(
+      new FacebookApiError("token expired", 190)
+    );
+
+    await expect(publishDuePosts({ source: "scheduler" })).resolves.toMatchObject({
+      published: 0,
+      failed: 1,
+    });
+    expect(events().map((event) => event.event)).toEqual(["claimed", "failed"]);
+  });
+
+  it("redacts token material from Facebook error messages", async () => {
+    useDb({ claim: [claimedRow()] });
+    vi.mocked(getPrimaryPage).mockResolvedValue({
+      pageId: "pg1",
+      token: "tok",
+    });
+    vi.mocked(publishPagePost).mockRejectedValue(
+      new FacebookApiError("failed: access_token=abc123", 190)
+    );
+
+    await publishDuePosts({ source: "scheduler" });
+    expect(events()[1]).toMatchObject({
+      errorMessage: "failed: access_token=[redacted]",
+    });
+  });
+
+  it("reports a workspace with no connected page", async () => {
+    useDb({ claim: [claimedRow()] });
+    vi.mocked(getPrimaryPage).mockResolvedValue(null);
+
+    await publishDuePosts({ source: "scheduler" });
+    expect(events()[1]).toMatchObject({
+      event: "retrying",
+      errorMessage: "This workspace has no connected Facebook Page.",
+    });
+  });
+});
+
+describe("syncNativeSchedules", () => {
+  it("returns zero when no native rows are due", async () => {
+    await expect(syncNativeSchedules()).resolves.toBe(0);
+    expect(recordScheduleEvent).not.toHaveBeenCalled();
+  });
+
+  it("marks a post published when Facebook reports it live", async () => {
+    useDb({ native: [nativeRow()] });
+    vi.mocked(resolvePageToken).mockResolvedValue("tok");
+    vi.mocked(isFacebookPostPublished).mockResolvedValue(true);
+
+    await expect(syncNativeSchedules()).resolves.toBe(1);
+    expect(events()[0]).toMatchObject({
+      event: "published",
+      facebookPostId: "fb_1",
+      metadata: { kind: "post", executor: "facebook" },
+    });
+  });
+
+  it("tries the next probe shape when one is inconclusive", async () => {
+    useDb({ native: [nativeRow({ kind: "reel" })] });
+    vi.mocked(resolvePageToken).mockResolvedValue("tok");
+    vi.mocked(isFacebookVideoPublished).mockResolvedValue(null);
+    vi.mocked(isFacebookPostPublished).mockResolvedValue(true);
+
+    await expect(syncNativeSchedules()).resolves.toBe(1);
+  });
+
+  it("falls through to the next probe when one throws", async () => {
+    useDb({ native: [nativeRow()] });
+    vi.mocked(resolvePageToken).mockResolvedValue("tok");
+    vi.mocked(isFacebookPostPublished).mockRejectedValue(
+      new FacebookApiError("boom", 500)
+    );
+    vi.mocked(isFacebookVideoPublished).mockResolvedValue(true);
+
+    await expect(syncNativeSchedules()).resolves.toBe(1);
+  });
+
+  it("infers publication from the scheduled_posts queue for containers", async () => {
+    useDb({
+      native: [nativeRow({ kind: "reel", scheduled_for: minutesAgo(5) })],
+    });
+    vi.mocked(resolvePageToken).mockResolvedValue("tok");
+    vi.mocked(isFacebookVideoPublished).mockResolvedValue(null);
+    vi.mocked(isFacebookPostPublished).mockResolvedValue(null);
+    vi.mocked(isFacebookStillScheduled).mockResolvedValue(false);
+
+    await expect(syncNativeSchedules()).resolves.toBe(1);
+    expect(events()[0]).toMatchObject({
+      event: "published",
+      metadata: { executor: "facebook", viaQueue: true },
+    });
+  });
+
+  it("fails items removed from the queue before their slot", async () => {
+    useDb({
+      native: [
+        nativeRow({
+          kind: "reel",
+          scheduled_for: new Date(Date.now() + 5 * 60_000).toISOString(),
+        }),
+      ],
+    });
+    vi.mocked(resolvePageToken).mockResolvedValue("tok");
+    vi.mocked(isFacebookVideoPublished).mockResolvedValue(null);
+    vi.mocked(isFacebookPostPublished).mockResolvedValue(null);
+    vi.mocked(isFacebookStillScheduled).mockResolvedValue(false);
+
+    await expect(syncNativeSchedules()).resolves.toBe(1);
+    expect(events()[0]).toMatchObject({
+      event: "failed",
+      errorMessage: "The item was removed from Facebook before its scheduled time.",
+    });
+  });
+
+  it("leaves items Facebook is still holding", async () => {
+    useDb({ native: [nativeRow({ kind: "reel" })] });
+    vi.mocked(resolvePageToken).mockResolvedValue("tok");
+    vi.mocked(isFacebookVideoPublished).mockResolvedValue(null);
+    vi.mocked(isFacebookPostPublished).mockResolvedValue(null);
+    vi.mocked(isFacebookStillScheduled).mockResolvedValue(true);
+
+    await expect(syncNativeSchedules()).resolves.toBe(0);
+    expect(recordScheduleEvent).not.toHaveBeenCalled();
+  });
+
+  it("fails items that stayed unpublished past their grace period", async () => {
+    useDb({
+      native: [
+        nativeRow({
+          page_id: null,
+          scheduled_for: minutesAgo(3 * 60),
+        }),
+      ],
+    });
+    vi.mocked(resolvePageToken).mockResolvedValue("tok");
+    vi.mocked(isFacebookPostPublished).mockResolvedValue(null);
+    vi.mocked(isFacebookVideoPublished).mockResolvedValue(null);
+
+    await expect(syncNativeSchedules()).resolves.toBe(1);
+    expect(events()[0]).toMatchObject({
+      event: "failed",
+      errorMessage: "Facebook did not publish this item at its scheduled time.",
+    });
+  });
+
+  it("reports rows without a Facebook id as failed without counting them", async () => {
+    useDb({ native: [nativeRow({ facebook_post_id: null })] });
+
+    await expect(syncNativeSchedules()).resolves.toBe(0);
+    expect(events()[0]).toMatchObject({
+      event: "failed",
+      errorMessage: "Facebook did not return an id for this item.",
+    });
+  });
+});

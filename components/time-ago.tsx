@@ -43,5 +43,15 @@ export function TimeAgo({ date, className }: TimeAgoProps) {
     return <span className={className} aria-hidden>—</span>;
   }
 
-  return <time className={className} dateTime={new Date(date).toISOString()}>{timeAgo}</time>;
+  // An unparseable date must not crash the tree — render it like the lib
+  // helper does, with an empty label and no dateTime attribute.
+  const parsed = new Date(date);
+  return (
+    <time
+      className={className}
+      dateTime={Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString()}
+    >
+      {timeAgo}
+    </time>
+  );
 }
