@@ -14,6 +14,11 @@ import {
   recordScheduleEvent,
   type ScheduleEventSource,
 } from "@/lib/schedule-events";
+import {
+  notifyTokenInvalid,
+  notifyWorkspace,
+  scheduledOutcomeCopy,
+} from "@/lib/notifications";
 import { getPrimaryPage, resolvePageToken } from "@/lib/facebook-page-token";
 
 /** How many times the local executor will try a post before giving up. */
@@ -40,6 +45,7 @@ type ClaimedRow = {
   text: string;
   image_url: string | null;
   image_urls: unknown;
+  kind: string;
   attempts: number;
 };
 
@@ -78,7 +84,7 @@ export async function publishDuePosts(
     FROM due
     WHERE s.id = due.id
     RETURNING s.id, s.workspace_id, s.news_item_id, s.draft_id, s.text,
-              s.image_url, s.image_urls, s.attempts`) as unknown as ClaimedRow[];
+              s.image_url, s.image_urls, s.kind, s.attempts`) as unknown as ClaimedRow[];
 
   let published = 0;
   let failed = 0;
@@ -131,6 +137,15 @@ export async function publishDuePosts(
         actorUserId: options.actorUserId,
         facebookPostId: result.id,
       });
+
+      const successCopy = scheduledOutcomeCopy(post.kind, true, post.text);
+      await notifyWorkspace({
+        workspaceId: post.workspace_id,
+        type: "scheduled_publish_success",
+        title: successCopy.title,
+        body: successCopy.body,
+        link: `/calendar?post=${post.id}`,
+      });
       published++;
     } catch (error) {
       const message =
@@ -139,6 +154,9 @@ export async function publishDuePosts(
           : error instanceof Error
             ? error.message
             : "The scheduled post could not be published.";
+      const permissionIssue =
+        error instanceof FacebookApiError &&
+        (error.code === 10 || error.code === 200 || error.code === 190);
 
       // A transient Facebook failure should not kill the scheduled post. Keep
       // it queued until the attempt budget runs out.
@@ -161,7 +179,21 @@ export async function publishDuePosts(
         metadata: { attempt: post.attempts, maxAttempts: MAX_ATTEMPTS },
       });
 
-      if (exhausted) failed++;
+      if (permissionIssue) {
+        await notifyTokenInvalid(post.workspace_id);
+      }
+
+      if (exhausted) {
+        failed++;
+        const failedCopy = scheduledOutcomeCopy(post.kind, false, message);
+        await notifyWorkspace({
+          workspaceId: post.workspace_id,
+          type: "scheduled_publish_failed",
+          title: failedCopy.title,
+          body: failedCopy.body,
+          link: `/calendar?post=${post.id}`,
+        });
+      }
     }
   }
 
@@ -210,6 +242,14 @@ async function requeueStuckPosts(): Promise<void> {
             facebookPostId: row.facebook_post_id,
             metadata: { kind: row.kind, executor: "facebook", recovered: true },
           });
+          const recoveredCopy = scheduledOutcomeCopy(row.kind, true);
+          await notifyWorkspace({
+            workspaceId: row.workspace_id,
+            type: "scheduled_publish_success",
+            title: recoveredCopy.title,
+            body: recoveredCopy.body,
+            link: `/calendar?post=${row.id}`,
+          });
           continue;
         }
       }
@@ -236,6 +276,21 @@ async function requeueStuckPosts(): Promise<void> {
         "The scheduler was interrupted before this post went out.",
       metadata: { attempt: row.attempts, maxAttempts: MAX_ATTEMPTS },
     });
+
+    if (exhausted) {
+      const interruptedCopy = scheduledOutcomeCopy(
+        row.kind,
+        false,
+        "The scheduler was interrupted before this post went out."
+      );
+      await notifyWorkspace({
+        workspaceId: row.workspace_id,
+        type: "scheduled_publish_failed",
+        title: interruptedCopy.title,
+        body: interruptedCopy.body,
+        link: `/calendar?post=${row.id}`,
+      });
+    }
   }
 }
 
@@ -299,6 +354,14 @@ export async function syncNativeSchedules(): Promise<number> {
           facebookPostId: postId,
           metadata: { kind: row.kind, executor: "facebook" },
         });
+        const nativeCopy = scheduledOutcomeCopy(row.kind, true);
+        await notifyWorkspace({
+          workspaceId: row.workspace_id,
+          type: "scheduled_publish_success",
+          title: nativeCopy.title,
+          body: nativeCopy.body,
+          link: `/calendar?post=${row.id}`,
+        });
         synced++;
         continue;
       }
@@ -330,6 +393,14 @@ export async function syncNativeSchedules(): Promise<number> {
               source: "scheduler",
               facebookPostId: postId,
               metadata: { kind: row.kind, executor: "facebook", viaQueue: true },
+            });
+            const queueCopy = scheduledOutcomeCopy(row.kind, true);
+            await notifyWorkspace({
+              workspaceId: row.workspace_id,
+              type: "scheduled_publish_success",
+              title: queueCopy.title,
+              body: queueCopy.body,
+              link: `/calendar?post=${row.id}`,
             });
           } else {
             await markNativeFailed(
@@ -386,6 +457,14 @@ async function markNativeFailed(row: NativeRow, reason: string) {
     facebookPostId: row.facebook_post_id,
     errorMessage: reason,
     metadata: { kind: row.kind, executor: "facebook" },
+  });
+  const failedCopy = scheduledOutcomeCopy(row.kind, false, reason);
+  await notifyWorkspace({
+    workspaceId: row.workspace_id,
+    type: "scheduled_publish_failed",
+    title: failedCopy.title,
+    body: failedCopy.body,
+    link: `/calendar?post=${row.id}`,
   });
 }
 

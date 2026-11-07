@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { cn } from "cn";
 import { FacebookMark } from "@/components/facebook-mark";
 import { useFacebookConnection } from "@/components/facebook-connection";
+import { NotificationBell } from "@/components/notifications";
 import {
   PageAvatar,
   useManagedPages,
@@ -480,6 +481,7 @@ export function AppFrame({
               <StoryQueueQuickLink />
               <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
               <PublishQuickNav />
+              <NotificationBell />
               <FacebookConnectionButton />
             </div>
           </header>

@@ -14,6 +14,11 @@ import {
   selectPage,
 } from '@/lib/facebook';
 import { encryptToken } from '@/lib/facebook-token';
+import {
+  clearNotificationsByDedupeKey,
+  notifyWorkspace,
+  TOKEN_INVALID_DEDUPE_KEY,
+} from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +50,28 @@ export async function GET(request: NextRequest) {
   const denied = params.get('error');
 
   if (denied) {
-    return finish(request, denied === 'access_denied' ? 'denied' : 'error');
+    const outcome = denied === 'access_denied' ? 'denied' : 'error';
+    // The actor saw the redirect toast; the workspace learns from the bell.
+    try {
+      const session = await auth.api.getSession({ headers: request.headers });
+      if (session) {
+        const workspace = await getWorkspaceForUser(session.user);
+        await notifyWorkspace({
+          workspaceId: workspace.id,
+          type: 'facebook_oauth_failed',
+          title: 'Facebook connection was not completed',
+          body:
+            outcome === 'denied'
+              ? 'Facebook authorization was denied, so publishing stays offline until the Pages are connected.'
+              : 'The Facebook connection attempt failed before authorization.',
+          link: '/settings',
+          excludeUserIds: [session.user.id],
+        });
+      }
+    } catch {
+      // Best-effort on this early path — the redirect must still go out.
+    }
+    return finish(request, outcome);
   }
 
   if (!facebookConfigured()) {
@@ -69,6 +95,7 @@ export async function GET(request: NextRequest) {
   }
 
   let outcome = 'error';
+  const workspace = await getWorkspaceForUser(session.user);
 
   try {
     const shortLivedToken = await exchangeCodeForToken(code);
@@ -77,15 +104,30 @@ export async function GET(request: NextRequest) {
 
     if (!pages.length) {
       outcome = 'no_pages';
+      await notifyWorkspace({
+        workspaceId: workspace.id,
+        type: 'facebook_oauth_failed',
+        title: 'Facebook connection returned no Pages',
+        body: 'The connected Facebook account manages no Pages, so nothing can publish. Check the account and reconnect.',
+        link: '/settings',
+        excludeUserIds: [session.user.id],
+      });
     } else {
       const page = selectPage(pages, process.env.FACEBOOK_PAGE_ID?.trim());
 
       if (!page) {
         outcome = 'page_not_found';
+        await notifyWorkspace({
+          workspaceId: workspace.id,
+          type: 'facebook_oauth_failed',
+          title: 'Facebook Page not found',
+          body: 'The expected Facebook Page was not found on the connected account. Check the Page setting and reconnect.',
+          link: '/settings',
+          excludeUserIds: [session.user.id],
+        });
       } else {
         const scopes = await fetchGrantedScopes(longLivedToken).catch(() => []);
         const encryptedToken = encryptToken(page.accessToken);
-        const workspace = await getWorkspaceForUser(session.user);
 
         await sql`
           INSERT INTO facebook_connections
@@ -107,14 +149,28 @@ export async function GET(request: NextRequest) {
         `;
 
         for (const managed of pages) {
-          await sql`
-            INSERT INTO facebook_pages
-              (workspace_id, page_id, page_name, access_token, page_picture_url, is_primary, updated_at)
-            VALUES
-              (${workspace.id}, ${managed.id}, ${managed.name},
-               ${encryptToken(managed.accessToken)}, ${managed.picture}, ${managed.id === page.id}, now())
-          `;
+        await sql`
+          INSERT INTO facebook_pages
+            (workspace_id, page_id, page_name, access_token, page_picture_url, is_primary, updated_at)
+          VALUES
+            (${workspace.id}, ${managed.id}, ${managed.name},
+             ${encryptToken(managed.accessToken)}, ${managed.picture}, ${managed.id === page.id}, now())
+        `;
         }
+
+        // The reconnect resolves every outstanding "token invalid" alert.
+        await clearNotificationsByDedupeKey(
+          workspace.id,
+          TOKEN_INVALID_DEDUPE_KEY
+        );
+        await notifyWorkspace({
+          workspaceId: workspace.id,
+          type: 'facebook_reconnected',
+          title: 'Facebook Pages connected',
+          body: `${page.name} is connected again. Publishing is back online.`,
+          link: '/settings',
+          excludeUserIds: [session.user.id],
+        });
 
         outcome = 'connected';
       }
@@ -125,6 +181,14 @@ export async function GET(request: NextRequest) {
     console.error(
       JSON.stringify({ route: 'facebook/callback', event: 'failed', message })
     );
+    await notifyWorkspace({
+      workspaceId: workspace.id,
+      type: 'facebook_oauth_failed',
+      title: 'Facebook connection failed',
+      body: message.slice(0, 200),
+      link: '/settings',
+      excludeUserIds: [session.user.id],
+    });
   }
 
   return finish(request, outcome);
