@@ -297,7 +297,11 @@ export default function VideosPage() {
 
         {results && <ResultList results={results} />}
       </ComposerCard>
-      <AssistantChat draft={description} onDraftChange={setDescription} />
+      <AssistantChat
+        draft={description}
+        onDraftChange={setDescription}
+        contextLabel="video description (5,000 character limit)"
+      />
     </PublishPage>
   );
 }

@@ -1198,6 +1198,7 @@ export default function Home() {
         draft={draft}
         storyId={selected?.id}
         onDraftChange={setDraft}
+        contextLabel="story draft"
       />
     </AppFrame>
   );

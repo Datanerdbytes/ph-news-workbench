@@ -299,7 +299,11 @@ export default function ReelsPage() {
           />
         </div>
       </div>
-      <AssistantChat draft={caption} onDraftChange={setCaption} />
+      <AssistantChat
+        draft={caption}
+        onDraftChange={setCaption}
+        contextLabel="reel caption (2,200 character limit)"
+      />
     </PublishPage>
   );
 }

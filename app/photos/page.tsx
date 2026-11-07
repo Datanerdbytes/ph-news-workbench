@@ -448,7 +448,11 @@ export default function PhotosPage() {
           </ComposerCard>
         </div>
       )}
-      <AssistantChat draft={message} onDraftChange={setMessage} />
+      <AssistantChat
+        draft={message}
+        onDraftChange={setMessage}
+        contextLabel="photo post caption"
+      />
     </PublishPage>
   );
 }

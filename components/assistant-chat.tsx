@@ -21,10 +21,13 @@ export function AssistantChat({
   draft = '',
   storyId,
   onDraftChange,
+  contextLabel,
 }: {
   draft?: string;
   storyId?: number;
   onDraftChange?: (text: string) => void;
+  /** Tells the model what it is editing, e.g. "reel caption (2,200 character limit)". */
+  contextLabel?: string;
 }) {
   // Without a draft target the assistant is a general chat: replies appear
   // in the conversation instead of rewriting a text field.
@@ -68,12 +71,15 @@ export function AssistantChat({
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, draft }),
+        body: JSON.stringify({ message: text, draft, context: contextLabel }),
       });
       const data = await res.json();
       if (!res.ok || !data.text) {
         throw new Error(
-          data.error ?? 'The assistant could not revise the draft.'
+          data.error ??
+            (chatMode
+              ? 'The assistant could not respond.'
+              : 'The assistant could not revise the text.')
         );
       }
       if (chatMode) {

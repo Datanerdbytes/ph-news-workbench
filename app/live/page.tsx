@@ -258,7 +258,11 @@ export default function LivePage() {
           </div>
         </section>
       </div>
-      <AssistantChat draft={description} onDraftChange={setDescription} />
+      <AssistantChat
+        draft={description}
+        onDraftChange={setDescription}
+        contextLabel="live stream description (5,000 character limit)"
+      />
     </PublishPage>
   );
 }

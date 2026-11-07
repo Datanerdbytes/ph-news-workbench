@@ -154,7 +154,11 @@ export default function PostPage() {
 
         {results && <ResultList results={results} />}
       </ComposerCard>
-      <AssistantChat draft={message} onDraftChange={setMessage} />
+      <AssistantChat
+        draft={message}
+        onDraftChange={setMessage}
+        contextLabel="post message (5,000 character limit)"
+      />
     </PublishPage>
   );
 }
