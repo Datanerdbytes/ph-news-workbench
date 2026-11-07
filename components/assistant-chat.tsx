@@ -29,12 +29,12 @@ export function AssistantChat({
   /** Tells the model what it is editing, e.g. "reel caption (2,200 character limit)". */
   contextLabel?: string;
 }) {
-  // Without a draft target — or before any draft text exists — the assistant
-  // is a general chat: replies appear in the conversation instead of
-  // rewriting a text field. Picking a fresh story used to strand the panel in
-  // "No draft yet" with a disabled input; now it flips back to draft mode as
-  // soon as the editor has text to revise.
-  const chatMode = !onDraftChange || !draft.trim();
+  // Composer pages (onDraftChange present) always work in draft mode: the
+  // reply populates the field — including when it starts empty ("write me a
+  // caption"). Pages without a field (Stories) are general chat. The input is
+  // enabled in every mode; the old "disabled until a draft exists" bug stays
+  // fixed.
+  const chatMode = !onDraftChange;
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -157,7 +157,11 @@ export function AssistantChat({
                   </p>
                   <p className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     <span className="size-1.5 rounded-full bg-brand" aria-hidden />
-                    {chatMode ? 'General chat' : 'Draft in context'}
+                    {chatMode
+                      ? 'General chat'
+                      : draft.trim()
+                        ? 'Draft in context'
+                        : 'Ready to write'}
                   </p>
                 </div>
               </div>
@@ -175,12 +179,14 @@ export function AssistantChat({
               ref={scrollRef}
               className="min-h-[180px] flex-1 space-y-2.5 overflow-y-auto overscroll-contain px-4 py-4"
             >
-              {!messages.length && (
+                  {!messages.length && (
                 <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     {chatMode
                       ? 'Ask anything — story ideas, hooks, caption lines, posting questions. Replies appear right here.'
-                      : 'Ask for a rewrite of the current draft. The text updates in place — nothing is published from here.'}
+                      : draft.trim()
+                        ? 'Ask for a rewrite of the current draft. The text updates in place — nothing is published from here.'
+                        : 'Ask me to write it for you — the reply lands straight in the field. Nothing is published from here.'}
                   </p>
                   <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {(chatMode
@@ -230,7 +236,11 @@ export function AssistantChat({
                 <div className="flex justify-start">
                   <span className="inline-flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
                     <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                    {chatMode ? 'Thinking…' : 'Revising…'}
+                    {chatMode
+                      ? 'Thinking…'
+                      : draft.trim()
+                        ? 'Revising…'
+                        : 'Writing…'}
                   </span>
                 </div>
               )}
@@ -247,12 +257,14 @@ export function AssistantChat({
                   placeholder={
                     chatMode
                       ? 'Ask anything…'
-                      : 'Rewrite — shorter, warmer, add hashtags…'
+                      : draft.trim()
+                        ? 'Rewrite — shorter, warmer, add hashtags…'
+                        : 'Ask me to write it for you…'
                   }
                   aria-label={
                     chatMode
                       ? 'Message the assistant'
-                      : 'Ask the assistant to revise the draft'
+                      : 'Ask the assistant to write or revise'
                   }
                   className="h-9 bg-background"
                   disabled={busy}
@@ -274,7 +286,7 @@ export function AssistantChat({
               <p className="mt-2 text-[10px] text-muted-foreground">
                 {chatMode
                   ? 'Replies stay in this chat. Nothing is sent to Facebook.'
-                  : 'Edits the text in place. Nothing is sent to Facebook.'}
+                  : 'Writes into the field. Nothing is sent to Facebook.'}
               </p>
             </form>
           </section>

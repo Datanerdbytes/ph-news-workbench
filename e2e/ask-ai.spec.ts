@@ -1,24 +1,23 @@
 import { expect, test } from "@playwright/test";
 
-// Regression for the "can't type to Ask AI" bug: with no draft text the
-// assistant used to strand the panel at "No draft yet" with a disabled input.
-// It must fall back to general chat with an always-enabled input.
+// Regression for two Ask AI bugs: (1) the input used to be disabled without a
+// draft ("can't type"), and (2) replies must populate the field, not stay in
+// the chat — even when the field starts empty ("write me a caption").
 test("Ask AI accepts typing without a draft selected", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: "Ask AI" }).click();
   const panel = page.getByRole("dialog", { name: "AI assistant" });
   await expect(panel).toBeVisible();
-  await expect(panel.getByText("General chat")).toBeVisible();
+  await expect(panel.getByText("Ready to write")).toBeVisible();
 
-  const input = panel.getByRole("textbox", { name: "Message the assistant" });
+  const input = panel.getByRole("textbox", { name: "Ask the assistant to write or revise" });
   await expect(input).toBeEnabled();
   await input.fill("Give me a story idea");
   await expect(input).toHaveValue("Give me a story idea");
 });
 
-// The other half of the fix: once the composer has text, the panel flips to
-// draft mode and offers to revise it in place.
+// The other half: once the composer has text, the pill says Draft in context.
 test("flips to draft mode once the composer has text", async ({ page }) => {
   await page.goto("/photos");
 
@@ -28,7 +27,7 @@ test("flips to draft mode once the composer has text", async ({ page }) => {
 
   await expect(panel.getByText("Draft in context")).toBeVisible();
   const input = panel.getByRole("textbox", {
-    name: "Ask the assistant to revise the draft",
+    name: "Ask the assistant to write or revise",
   });
   await expect(input).toBeEnabled();
   await input.fill("Make it shorter");
