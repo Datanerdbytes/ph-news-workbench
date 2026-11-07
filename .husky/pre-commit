@@ -1,0 +1,6 @@
+# Staged files: eslint --fix (the repo's formatter — no Prettier by design).
+npx lint-staged
+
+# The two project gates, matching CI.
+npm run typecheck
+npm run test
