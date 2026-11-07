@@ -74,11 +74,19 @@ export async function POST(request: Request) {
       results,
     });
 
-    return crosspostResponse(results, {
-      scheduledFor: schedule.unix
-        ? new Date(schedule.unix * 1000).toISOString()
-        : null,
-    });
+    return crosspostResponse(
+      results,
+      {
+        scheduledFor: schedule.unix
+          ? new Date(schedule.unix * 1000).toISOString()
+          : null,
+      },
+      {
+        workspaceId: access.workspace.id,
+        actorUserId: access.user.id,
+        kind: 'post',
+      }
+    );
   } catch (error) {
     return facebookErrorResponse(
       error,

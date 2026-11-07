@@ -9,6 +9,10 @@ import {
   publishPagePost,
   redactTokens,
 } from '@/lib/facebook';
+import {
+  notifyTokenInvalid,
+  notifyWorkspace,
+} from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,6 +117,18 @@ export async function POST(request: Request) {
       const permissionIssue =
         error.code === 10 || error.code === 200 || error.code === 190;
       if (permissionIssue) {
+        await notifyTokenInvalid(access.workspace.id);
+        await notifyWorkspace({
+          workspaceId: access.workspace.id,
+          type: 'publish_failed',
+          title: 'Post could not be published',
+          body: `${redactTokens(error.message)} Reconnect the Page to refresh its permissions.`.slice(
+            0,
+            200
+          ),
+          link: '/post',
+          excludeUserIds: [access.user.id],
+        });
         return NextResponse.json(
           {
             error: `${redactTokens(error.message)} Reconnect the Page to refresh its permissions.`,
@@ -121,12 +137,28 @@ export async function POST(request: Request) {
           { status: 403 }
         );
       }
+      await notifyWorkspace({
+        workspaceId: access.workspace.id,
+        type: 'publish_failed',
+        title: 'Post could not be published',
+        body: redactTokens(error.message).slice(0, 200),
+        link: '/post',
+        excludeUserIds: [access.user.id],
+      });
       return NextResponse.json(
         { error: redactTokens(error.message), code: 'publish_failed' },
         { status: 502 }
       );
     }
 
+    await notifyWorkspace({
+      workspaceId: access.workspace.id,
+      type: 'publish_failed',
+      title: 'Post could not be published',
+      body: 'The post could not be published.',
+      link: '/post',
+      excludeUserIds: [access.user.id],
+    });
     return NextResponse.json(
       { error: 'The post could not be published.', code: 'publish_failed' },
       { status: 500 }

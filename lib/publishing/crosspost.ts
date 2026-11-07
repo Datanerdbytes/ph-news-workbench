@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { redactTokens } from '@/lib/facebook';
+import { FacebookApiError, redactTokens } from '@/lib/facebook';
+import {
+  kindComposerPath,
+  kindLabel,
+  notifyTokenInvalid,
+  notifyWorkspace,
+} from '@/lib/notifications';
 import { resolvePageTargets, type PageTarget } from './connection';
 
 export type PagePublishResult = {
@@ -14,6 +20,23 @@ export type CrosspostResult = {
   permalink?: string | null;
   error?: string;
 };
+
+/** Workspace + actor context, so publish outcomes reach the notification bell. */
+export type CrosspostNotifyContext = {
+  workspaceId: string;
+  actorUserId: string;
+  kind?: string | null;
+};
+
+/** Body copy stays one line in the bell panel. */
+function clampDetail(text: string, max = 200) {
+  const value = text.trim();
+  return value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value;
+}
+
+function firstFailure(results: CrosspostResult[]) {
+  return results.find((result) => !result.ok) ?? null;
+}
 
 export async function publishToSelectedPages({
   workspaceId,
@@ -43,6 +66,12 @@ export async function publishToSelectedPages({
         permalink: result.permalink,
       });
     } catch (error) {
+      if (
+        error instanceof FacebookApiError &&
+        (error.code === 10 || error.code === 200 || error.code === 190)
+      ) {
+        await notifyTokenInvalid(workspaceId);
+      }
       results.push({
         page: { id: target.id, name: target.name },
         ok: false,
@@ -60,10 +89,16 @@ export function firstSuccess(results: CrosspostResult[]) {
   return results.find((result) => result.ok) ?? null;
 }
 
-export function crosspostResponse(
+/**
+ * Builds the shared composer response. Pass `notify` to also record a
+ * notification for publish failures — the actor already sees the route's
+ * toast, so they are excluded; other members learn from the bell.
+ */
+export async function crosspostResponse(
   results: CrosspostResult[],
-  extra: Record<string, unknown> = {}
-): NextResponse {
+  extra: Record<string, unknown> = {},
+  notify?: CrosspostNotifyContext
+): Promise<NextResponse> {
   if (!results.length) {
     return NextResponse.json(
       {
@@ -78,6 +113,19 @@ export function crosspostResponse(
 
   const success = firstSuccess(results);
   if (!success) {
+    if (notify) {
+      await notifyWorkspace({
+        workspaceId: notify.workspaceId,
+        type: 'publish_failed',
+        title: `${kindLabel(notify.kind)} could not be published`,
+        body: clampDetail(
+          firstFailure(results)?.error ??
+            'Facebook rejected the post on every selected Page.'
+        ),
+        link: kindComposerPath(notify.kind),
+        excludeUserIds: [notify.actorUserId],
+      });
+    }
     return NextResponse.json(
       {
         error:
@@ -92,6 +140,23 @@ export function crosspostResponse(
   }
 
   const partial = results.some((result) => !result.ok);
+  if (partial && notify) {
+    const failed = firstFailure(results);
+    const failedCount = results.filter((result) => !result.ok).length;
+    await notifyWorkspace({
+      workspaceId: notify.workspaceId,
+      type: 'crosspost_partial_failure',
+      title: `${kindLabel(notify.kind)} published with Page failures`,
+      body: clampDetail(
+        `${failedCount} of ${results.length} Pages failed${
+          failed ? `: ${failed.page.name} — ${failed.error}` : ''
+        }`
+      ),
+      link: kindComposerPath(notify.kind),
+      excludeUserIds: [notify.actorUserId],
+    });
+  }
+
   return NextResponse.json(
     {
       id: success.id,

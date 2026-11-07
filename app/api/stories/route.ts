@@ -87,7 +87,11 @@ export async function POST(request: Request) {
           }),
       });
 
-      return crosspostResponse(results, { kind });
+      return crosspostResponse(results, { kind }, {
+      workspaceId: access.workspace.id,
+      actorUserId: access.user.id,
+      kind,
+    });
     }
 
     const video = form?.get('video');
@@ -129,7 +133,11 @@ export async function POST(request: Request) {
         }),
     });
 
-    return crosspostResponse(results, { kind });
+    return crosspostResponse(results, { kind }, {
+      workspaceId: access.workspace.id,
+      actorUserId: access.user.id,
+      kind,
+    });
   } catch (error) {
     return facebookErrorResponse(
       error,
