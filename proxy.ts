@@ -5,7 +5,11 @@ import type { NextRequest } from "next/server";
 const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
 
 export function proxy(request: NextRequest) {
-  const session = request.cookies.get("better-auth.session_token");
+  // better-auth prefixes the session cookie with __Secure- on HTTPS hosts
+  // (production) and leaves it bare over HTTP (local dev) — accept both.
+  const session =
+    request.cookies.get("better-auth.session_token") ??
+    request.cookies.get("__Secure-better-auth.session_token");
   const path = request.nextUrl.pathname;
   const isPublic =
     PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`)) ||

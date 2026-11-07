@@ -28,6 +28,13 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg", schema }),
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL!,
+  // Extra browser origins allowed to call the auth API (comma-separated).
+  // better-auth otherwise trusts only baseURL, which rejects Vercel's other
+  // aliases and preview deployments.
+  trustedOrigins: (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
   emailAndPassword: {
     enabled: true,
     // Sign-in is refused with 403 EMAIL_NOT_VERIFIED until the user opens the
