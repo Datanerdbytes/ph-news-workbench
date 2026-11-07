@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { publishPageReel } from '@/lib/facebook';
 import { stripMarkdown } from '@/lib/format';
+import { deleteStagedBlobs, stagedFileToBuffer } from '@/lib/blob';
 import { requirePublishingConnection } from '@/lib/publishing/connection';
 import {
   crosspostResponse,
@@ -13,11 +14,23 @@ import { recordNativeSchedule } from '@/lib/schedule-mirror';
 import { readMp4DurationSeconds } from '@/lib/reel-meta';
 
 export const dynamic = 'force-dynamic';
+// Blob download is same-network and fast; the Facebook rupload transfer owns
+// the budget. Vercel Hobby's ceiling is 60s for Node functions.
+export const maxDuration = 60;
 
 const MAX_BYTES = 100 * 1024 * 1024;
 const MIN_SECONDS = 3;
 const MAX_SECONDS = 90;
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
+
+type ReelPostBody = {
+  videoUrl?: unknown;
+  filename?: unknown;
+  videoType?: unknown;
+  caption?: unknown;
+  scheduledFor?: unknown;
+  pageIds?: unknown;
+};
 
 export async function POST(request: Request) {
   const result = await requirePublishingConnection(request, 'post a reel');
@@ -25,43 +38,63 @@ export async function POST(request: Request) {
 
   const { access } = result.context;
 
-  const form = await request.formData().catch(() => null);
-  const video = form?.get('video');
-  if (!(video instanceof File) || video.size === 0) {
+  const body = (await request.json().catch(() => null)) as ReelPostBody | null;
+  const videoUrl = typeof body?.videoUrl === 'string' ? body.videoUrl : '';
+  if (!videoUrl) {
     return NextResponse.json(
-      { error: 'Choose a video file to post as a reel.' },
+      { error: 'Stage the video first, then post the reel.' },
       { status: 400 }
     );
   }
-  if (video.size > MAX_BYTES) {
+
+  const filename =
+    typeof body?.filename === 'string' && body.filename.trim()
+      ? body.filename
+      : 'reel.mp4';
+  const videoType =
+    typeof body?.videoType === 'string' && VIDEO_TYPES.has(body.videoType)
+      ? body.videoType
+      : 'video/mp4';
+
+  const rawCaption = typeof body?.caption === 'string' ? body.caption : '';
+  const caption = stripMarkdown(rawCaption).trim().slice(0, 2200);
+
+  const schedule = parseScheduledPublishTime(body?.scheduledFor);
+  if (schedule.error) {
+    return NextResponse.json({ error: schedule.error }, { status: 400 });
+  }
+
+  const pageIds = readPageIds(body?.pageIds);
+
+  // Staged video: browser -> Blob -> server. The staging helper authenticates
+  // the URL against our store, so a fabricated or foreign URL is refused.
+  let videoBytes: Buffer;
+  try {
+    videoBytes = await stagedFileToBuffer(videoUrl);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'The staged video could not be read.',
+      },
+      { status: 400 }
+    );
+  }
+
+  if (videoBytes.length === 0) {
+    return NextResponse.json(
+      { error: 'The staged video is empty.' },
+      { status: 400 }
+    );
+  }
+  if (videoBytes.length > MAX_BYTES) {
     return NextResponse.json(
       { error: 'Reels must be 100 MB or smaller.' },
       { status: 400 }
     );
   }
-  const looksLikeVideo =
-    VIDEO_TYPES.has(video.type) ||
-    (!video.type && /\.(mp4|mov)$/i.test(video.name));
-  if (!looksLikeVideo) {
-    return NextResponse.json(
-      { error: 'Upload an MP4 or MOV video.' },
-      { status: 400 }
-    );
-  }
-
-  const rawCaption = form?.get('caption');
-  const caption =
-    typeof rawCaption === 'string'
-      ? stripMarkdown(rawCaption).trim().slice(0, 2200)
-      : '';
-
-  const schedule = parseScheduledPublishTime(form?.get('scheduledFor'));
-  if (schedule.error) {
-    return NextResponse.json({ error: schedule.error }, { status: 400 });
-  }
-
-  const pageIds = readPageIds(form?.get('pageIds'));
-  const videoBytes = Buffer.from(await video.arrayBuffer());
   const durationSeconds = readMp4DurationSeconds(videoBytes);
   if (durationSeconds === null) {
     return NextResponse.json(
@@ -89,8 +122,8 @@ export async function POST(request: Request) {
           caption,
           video: {
             bytes: videoBytes,
-            type: video.type || 'video/mp4',
-            filename: video.name || 'reel.mp4',
+            type: videoType,
+            filename,
           },
           scheduledPublishTime: schedule.unix,
         }),
@@ -128,5 +161,9 @@ export async function POST(request: Request) {
       'reel_failed',
       'The reel could not be posted.'
     );
+  } finally {
+    // The staging copy is transient regardless of outcome — Facebook either
+    // has the video, or the user re-stages a fresh file on retry.
+    await deleteStagedBlobs([videoUrl]);
   }
 }

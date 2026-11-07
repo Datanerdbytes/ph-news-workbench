@@ -89,6 +89,13 @@ vi.mock("@/components/assistant-chat", () => ({
   AssistantChat: () => null,
 }));
 
+vi.mock("@vercel/blob/client", () => ({
+  upload: vi.fn(async (pathname: string) => ({
+    url: `https://store.public.blob.vercel-storage.com/${pathname}`,
+    pathname,
+  })),
+}));
+
 import PhotosPage from "./page";
 
 async function flush() {

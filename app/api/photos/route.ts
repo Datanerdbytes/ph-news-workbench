@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { MAX_POST_IMAGES, parseImages } from '@/lib/facebook';
 import { stripMarkdown } from '@/lib/format';
+import { deleteStagedBlobs } from '@/lib/blob';
 import { requirePublishingConnection } from '@/lib/publishing/connection';
 import {
   crosspostResponse,
@@ -30,6 +31,14 @@ export async function POST(request: Request) {
   );
   const rawImages = Array.isArray(body?.images) ? body.images : [];
   const images = parseImages(rawImages);
+  // Staged images live in Blob only until Facebook fetches them — drop the
+  // staging copies once the publish succeeds so nothing lingers.
+  const stagedBlobUrls = images
+    .map((image) => ('url' in image ? image.url : null))
+    .filter(
+      (url): url is string =>
+        url !== null && url.includes('.public.blob.vercel-storage.com')
+    );
   const pageIds = readPageIds(body?.pageIds);
 
   try {
@@ -82,6 +91,8 @@ export async function POST(request: Request) {
         message,
         images,
       });
+
+      await deleteStagedBlobs(stagedBlobUrls);
 
       return NextResponse.json(
         {
@@ -138,6 +149,8 @@ export async function POST(request: Request) {
       scheduledFor: schedule.unix ? new Date(schedule.unix * 1000) : null,
       results,
     });
+
+    await deleteStagedBlobs(stagedBlobUrls);
 
     return crosspostResponse(
       results,
