@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { discoverDiskDownloads, publicDiskDownload } from "@/lib/downloads/disk-jobs";
 import { downloadJobs, publicDownloadJob, type DownloadJob } from "@/lib/downloads/jobs";
 import { requireWorkspace, unauthorized } from "@/lib/session";
 
@@ -113,11 +114,15 @@ export async function GET(request: Request) {
   const access = await requireWorkspace(request);
   if (!access) return unauthorized();
 
-  const jobs = [...downloadJobs.values()]
+  const sessionJobs = [...downloadJobs.values()]
     .filter((job) => job.workspaceId === access.workspace.id)
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, 20)
     .map(publicDownloadJob);
+  const diskJobs = (await discoverDiskDownloads())
+    .filter((disk) => !sessionJobs.some((job) => job.saveLocation === disk.filePath))
+    .map(publicDiskDownload);
+  const jobs = [...sessionJobs, ...diskJobs]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 20);
   return NextResponse.json({ jobs });
 }
 
