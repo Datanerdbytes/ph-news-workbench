@@ -78,3 +78,32 @@ export async function instagramErrorResponse(
     }
   );
 }
+
+export async function youtubeErrorResponse(
+  error: unknown,
+  code: string,
+  fallback: string,
+  notify?: { workspaceId: string; kind?: string | null }
+): Promise<NextResponse> {
+  const message =
+    error instanceof Error && error.message
+      ? redactTokens(error.message)
+      : fallback;
+
+  let status = 502;
+  let outCode = code;
+  if (error instanceof Error) {
+    if (/token|Reconnect/i.test(message)) {
+      status = 403;
+      outCode = 'permission';
+    } else if (/quota/i.test(message)) {
+      outCode = 'quota_exceeded';
+    }
+  }
+
+  if (notify) {
+    await notifyPublishAttemptFailure({ ...notify, reason: message });
+  }
+
+  return NextResponse.json({ error: message, code: outCode }, { status });
+}
