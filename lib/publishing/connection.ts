@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { graphRequest } from '@/lib/facebook';
-import { decryptToken } from '@/lib/facebook-token';
+import { decryptToken, decryptTikTokSecret, decryptYouTubeSecret } from '@/lib/facebook-token';
 import { requireWorkspace, unauthorized } from '@/lib/session';
 
 type ConnectionRow = {
@@ -230,4 +230,220 @@ export async function resolvePageTargets(
     name: page.page_name,
     accessToken: decryptToken(page.access_token),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Non-Facebook platform connections. Instagram has no table by design — an
+// IG business account hangs off the connected Facebook Page, so its gate is
+// requirePublishingConnection and the Instagram slice probes the linked
+// account through it. YouTube and TikTok own their OAuth and get one row
+// per workspace in <platform>_connections.
+// ---------------------------------------------------------------------------
+
+export type PlatformProvider = 'youtube' | 'tiktok' | 'instagram';
+
+export type PlatformConnection = {
+  platform: PlatformProvider;
+  platformUserId: string;
+  username: string;
+  accessToken: string;
+  refreshToken?: string;
+  scopes: string[];
+  /** ISO timestamp when the access token stops working, when the API says. */
+  expiresAt: string | null;
+};
+
+export type PlatformConnectionContext = {
+  access: WorkspaceAccess;
+  connection: PlatformConnection;
+};
+
+export type PlatformConnectionResult =
+  | { context: PlatformConnectionContext; response?: never }
+  | { context?: never; response: NextResponse };
+
+type PlatformProviderConfig = {
+  name: string;
+  table: () => string;
+  columns: () => { userId: string; hasRefresh: boolean };
+  requiredScopes: string[];
+  decrypt: (payload: string) => string;
+};
+
+export const PLATFORM_PROVIDERS: Record<
+  Exclude<PlatformProvider, 'instagram'>,
+  PlatformProviderConfig
+> = {
+  youtube: {
+    name: 'YouTube',
+    table: () => 'youtube_connections',
+    columns: () => ({ userId: 'youtube_user_id', hasRefresh: true }),
+    requiredScopes: ['https://www.googleapis.com/auth/youtube.upload'],
+    decrypt: decryptYouTubeSecret,
+  },
+  tiktok: {
+    name: 'TikTok',
+    table: () => 'tiktok_connections',
+    columns: () => ({ userId: 'tiktok_user_id', hasRefresh: true }),
+    requiredScopes: [],
+    decrypt: decryptTikTokSecret,
+  },
+};
+
+export function isPlatformProvider(value: string): value is PlatformProvider {
+  return value === 'youtube' || value === 'tiktok' || value === 'instagram';
+}
+
+export function platformProviderName(provider: PlatformProvider): string {
+  return provider === 'instagram' ? 'Instagram' : PLATFORM_PROVIDERS[provider].name;
+}
+
+type PlatformRow = {
+  platform_user_id: string;
+  username: string;
+  access_token: string;
+  refresh_token: string | null;
+  scopes: string | null;
+  expires_at: Date | string | null;
+};
+
+function toIsoTimestamp(value: unknown): string | null {
+  if (!value) return null;
+  const date =
+    value instanceof Date ? value : new Date(typeof value === 'string' ? value : Number(value));
+  return Number.isNaN(date.valueOf()) ? null : date.toISOString();
+}
+
+/**
+ * Auth-and-load gate for a non-Facebook publisher. Mirrors
+ * requirePublishingConnection: 409 when not connected, 403 when the stored
+ * grant lacks a publish scope, 500 when the row cannot be read.
+ */
+export async function requirePlatformConnection(
+  request: Request,
+  provider: Exclude<PlatformProvider, 'instagram'>,
+  action: string
+): Promise<PlatformConnectionResult> {
+  const access = await requireWorkspace(request);
+  if (!access) return { response: unauthorized() };
+
+  const config = PLATFORM_PROVIDERS[provider];
+  const name = config.name;
+
+  let rows: PlatformRow[];
+  try {
+    if (provider === 'youtube') {
+      rows = (await sql`
+        SELECT youtube_user_id AS platform_user_id, username, access_token, refresh_token, scopes, expires_at
+        FROM youtube_connections
+        WHERE workspace_id = ${access.workspace.id}
+      `) as unknown as PlatformRow[];
+    } else {
+      rows = (await sql`
+        SELECT tiktok_user_id AS platform_user_id, username, access_token, refresh_token, scopes, expires_at
+        FROM tiktok_connections
+        WHERE workspace_id = ${access.workspace.id}
+      `) as unknown as PlatformRow[];
+    }
+  } catch {
+    return {
+      response: NextResponse.json(
+        {
+          error: `Could not read the ${name} connection.`,
+          code: 'connection_failed',
+        },
+        { status: 500 }
+      ),
+    };
+  }
+
+  const row = rows[0];
+  if (!row) {
+    return {
+      response: NextResponse.json(
+        {
+          error: `Connect your ${name} account before ${action}.`,
+          code: 'not_connected',
+        },
+        { status: 409 }
+      ),
+    };
+  }
+
+  const scopes = (row.scopes ?? '').split(',').filter(Boolean);
+  const missing = config.requiredScopes.filter((scope) => !scopes.includes(scope));
+  if (missing.length) {
+    return {
+      response: NextResponse.json(
+        {
+          error: `This connection cannot ${action}. Reconnect ${name} to grant ${missing.join(' + ')}.`,
+          code: 'scope_missing',
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
+  try {
+    return {
+      context: {
+        access,
+        connection: {
+          platform: provider,
+          platformUserId: row.platform_user_id,
+          username: row.username,
+          accessToken: config.decrypt(row.access_token),
+          refreshToken: row.refresh_token && config.columns().hasRefresh ? config.decrypt(row.refresh_token) : undefined,
+          scopes,
+          expiresAt: toIsoTimestamp(row.expires_at),
+        },
+      },
+    };
+  } catch {
+    return {
+      response: NextResponse.json(
+        {
+          error: `The stored ${name} token is unreadable. Reconnect ${name}.`,
+          code: 'not_connected',
+        },
+        { status: 409 }
+      ),
+    };
+  }
+}
+
+/**
+ * Row load without request gating — the executor in crosspost.ts resolves
+ * the publishing account through this helper.
+ */
+export async function resolvePlatformAccount(
+  workspaceId: string,
+  provider: Exclude<PlatformProvider, 'instagram'>
+): Promise<PlatformConnection | null> {
+  const rows =
+    provider === 'youtube'
+      ? ((await sql`
+          SELECT youtube_user_id AS platform_user_id, username, access_token, refresh_token, scopes, expires_at
+          FROM youtube_connections
+          WHERE workspace_id = ${workspaceId}
+        `) as unknown as PlatformRow[])
+      : ((await sql`
+          SELECT tiktok_user_id AS platform_user_id, username, access_token, refresh_token, scopes, expires_at
+          FROM tiktok_connections
+          WHERE workspace_id = ${workspaceId}
+        `) as unknown as PlatformRow[]);
+
+  const row = rows[0];
+  if (!row) return null;
+  const config = PLATFORM_PROVIDERS[provider];
+  return {
+    platform: provider,
+    platformUserId: row.platform_user_id,
+    username: row.username,
+    accessToken: config.decrypt(row.access_token),
+    refreshToken:
+      row.refresh_token && config.columns().hasRefresh ? config.decrypt(row.refresh_token) : undefined,
+    scopes: (row.scopes ?? '').split(',').filter(Boolean),
+    expiresAt: toIsoTimestamp(row.expires_at),
+  };
 }

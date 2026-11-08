@@ -161,6 +161,36 @@ CREATE TABLE IF NOT EXISTS facebook_pages (
 CREATE INDEX IF NOT EXISTS facebook_pages_workspace_idx
   ON facebook_pages (workspace_id, is_primary DESC);
 
+-- Instagram has no connection table on purpose: it rides the Facebook
+-- OAuth (an IG pro account is linked to a managed Page), so its status
+-- derives from facebook_connections plus a Graph probe.
+
+CREATE TABLE IF NOT EXISTS youtube_connections (
+  workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  youtube_user_id TEXT NOT NULL,
+  username TEXT NOT NULL,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT,
+  scopes TEXT,
+  expires_at TIMESTAMPTZ,
+  connected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS tiktok_connections (
+  workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  tiktok_user_id TEXT NOT NULL,
+  username TEXT NOT NULL,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT,
+  scopes TEXT,
+  expires_at TIMESTAMPTZ,
+  connected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS live_streams (
   id SERIAL PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
