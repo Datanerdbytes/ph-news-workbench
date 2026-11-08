@@ -13,8 +13,10 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const MIN_DURATION = 3;
-const MAX_DURATION = 90;
-const MAX_BYTES = 100 * 1024 * 1024;
+// Facebook's chunked video upload (used for clips over 90 seconds) accepts
+// up to 45 minutes; the reel-length cap lives in the publish route only.
+const MAX_DURATION = 45 * 60;
+const MAX_BYTES = 1024 * 1024 * 1024;
 // WebM is accepted for reels baked in the browser (the GSAP animation overlay
 // is recorded to WebM by MediaRecorder) — it is transcoded to H.264 MP4 here
 // like every other input.
@@ -53,7 +55,7 @@ export async function POST(request: Request) {
   }
   if (video.size > MAX_BYTES) {
     return NextResponse.json(
-      { error: 'Videos must be 100 MB or smaller.' },
+      { error: 'Videos must be 1 GB or smaller.' },
       { status: 400 }
     );
   }
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
     if (duration < MIN_DURATION || duration > MAX_DURATION) {
       return NextResponse.json(
         {
-          error: `Facebook reels must be ${MIN_DURATION}–${MAX_DURATION} seconds (this one is ${duration.toFixed(1)}s).`,
+          error: `Facebook reels must be ${MIN_DURATION} seconds to ${Math.floor(MAX_DURATION / 60)} minutes (this one is ${duration.toFixed(1)}s).`,
         },
         { status: 400 }
       );
