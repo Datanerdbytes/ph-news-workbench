@@ -5,6 +5,7 @@ import "./globals.css";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { FacebookConnectionProvider } from "@/components/facebook-connection";
+import { InstagramConnectionProvider } from "@/components/instagram-connection";
 import { SessionProvider } from "@/components/session-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { DEFAULT_THEME, getTheme, isThemeId } from "@/lib/themes";
@@ -65,7 +66,9 @@ export default async function RootLayout({
     >
       <body className="min-h-dvh font-sans antialiased">
         <SessionProvider>
-          <FacebookConnectionProvider>{children}</FacebookConnectionProvider>
+          <FacebookConnectionProvider>
+            <InstagramConnectionProvider>{children}</InstagramConnectionProvider>
+          </FacebookConnectionProvider>
         </SessionProvider>
         <Toaster position="bottom-right" />
       </body>

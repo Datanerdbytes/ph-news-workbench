@@ -81,7 +81,10 @@ export function facebookRedirectUri(): string {
   return 'http://localhost:3000/api/facebook/callback';
 }
 
-export function buildAuthorizationUrl(state: string): string {
+export function buildAuthorizationUrl(
+  state: string,
+  extraScopes: readonly string[] = []
+): string {
   const url = new URL(
     `https://www.facebook.com/${facebookGraphVersion()}/dialog/oauth`
   );
@@ -89,7 +92,12 @@ export function buildAuthorizationUrl(state: string): string {
   url.searchParams.set('redirect_uri', facebookRedirectUri());
   url.searchParams.set('state', state);
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('scope', FACEBOOK_SCOPES.join(','));
+  // Instagram publishing rides the same Meta app grant: the extra IG scopes
+  // stack on top of the Facebook Page scopes so one reconnect covers both.
+  url.searchParams.set(
+    'scope',
+    [...new Set([...FACEBOOK_SCOPES, ...extraScopes])].join(',')
+  );
   return url.toString();
 }
 
