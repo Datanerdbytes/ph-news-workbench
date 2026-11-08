@@ -1,16 +1,14 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { NextResponse } from "next/server";
+import { downloadRoot, findDiskDownload, videoContentType } from "@/lib/downloads/disk-jobs";
 import { downloadJobs } from "@/lib/downloads/jobs";
 import { requireWorkspace, unauthorized } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const DOWNLOAD_ROOT = path.join(os.homedir(), "Downloads", "VideoDownloader");
 
 type RangeSelection = { start: number; end: number } | "full" | "invalid";
 
@@ -45,19 +43,31 @@ export async function GET(
   }
 
   const { id } = await params;
-  const job = downloadJobs.get(id);
-  if (!job || job.workspaceId !== access.workspace.id) {
+  const isDiskJob = id.startsWith("disk-");
+
+  let filePath: string | null;
+  if (isDiskJob) {
+    const disk = await findDiskDownload(id);
+    filePath = disk?.filePath ?? null;
+  } else {
+    const job = downloadJobs.get(id);
+    if (!job || job.workspaceId !== access.workspace.id) {
+      return NextResponse.json({ error: "Download job not found." }, { status: 404 });
+    }
+    if (job.status !== "done" || !job.filePath) {
+      return NextResponse.json(
+        { error: "The video file is not ready yet." },
+        { status: 409 }
+      );
+    }
+    filePath = job.filePath;
+  }
+  if (!filePath) {
     return NextResponse.json({ error: "Download job not found." }, { status: 404 });
   }
-  if (job.status !== "done" || !job.filePath) {
-    return NextResponse.json(
-      { error: "The video file is not ready yet." },
-      { status: 409 }
-    );
-  }
 
-  const resolved = path.resolve(job.filePath);
-  if (!resolved.startsWith(`${DOWNLOAD_ROOT}${path.sep}`)) {
+  const resolved = path.resolve(filePath);
+  if (!resolved.startsWith(`${downloadRoot()}${path.sep}`)) {
     return NextResponse.json({ error: "Download job not found." }, { status: 404 });
   }
 
@@ -93,7 +103,7 @@ export async function GET(
   const fileName = resolved.split(path.sep).at(-1) ?? "video.mp4";
 
   const headers: Record<string, string> = {
-    "Content-Type": "video/mp4",
+    "Content-Type": videoContentType(resolved),
     "Content-Length": String(end - start + 1),
     "Accept-Ranges": "bytes",
     "Cache-Control": "no-store",

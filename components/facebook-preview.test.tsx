@@ -56,4 +56,31 @@ describe("FacebookPreview", () => {
     // PageAvatar renders the first letter, uppercased.
     expect(screen.getByText("T")).toBeInTheDocument();
   });
+
+  it("renders a link-share card with the hostname", () => {
+    render(
+      <FacebookPreview text="Read more" link="https://www.pna.gov.ph/articles/123" />
+    );
+    expect(screen.getByText("pna.gov.ph")).toBeInTheDocument();
+  });
+
+  it("prefixes a schemeless link before parsing the hostname", () => {
+    render(<FacebookPreview text="x" link="verafiles.org/stories" />);
+    expect(screen.getByText("verafiles.org")).toBeInTheDocument();
+  });
+
+  it("omits the link card when no link is given", () => {
+    render(<FacebookPreview text="x" />);
+    expect(document.querySelector(".lucide-link-2")).toBeNull();
+  });
+
+  it("shows the link card when a link is given", () => {
+    render(<FacebookPreview text="x" link="https://pna.gov.ph/a" />);
+    expect(document.querySelector(".lucide-link-2")).not.toBeNull();
+  });
+
+  it("treats a malformed link as plain text instead of throwing", () => {
+    render(<FacebookPreview text="x" link="not a url" />);
+    expect(screen.getByText("not a url")).toBeInTheDocument();
+  });
 });
