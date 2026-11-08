@@ -123,7 +123,7 @@ export default function VideosPage() {
                 Chunked upload
               </p>
               <p className="mt-0.5 text-[9px] leading-relaxed text-white/45">
-                Over 90 seconds belongs here, not Reels · up to 45 minutes.
+                Title, description &amp; thumbnail · up to 45 minutes · 1 GB.
               </p>
             </div>
           </div>

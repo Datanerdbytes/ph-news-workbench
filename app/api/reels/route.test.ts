@@ -12,6 +12,10 @@ vi.mock("@/lib/facebook", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/facebook")>();
   return { ...actual, publishPageReel: vi.fn() };
 });
+vi.mock("@/lib/publishing/videos", () => ({
+  MAX_VIDEO_BYTES: 1024 * 1024 * 1024,
+  publishPageVideo: vi.fn(),
+}));
 vi.mock("@/lib/publishing/connection", () => ({
   requirePublishingConnection: vi.fn(),
 }));
@@ -21,11 +25,16 @@ vi.mock("@/lib/publishing/crosspost", () => ({
 }));
 vi.mock("@/lib/schedule-mirror", () => ({ recordNativeSchedule: vi.fn() }));
 vi.mock("@/lib/reel-meta", () => ({ readMp4DurationSeconds: vi.fn() }));
+vi.mock("@/lib/notifications", () => ({
+  notifyPublishAttemptFailure: vi.fn(),
+}));
 
 import { deleteStagedBlobs, stagedFileToBuffer } from "@/lib/blob";
 import { publishPageReel } from "@/lib/facebook";
+import { notifyPublishAttemptFailure } from "@/lib/notifications";
 import { crosspostResponse, publishToSelectedPages } from "@/lib/publishing/crosspost";
 import { requirePublishingConnection } from "@/lib/publishing/connection";
+import { publishPageVideo } from "@/lib/publishing/videos";
 import { readMp4DurationSeconds } from "@/lib/reel-meta";
 import { POST } from "./route";
 
@@ -35,7 +44,9 @@ const delMock = deleteStagedBlobs as unknown as Mock;
 const publishMock = publishToSelectedPages as unknown as Mock;
 const responseMock = crosspostResponse as unknown as Mock;
 const reelMock = publishPageReel as unknown as Mock;
+const videoMock = publishPageVideo as unknown as Mock;
 const durationMock = readMp4DurationSeconds as unknown as Mock;
+const notifyMock = notifyPublishAttemptFailure as unknown as Mock;
 
 const access = {
   user: { id: "u1" },
@@ -62,6 +73,7 @@ beforeEach(() => {
     return { results: [{ page: { id: "p1", name: "NeuralVerse" }, ok: true, ...result }] };
   });
   reelMock.mockResolvedValue({ id: "fb_1", permalink: null });
+  videoMock.mockResolvedValue({ id: "fb_video_1", permalink: null });
   durationMock.mockReturnValue(30); // a plausible 30-second reel
   responseMock.mockReturnValue(new Response(JSON.stringify({ ok: true }), { status: 201 }));
 });
@@ -146,8 +158,69 @@ describe("POST /api/reels (Blob-staged)", () => {
     expect(delMock).not.toHaveBeenCalled();
   });
 
-  it("rejects reels outside the 3–90 second range", async () => {
-    durationMock.mockReturnValueOnce(120);
+  it("publishes 90s-and-under clips through the Reels API", async () => {
+    durationMock.mockReturnValueOnce(88);
+
+    const res = await POST(post({
+      videoUrl: "https://store.public.blob.vercel-storage.com/reels/short.mp4",
+      pageIds: ["p1"],
+    }));
+
+    expect(res.status).toBe(201);
+    expect(reelMock).toHaveBeenCalledTimes(1);
+    expect(videoMock).not.toHaveBeenCalled();
+    expect(delMock).toHaveBeenCalledWith([
+      "https://store.public.blob.vercel-storage.com/reels/short.mp4",
+    ]);
+  });
+
+  it("routes clips over 90 seconds through the chunked Video API", async () => {
+    durationMock.mockReturnValueOnce(150);
+
+    await POST(post({
+      videoUrl: "https://store.public.blob.vercel-storage.com/reels/long.mp4",
+      pageIds: ["p1"],
+    }));
+
+    expect(reelMock).not.toHaveBeenCalled();
+    expect(videoMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: "", // no caption
+        video: {
+          bytes: expect.any(Buffer),
+          type: "video/mp4",
+          filename: "reel.mp4",
+        },
+        scheduledPublishTime: null,
+      })
+    );
+    expect(videoMock.mock.calls[0][0]).not.toHaveProperty("title");
+    // The staging copy still deletes even on the Video API path.
+    expect(delMock).toHaveBeenCalledWith([
+      "https://store.public.blob.vercel-storage.com/reels/long.mp4",
+    ]);
+  });
+
+  it("keeps native scheduling on the long path", async () => {
+    durationMock.mockReturnValueOnce(300);
+
+    await POST(
+      post({
+        videoUrl: "https://store.public.blob.vercel-storage.com/reels/long.mp4",
+        scheduledFor: new Date(Date.now() + 11 * 60_000).toISOString(),
+        pageIds: ["p1"],
+      })
+    );
+
+    expect(videoMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scheduledPublishTime: expect.any(Number),
+      })
+    );
+  });
+
+  it("rejects reels over the 45-minute resumable-upload envelope", async () => {
+    durationMock.mockReturnValueOnce(2760); // 46 minutes
 
     const res = await POST(post({
       videoUrl: "https://store.public.blob.vercel-storage.com/reels/c.mp4",
@@ -156,7 +229,7 @@ describe("POST /api/reels (Blob-staged)", () => {
 
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe(
-      "Reels must be 3 to 90 seconds. This clip is 120 seconds."
+      "Reels must be 3 seconds to 45 minutes. This clip is 46 minutes."
     );
     expect(publishMock).not.toHaveBeenCalled();
     expect(delMock).not.toHaveBeenCalled();
@@ -173,5 +246,40 @@ describe("POST /api/reels (Blob-staged)", () => {
       expect.objectContaining({ scheduledFor: null }),
       expect.objectContaining({ workspaceId: "ws_1", actorUserId: "u1", kind: "reel" })
     );
+  });
+
+  it("records headline-limited reels in the bell, actor included", async () => {
+    notifyMock.mockClear();
+    durationMock.mockReturnValueOnce(2760);
+
+    const res = await POST(post({
+      videoUrl: "https://store.public.blob.vercel-storage.com/reels/c.mp4",
+      pageIds: ["p1"],
+    }));
+
+    expect(res.status).toBe(400);
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+    expect(notifyMock).toHaveBeenCalledWith({
+      workspaceId: "ws_1",
+      kind: "reel",
+      reason: "Reels must be 3 seconds to 45 minutes. This clip is 46 minutes.",
+    });
+  });
+
+  it("records unexpected publish errors in the bell with the response copy", async () => {
+    notifyMock.mockClear();
+    publishMock.mockRejectedValueOnce(new Error("Facebook rejected the reel"));
+
+    const res = await POST(post({
+      videoUrl: "https://store.public.blob.vercel-storage.com/reels/b.mp4",
+      pageIds: ["p1"],
+    }));
+
+    expect(res.status).toBe(500);
+    expect(notifyMock).toHaveBeenCalledWith({
+      workspaceId: "ws_1",
+      kind: "reel",
+      reason: "Facebook rejected the reel",
+    });
   });
 });

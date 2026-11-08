@@ -110,6 +110,29 @@ export function notifyTokenInvalid(workspaceId: string) {
   });
 }
 
+/**
+ * A composer submit that our limits or Facebook rejected, before any
+ * scheduled row exists to track it — record it for the whole workspace,
+ * actor included, so failed posts stay visible once the toast is gone.
+ */
+export function notifyPublishAttemptFailure({
+  workspaceId,
+  kind,
+  reason,
+}: {
+  workspaceId: string;
+  kind?: string | null;
+  reason: string;
+}) {
+  return notifyWorkspace({
+    workspaceId,
+    type: "publish_failed",
+    title: `${kindLabel(kind)} could not be published`,
+    body: snippet(reason, 200),
+    link: kindComposerPath(kind),
+  });
+}
+
 const KIND_LABELS: Record<string, string> = {
   post: "post",
   photo: "photo post",

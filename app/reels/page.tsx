@@ -28,7 +28,7 @@ import {
   type PresetValues,
 } from '@/lib/reels/presets';
 
-const MAX_BYTES = 100 * 1024 * 1024;
+const MAX_BYTES = 1024 * 1024 * 1024;
 
 /**
  * Run a video blob through the normalizer (H.264 1080×1920). Returns the
@@ -122,7 +122,7 @@ export default function ReelsPage() {
   async function post() {
     if (!file) return;
     if (file.size > MAX_BYTES) {
-      toast.error('Reels must be 100 MB or smaller.');
+      toast.error('Reels must be 1 GB or smaller.');
       return;
     }
     setBusy(true);
@@ -216,13 +216,13 @@ export default function ReelsPage() {
       <ComposerCard
         icon={<Video className="size-4" />}
         title="New reel"
-        badge="3–90s · 100 MB max"
+        badge="3s–45min · 1 GB max"
       >
         <FilePicker
           id="reel-video"
           accept="video/mp4,video/quicktime"
           label="Choose an MP4 or MOV"
-          hint="3–90s"
+          hint="3s–45min"
           file={file}
           onPick={handlePick}
           onClear={() => setFile(null)}

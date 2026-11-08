@@ -10,6 +10,8 @@ import {
 import { facebookErrorResponse } from '@/lib/publishing/errors';
 import { readPageIds } from '@/lib/publishing/request';
 import { parseScheduledPublishTime } from '@/lib/publishing/schedule';
+import { MAX_VIDEO_BYTES, publishPageVideo } from '@/lib/publishing/videos';
+import { notifyPublishAttemptFailure } from '@/lib/notifications';
 import { recordNativeSchedule } from '@/lib/schedule-mirror';
 import { readMp4DurationSeconds } from '@/lib/reel-meta';
 
@@ -18,9 +20,18 @@ export const dynamic = 'force-dynamic';
 // the budget. Vercel Hobby's ceiling is 60s for Node functions.
 export const maxDuration = 60;
 
-const MAX_BYTES = 100 * 1024 * 1024;
+const MAX_BYTES = MAX_VIDEO_BYTES;
 const MIN_SECONDS = 3;
-const MAX_SECONDS = 90;
+// The Reels Publishing API (POST /{page-id}/video_reels, used for ≤ 90s
+// clips) hard-caps duration at 3–90 seconds — Meta rejects longer uploads
+// there with error 1363128. Facebook itself no longer limits reel length
+// (Business Help: "no minimum or maximum length requirement"), and its
+// chunked video upload documented envelope is 45 minutes / 1.75 GB. Clips
+// between 90 seconds and 45 minutes therefore publish through the Video API
+// (POST /{page-id}/videos) — every video on Facebook is shared as a reel
+// since Meta's June 2025 migration, so they surface identically.
+const REEL_API_MAX_SECONDS = 90;
+const MAX_SECONDS = 45 * 60;
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
 
 type ReelPostBody = {
@@ -66,49 +77,50 @@ export async function POST(request: Request) {
 
   const pageIds = readPageIds(body?.pageIds);
 
+  // Hard content rejections ring the bell too — the workspace stays aware of
+  // failed post attempts after the composer's toast is gone.
+  const notifyFailure = (reason: string) =>
+    notifyPublishAttemptFailure({
+      workspaceId: access.workspace.id,
+      kind: 'reel',
+      reason,
+    });
+
   // Staged video: browser -> Blob -> server. The staging helper authenticates
   // the URL against our store, so a fabricated or foreign URL is refused.
   let videoBytes: Buffer;
   try {
     videoBytes = await stagedFileToBuffer(videoUrl);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'The staged video could not be read.',
-      },
-      { status: 400 }
-    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'The staged video could not be read.';
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   if (videoBytes.length === 0) {
-    return NextResponse.json(
-      { error: 'The staged video is empty.' },
-      { status: 400 }
-    );
+    const message = 'The staged video is empty.';
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
   if (videoBytes.length > MAX_BYTES) {
-    return NextResponse.json(
-      { error: 'Reels must be 100 MB or smaller.' },
-      { status: 400 }
-    );
+    const message = 'Reels must be 1 GB or smaller.';
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
   const durationSeconds = readMp4DurationSeconds(videoBytes);
   if (durationSeconds === null) {
-    return NextResponse.json(
-      { error: 'Could not read the video length. Upload an MP4 or MOV file.' },
-      { status: 400 }
-    );
+    const message =
+      'Could not read the video length. Upload an MP4 or MOV file.';
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
   if (durationSeconds < MIN_SECONDS || durationSeconds > MAX_SECONDS) {
-    return NextResponse.json(
-      {
-        error: `Reels must be ${MIN_SECONDS} to ${MAX_SECONDS} seconds. This clip is ${Math.round(durationSeconds)} seconds.`,
-      },
-      { status: 400 }
-    );
+    const message = `Reels must be ${MIN_SECONDS} seconds to ${Math.floor(MAX_SECONDS / 60)} minutes. This clip is ${durationSeconds >= 60 ? `${Math.floor(durationSeconds / 60)} minutes` : `${Math.round(durationSeconds)} seconds`}.`;
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   try {
@@ -116,17 +128,31 @@ export async function POST(request: Request) {
       workspaceId: access.workspace.id,
       pageIds,
       publish: (page) =>
-        publishPageReel({
-          pageId: page.id,
-          accessToken: page.accessToken,
-          caption,
-          video: {
-            bytes: videoBytes,
-            type: videoType,
-            filename,
-          },
-          scheduledPublishTime: schedule.unix,
-        }),
+        // ≤ 90s rides the Reels rupload (fast, single request); longer clips
+        // go through the chunked Video API, which Meta shares as reels.
+        durationSeconds <= REEL_API_MAX_SECONDS
+          ? publishPageReel({
+              pageId: page.id,
+              accessToken: page.accessToken,
+              caption,
+              video: {
+                bytes: videoBytes,
+                type: videoType,
+                filename,
+              },
+              scheduledPublishTime: schedule.unix,
+            })
+          : publishPageVideo({
+              pageId: page.id,
+              accessToken: page.accessToken,
+              description: caption,
+              video: {
+                bytes: videoBytes,
+                type: videoType,
+                filename,
+              },
+              scheduledPublishTime: schedule.unix,
+            }),
     });
 
     // The reel exists on Facebook now; mirror it into scheduled_posts so the
@@ -159,7 +185,11 @@ export async function POST(request: Request) {
     return facebookErrorResponse(
       error,
       'reel_failed',
-      'The reel could not be posted.'
+      'The reel could not be posted.',
+      {
+        workspaceId: access.workspace.id,
+        kind: 'reel',
+      }
     );
   } finally {
     // The staging copy is transient regardless of outcome — Facebook either
