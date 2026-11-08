@@ -54,6 +54,7 @@ type DownloadRecord = {
   statusMessage: string;
   fileName: string | null;
   saveLocation: string | null;
+  source?: "session" | "disk";
   error: string | null;
   createdAt: number;
 };
@@ -674,9 +675,11 @@ export default function DownloadsPage() {
                           Ready on this device
                         </p>
                         <p className="mt-0.5 truncate text-[9.5px] text-white/45">
-                          {previewJob.quality === "best"
-                            ? "Best available quality"
-                            : `Up to ${previewJob.quality}p`}{" "}
+                          {previewJob.source === "disk"
+                            ? "Recovered from your Downloads folder"
+                            : previewJob.quality === "best"
+                              ? "Best available quality"
+                              : `Up to ${previewJob.quality}p`}{" "}
                           · MP4 · Local file
                         </p>
                       </div>

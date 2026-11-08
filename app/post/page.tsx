@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Link2, PenLine, SendHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssistantChat } from '@/components/assistant-chat';
+import { FacebookPreview } from '@/components/facebook-preview';
+import { useFacebookConnection } from '@/components/facebook-connection';
 import { Button } from '@/components/ui/button';
 import {
   ComposerCard,
@@ -23,6 +25,7 @@ const MAX_MESSAGE_LENGTH = 5000;
 
 export default function PostPage() {
   const pages = useManagedPages();
+  const connection = useFacebookConnection();
   const [message, setMessage] = useState('');
   const [link, setLink] = useState('');
   const [scheduleOn, setScheduleOn] = useState(false);
@@ -30,6 +33,7 @@ export default function PostPage() {
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PublishResult[] | null>(null);
 
+  const selectedPage = pages.pages.find((page) => page.id === pages.selected[0]);
   const canPublish = message.trim().length > 0;
 
   async function post() {
@@ -69,6 +73,8 @@ export default function PostPage() {
 
   return (
     <PublishPage eyebrow="Publishing" title="Post">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0">
       <ComposerCard
         icon={<PenLine className="size-4" />}
         title="New post"
@@ -154,6 +160,18 @@ export default function PostPage() {
 
         {results && <ResultList results={results} />}
       </ComposerCard>
+        </div>
+
+        <div className="self-start xl:sticky xl:top-[70px]">
+          <FacebookPreview
+            text={message}
+            link={link.trim() || undefined}
+            connected={connection.connected}
+            pageName={selectedPage?.name}
+            pagePicture={selectedPage?.picture}
+          />
+        </div>
+      </div>
       <AssistantChat
         draft={message}
         onDraftChange={setMessage}
