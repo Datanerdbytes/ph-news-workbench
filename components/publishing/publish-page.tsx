@@ -83,7 +83,7 @@ export function PlatformPublishPage({
   mark: React.ReactNode;
   platformName: string;
   /** Shown when the account connection is the only missing piece. */
-  gateHint: string;
+  gateHint: React.ReactNode;
   connectLabel: string;
   connection: PlatformConnectionState;
   children: React.ReactNode;
@@ -137,7 +137,7 @@ function PlatformConnectGate({
   onConnect: () => void;
   mark: React.ReactNode;
   platformName: string;
-  gateHint: string;
+  gateHint: React.ReactNode;
   connectLabel: string;
 }) {
   return (
