@@ -418,7 +418,7 @@ export default function PhotosPage() {
           )}
         </div>
 
-        <div className="self-start xl:sticky xl:top-5">
+        <div className="self-start xl:sticky xl:top-[70px]">
           {tab === 'feed' ? (
             <FacebookPreview
               text={message}
