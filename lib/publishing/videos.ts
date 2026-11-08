@@ -31,7 +31,7 @@ export type PageVideo = {
 export async function publishPageVideo({
   pageId,
   accessToken,
-  title,
+  title = '',
   description = '',
   video,
   thumbnail = null,
@@ -40,7 +40,8 @@ export async function publishPageVideo({
 }: {
   pageId: string;
   accessToken: string;
-  title: string;
+  /** Optional — long reels posted as videos describe themselves via the caption. */
+  title?: string;
   description?: string;
   video: VideoUpload;
   thumbnail?: VideoUpload | null;
@@ -95,9 +96,9 @@ export async function publishPageVideo({
   const finishFields: Record<string, string> = {
     upload_phase: 'finish',
     upload_session_id: sessionId,
-    title,
     ...scheduledFields(scheduledPublishTime),
   };
+  if (title) finishFields.title = title;
   if (description) finishFields.description = description;
   if (feedTargeting) finishFields.feed_targeting = feedTargeting;
 

@@ -8,7 +8,9 @@ export const runtime = 'nodejs';
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const VIDEO_TYPES = ['video/mp4', 'video/quicktime'];
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-const VIDEO_MAX_BYTES = 100 * 1024 * 1024;
+// Long reels stage through here too — aligned with the chunked Video API's
+// 45-minute / 1.75 GB envelope the publish route enforces (1 GB own cap).
+const VIDEO_MAX_BYTES = 1024 * 1024 * 1024;
 
 /**
  * Mints short-lived client upload tokens so the browser can push media
