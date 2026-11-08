@@ -10,6 +10,7 @@ import {
   ThumbsUp,
 } from 'lucide-react';
 import { FacebookMark } from '@/components/facebook-mark';
+import { cn } from 'cn';
 import { PageAvatar } from '@/components/publishing/page-selection';
 import { presetStart, type PresetValues, type ReelPreset } from '@/lib/reels/presets';
 
@@ -125,7 +126,10 @@ export function FinalReelPreview({
                     src={videoUrl}
                     controls
                     playsInline
-                    className="h-full w-full object-contain will-change-transform"
+                    className={cn(
+                      'h-full w-full will-change-transform',
+                      hasOverlay ? 'object-cover' : 'object-contain'
+                    )}
                   />
                   {hasOverlay && (
                     <canvas

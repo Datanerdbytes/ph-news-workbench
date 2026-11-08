@@ -42,12 +42,13 @@ function div(parent: HTMLElement, css: string, text?: string): HTMLDivElement {
   return d;
 }
 
-/** Simulated footage background shared by every DOM preview. */
+/** Simulated footage background shared by every DOM preview. Bright enough
+ * that the translucent panels read the way they will over real footage. */
 function addStageBg(stage: HTMLElement): HTMLDivElement {
   stage.style.fontFamily = 'Manrope, sans-serif';
   return div(
     stage,
-    'position:absolute;inset:0;background:radial-gradient(120% 90% at 22% 10%, #2b4a52 0%, #16323a 46%, #0d2127 100%);'
+    'position:absolute;inset:0;background:radial-gradient(120% 90% at 22% 10%, #93b1bd 0%, #5e7d8a 46%, #365661 100%);'
   );
 }
 

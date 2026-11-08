@@ -3,15 +3,15 @@ import { getPreset, presetStart, type PresetValues } from '@/lib/reels/presets';
 /**
  * Bakes a pre-built animation preset into reel footage, in the browser.
  *
- * The video plays through once while each frame is drawn onto a 720×1280
- * canvas (9:16, upscaled to 1080×1920 by the normalizer afterwards): first the
- * cover-cropped footage, then the preset's overlay at the current time. The
+ * The video plays through once while each frame is drawn onto a 1080×1920
+ * canvas — first the cover-cropped footage, then the preset's overlay at the
+ * current time — so what gets recorded is already the composited reel. The
  * canvas stream is recorded together with the video's audio into a WebM, which
  * /api/reels/prepare transcodes to H.264 MP4.
  */
 
-const CANVAS_W = 720;
-const CANVAS_H = 1280;
+const CANVAS_W = 1080;
+const CANVAS_H = 1920;
 const DESIGN_W = 1080;
 const DESIGN_H = 1920;
 
@@ -109,11 +109,19 @@ export async function bakeReelAnimation(options: BakeOptions): Promise<Blob> {
   });
 
   video.currentTime = 0;
-  await video.play().catch(() => {
-    // Transient activation may have expired — retry muted (silent bake).
-    video.muted = true;
-    return video.play();
-  });
+  try {
+    await video.play();
+  } catch {
+    // Playback was blocked. Do NOT retry muted: the audio track is captured
+    // through the AudioContext from this element, so a muted play would bake
+    // a silent reel. Fail loudly instead — the composer falls back to posting
+    // the footage without the animation.
+    await audioCtx.close().catch(() => {});
+    stream.getTracks().forEach((track) => track.stop());
+    throw new Error(
+      'Playback was blocked, so the animation bake was skipped. Try posting again — the reel still publishes without it.'
+    );
+  }
   recorder.start(250);
 
   const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
