@@ -107,3 +107,33 @@ export async function youtubeErrorResponse(
 
   return NextResponse.json({ error: message, code: outCode }, { status });
 }
+
+export async function tiktokErrorResponse(
+  error: unknown,
+  code: string,
+  fallback: string,
+  notify?: { workspaceId: string; kind?: string | null }
+): Promise<NextResponse> {
+  const message =
+    error instanceof Error && error.message
+      ? redactTokens(error.message)
+      : fallback;
+
+  let status = 502;
+  let outCode = code;
+  if (error instanceof Error) {
+    if (/token|Reconnect/i.test(message)) {
+      status = 403;
+      outCode = 'permission';
+    } else if (/access_denied|scopes|permission/i.test(message)) {
+      status = 403;
+      outCode = 'permission';
+    }
+  }
+
+  if (notify) {
+    await notifyPublishAttemptFailure({ ...notify, reason: message });
+  }
+
+  return NextResponse.json({ error: message, code: outCode }, { status });
+}
