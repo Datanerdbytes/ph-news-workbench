@@ -9,6 +9,7 @@ import { facebookErrorResponse } from '@/lib/publishing/errors';
 import { readPageIds, readText } from '@/lib/publishing/request';
 import { parseScheduledPublishTime } from '@/lib/publishing/schedule';
 import { MAX_VIDEO_BYTES, publishPageVideo } from '@/lib/publishing/videos';
+import { notifyPublishAttemptFailure } from '@/lib/notifications';
 import { recordNativeSchedule } from '@/lib/schedule-mirror';
 import { readMp4DurationSeconds } from '@/lib/reel-meta';
 
@@ -25,6 +26,15 @@ export async function POST(request: Request) {
 
   const { access } = result.context;
 
+  // The file was attached but Facebook's formats or our envelope reject it —
+  // ring the bell like any other failed post attempt.
+  const notifyFailure = (reason: string) =>
+    notifyPublishAttemptFailure({
+      workspaceId: access.workspace.id,
+      kind: 'video',
+      reason,
+    });
+
   const form = await request.formData().catch(() => null);
   const video = form?.get('video');
   if (!(video instanceof File) || video.size === 0) {
@@ -38,16 +48,14 @@ export async function POST(request: Request) {
     VIDEO_TYPES.has(video.type) ||
     (!video.type && /\.(mp4|mov)$/i.test(video.name));
   if (!looksLikeVideo) {
-    return NextResponse.json(
-      { error: 'Upload an MP4 or MOV video.' },
-      { status: 400 }
-    );
+    const message = 'Upload an MP4 or MOV video.';
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
   if (video.size > MAX_VIDEO_BYTES) {
-    return NextResponse.json(
-      { error: 'Videos must be 1 GB or smaller.' },
-      { status: 400 }
-    );
+    const message = 'Videos must be 1 GB or smaller.';
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   const title = stripMarkdown(readText(form?.get('title'), 200));
@@ -110,12 +118,9 @@ export async function POST(request: Request) {
   const videoBytes = Buffer.from(await video.arrayBuffer());
   const duration = readMp4DurationSeconds(videoBytes);
   if (duration !== null && duration > MAX_DURATION_SECONDS) {
-    return NextResponse.json(
-      {
-        error: `Facebook videos must be 45 minutes or shorter. This video is ${Math.round(duration / 60)} minutes.`,
-      },
-      { status: 400 }
-    );
+    const message = `Facebook videos must be 45 minutes or shorter. This video is ${Math.round(duration / 60)} minutes.`;
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   try {
@@ -165,7 +170,11 @@ export async function POST(request: Request) {
     return facebookErrorResponse(
       error,
       'video_failed',
-      'The video could not be published.'
+      'The video could not be published.',
+      {
+        workspaceId: access.workspace.id,
+        kind: 'video',
+      }
     );
   }
 }

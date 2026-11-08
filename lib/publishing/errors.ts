@@ -1,37 +1,45 @@
 import { NextResponse } from 'next/server';
 import { FacebookApiError, redactTokens } from '@/lib/facebook';
+import { notifyPublishAttemptFailure } from '@/lib/notifications';
 
-export function facebookErrorResponse(
+export async function facebookErrorResponse(
   error: unknown,
   code: string,
-  fallback: string
-): NextResponse {
+  fallback: string,
+  notify?: { workspaceId: string; kind?: string | null }
+): Promise<NextResponse> {
+  const permissionIssue =
+    error instanceof FacebookApiError &&
+    (error.code === 10 || error.code === 200 || error.code === 190);
+
+  let message: string;
+  let outCode = code;
   if (error instanceof FacebookApiError) {
-    const permissionIssue =
-      error.code === 10 || error.code === 200 || error.code === 190;
-
+    message = redactTokens(error.message);
     if (permissionIssue) {
-      return NextResponse.json(
-        {
-          error: `${redactTokens(error.message)} Reconnect the Page to refresh its permissions.`,
-          code: 'permission',
-        },
-        { status: 403 }
-      );
+      message = `${message} Reconnect the Page to refresh its permissions.`;
+      outCode = 'permission';
     }
-
-    return NextResponse.json(
-      { error: redactTokens(error.message), code },
-      { status: 502 }
-    );
+  } else if (error instanceof Error && error.message) {
+    message = redactTokens(error.message);
+  } else {
+    message = fallback;
   }
 
-  if (error instanceof Error && error.message) {
-    return NextResponse.json(
-      { error: redactTokens(error.message), code },
-      { status: 500 }
-    );
+  // The bell keeps the failed attempt visible after the toast is gone.
+  if (notify) {
+    await notifyPublishAttemptFailure({ ...notify, reason: message });
   }
 
-  return NextResponse.json({ error: fallback, code }, { status: 500 });
+  return NextResponse.json(
+    { error: message, code: outCode },
+    {
+      status:
+        error instanceof FacebookApiError
+          ? permissionIssue
+            ? 403
+            : 502
+          : 500,
+    }
+  );
 }

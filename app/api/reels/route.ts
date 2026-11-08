@@ -11,6 +11,7 @@ import { facebookErrorResponse } from '@/lib/publishing/errors';
 import { readPageIds } from '@/lib/publishing/request';
 import { parseScheduledPublishTime } from '@/lib/publishing/schedule';
 import { MAX_VIDEO_BYTES, publishPageVideo } from '@/lib/publishing/videos';
+import { notifyPublishAttemptFailure } from '@/lib/notifications';
 import { recordNativeSchedule } from '@/lib/schedule-mirror';
 import { readMp4DurationSeconds } from '@/lib/reel-meta';
 
@@ -76,49 +77,50 @@ export async function POST(request: Request) {
 
   const pageIds = readPageIds(body?.pageIds);
 
+  // Hard content rejections ring the bell too — the workspace stays aware of
+  // failed post attempts after the composer's toast is gone.
+  const notifyFailure = (reason: string) =>
+    notifyPublishAttemptFailure({
+      workspaceId: access.workspace.id,
+      kind: 'reel',
+      reason,
+    });
+
   // Staged video: browser -> Blob -> server. The staging helper authenticates
   // the URL against our store, so a fabricated or foreign URL is refused.
   let videoBytes: Buffer;
   try {
     videoBytes = await stagedFileToBuffer(videoUrl);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'The staged video could not be read.',
-      },
-      { status: 400 }
-    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'The staged video could not be read.';
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   if (videoBytes.length === 0) {
-    return NextResponse.json(
-      { error: 'The staged video is empty.' },
-      { status: 400 }
-    );
+    const message = 'The staged video is empty.';
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
   if (videoBytes.length > MAX_BYTES) {
-    return NextResponse.json(
-      { error: 'Reels must be 1 GB or smaller.' },
-      { status: 400 }
-    );
+    const message = 'Reels must be 1 GB or smaller.';
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
   const durationSeconds = readMp4DurationSeconds(videoBytes);
   if (durationSeconds === null) {
-    return NextResponse.json(
-      { error: 'Could not read the video length. Upload an MP4 or MOV file.' },
-      { status: 400 }
-    );
+    const message =
+      'Could not read the video length. Upload an MP4 or MOV file.';
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
   if (durationSeconds < MIN_SECONDS || durationSeconds > MAX_SECONDS) {
-    return NextResponse.json(
-      {
-        error: `Reels must be ${MIN_SECONDS} seconds to ${Math.floor(MAX_SECONDS / 60)} minutes. This clip is ${durationSeconds >= 60 ? `${Math.floor(durationSeconds / 60)} minutes` : `${Math.round(durationSeconds)} seconds`}.`,
-      },
-      { status: 400 }
-    );
+    const message = `Reels must be ${MIN_SECONDS} seconds to ${Math.floor(MAX_SECONDS / 60)} minutes. This clip is ${durationSeconds >= 60 ? `${Math.floor(durationSeconds / 60)} minutes` : `${Math.round(durationSeconds)} seconds`}.`;
+    await notifyFailure(message);
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   try {
@@ -183,7 +185,11 @@ export async function POST(request: Request) {
     return facebookErrorResponse(
       error,
       'reel_failed',
-      'The reel could not be posted.'
+      'The reel could not be posted.',
+      {
+        workspaceId: access.workspace.id,
+        kind: 'reel',
+      }
     );
   } finally {
     // The staging copy is transient regardless of outcome — Facebook either
