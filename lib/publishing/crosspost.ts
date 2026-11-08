@@ -171,3 +171,78 @@ export async function crosspostResponse(
     { status: partial ? 207 : 201 }
   );
 }
+
+// ---------------------------------------------------------------------------
+// Single-account publishing (Instagram / YouTube / TikTok). Facebook fans out
+// to Pages; every other platform publishes to exactly one account per
+// workspace, so the executor wraps one call instead of a loop.
+// ---------------------------------------------------------------------------
+
+export type AccountTarget = {
+  platform: string;
+  id: string;
+  name: string;
+  accessToken: string;
+};
+
+export type AccountPublishResult = PagePublishResult;
+
+export type AccountOutcome = {
+  ok: boolean;
+  id?: string;
+  permalink?: string | null;
+  error?: string;
+  /** Token/auth rejection per the caller's classifier — routes map this to a reconnect hint. */
+  rejected?: boolean;
+};
+
+/** Provider-specific classifiers mark rejected grants (401/403/190-class). */
+export type TokenRejection = (error: unknown) => boolean;
+
+/**
+ * Runs one publish attempt against the account. Pass workspaceId + kind to
+ * record failures in the notification bell (actor included) so lost toasts
+ * surface later, same contract as crosspostResponse.
+ */
+export async function publishToAccount({
+  account,
+  publish,
+  workspaceId,
+  kind,
+  isTokenRejection,
+}: {
+  account: AccountTarget;
+  publish: (account: AccountTarget) => Promise<AccountPublishResult>;
+  workspaceId?: string;
+  kind?: string | null;
+  isTokenRejection?: TokenRejection;
+}): Promise<AccountOutcome> {
+  try {
+    const result = await publish(account);
+    return {
+      ok: true,
+      id: result.id,
+      permalink: result.permalink,
+    };
+  } catch (error) {
+    const message = redactTokens(
+      error instanceof Error ? error.message : 'The platform rejected the post.'
+    );
+    if (workspaceId) {
+      await notifyWorkspace({
+        workspaceId,
+        type: 'publish_failed',
+        title: `${kindLabel(kind)} could not be published`,
+        body: clampDetail(message),
+        link: kindComposerPath(kind),
+      });
+    }
+    return {
+      ok: false,
+      error: message,
+      ...(workspaceId && isTokenRejection?.(error)
+        ? { rejected: true }
+        : {}),
+    };
+  }
+}

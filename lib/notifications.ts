@@ -140,6 +140,10 @@ const KIND_LABELS: Record<string, string> = {
   reel: "reel",
   live: "live stream",
   story: "story",
+  "instagram-post": "Instagram post",
+  "instagram-reel": "Instagram reel",
+  "youtube-video": "YouTube video",
+  "tiktok-video": "TikTok video",
 };
 
 export function kindLabel(kind: string | null | undefined): string {
@@ -153,6 +157,10 @@ const KIND_COMPOSER_PATHS: Record<string, string> = {
   reel: "/reels",
   story: "/stories",
   live: "/live",
+  "instagram-post": "/instagram",
+  "instagram-reel": "/instagram",
+  "youtube-video": "/youtube",
+  "tiktok-video": "/tiktok",
 };
 
 export function kindComposerPath(kind: string | null | undefined) {

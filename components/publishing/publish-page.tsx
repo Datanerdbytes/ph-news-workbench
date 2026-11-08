@@ -49,6 +49,125 @@ export function PublishPage({
   );
 }
 
+/**
+ * Connection state every platform composer hands to PlatformPublishPage —
+ * the shape useFacebookConnection/useThreadsConnection already return once
+ * their loading/connect fields are projected.
+ */
+export type PlatformConnectionState = {
+  loading: boolean;
+  connected: boolean;
+  configured: boolean;
+  unreachable: boolean;
+  connect: () => void;
+};
+
+/**
+ * Facebook-neutral composer shell: same header + connect-gate anatomy as
+ * PublishPage, branded per platform via `mark` and `platformName`. Setting
+ * up a new platform page is: build a connection hook, pass its projected
+ * state here, compose inside `children` with a 360px preview rail.
+ */
+export function PlatformPublishPage({
+  eyebrow,
+  title,
+  mark,
+  platformName,
+  gateHint,
+  connectLabel,
+  connection,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  mark: React.ReactNode;
+  platformName: string;
+  /** Shown when the account connection is the only missing piece. */
+  gateHint: string;
+  connectLabel: string;
+  connection: PlatformConnectionState;
+  children: React.ReactNode;
+}) {
+  return (
+    <AppFrame>
+      <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:py-8">
+        <header className="border-b border-border pb-5">
+          <div>
+            <p className="eyebrow text-brand">{eyebrow}</p>
+            <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight">
+              {title}
+            </h1>
+          </div>
+        </header>
+
+        {connection.loading ? (
+          <div className="mt-6 grid gap-3">
+            <div className="h-9 w-52 animate-pulse rounded-lg bg-surface-3" />
+            <div className="h-64 animate-pulse rounded-xl bg-surface-2" />
+          </div>
+        ) : connection.connected ? (
+          <div className="mt-6">{children}</div>
+        ) : (
+          <PlatformConnectGate
+            configured={connection.configured}
+            unreachable={connection.unreachable}
+            onConnect={connection.connect}
+            mark={mark}
+            platformName={platformName}
+            gateHint={gateHint}
+            connectLabel={connectLabel}
+          />
+        )}
+      </div>
+    </AppFrame>
+  );
+}
+
+function PlatformConnectGate({
+  configured,
+  unreachable,
+  onConnect,
+  mark,
+  platformName,
+  gateHint,
+  connectLabel,
+}: {
+  configured: boolean;
+  unreachable: boolean;
+  onConnect: () => void;
+  mark: React.ReactNode;
+  platformName: string;
+  gateHint: string;
+  connectLabel: string;
+}) {
+  return (
+    <div className="mt-6 rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center paper-shadow-sm">
+      <span className="mx-auto grid size-10 place-items-center" aria-hidden>
+        {mark}
+      </span>
+      <h2 className="mt-3 text-sm font-semibold">
+        {unreachable
+          ? 'Connection status unavailable'
+          : configured
+            ? `Connect ${platformName}`
+            : `${platformName} is not configured`}
+      </h2>
+      <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-muted-foreground">
+        {unreachable
+          ? `Reload the page to check the ${platformName} connection again.`
+          : configured
+            ? gateHint
+            : `Add the ${platformName} app credentials to this environment before publishing.`}
+      </p>
+      {configured && !unreachable && (
+        <Button variant="brand" size="sm" className="mt-4" onClick={onConnect}>
+          {connectLabel}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ConnectGate({
   configured,
   unreachable,

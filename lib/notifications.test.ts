@@ -56,6 +56,23 @@ describe("NOTIFICATION_META", () => {
   });
 });
 
+describe("kindLabel / kindComposerPath for platform kinds", () => {
+  it("labels and routes the non-Facebook publish kinds", () => {
+    expect(kindLabel("instagram-post")).toBe("Instagram post");
+    expect(kindLabel("instagram-reel")).toBe("Instagram reel");
+    expect(kindLabel("youtube-video")).toBe("YouTube video");
+    expect(kindLabel("tiktok-video")).toBe("TikTok video");
+    expect(kindComposerPath("youtube-video")).toBe("/youtube");
+    expect(kindComposerPath("tiktok-video")).toBe("/tiktok");
+    expect(kindComposerPath("instagram-reel")).toBe("/instagram");
+  });
+
+  it("keeps unknown kinds falling back like before", () => {
+    expect(kindLabel("banner")).toBe("post");
+    expect(kindComposerPath("banner")).toBeNull();
+  });
+});
+
 describe("scheduledOutcomeCopy", () => {
   it("titles successes and failures per kind", () => {
     expect(scheduledOutcomeCopy("reel", true).title).toBe(

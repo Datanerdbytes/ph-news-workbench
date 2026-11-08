@@ -10,6 +10,8 @@ const TAG_BYTES = 16;
 export const SECRET_INFOS = {
   facebookPageToken: 'facebook-page-token',
   llmProviderKey: 'llm-provider-key',
+  youtubeToken: 'youtube-token',
+  tiktokToken: 'tiktok-token',
 } as const;
 
 function encryptionKey(info: string): Buffer {
@@ -68,4 +70,20 @@ export function encryptToken(token: string): string {
 
 export function decryptToken(payload: string): string {
   return decryptSecret(payload, SECRET_INFOS.facebookPageToken);
+}
+
+export function encryptYouTubeSecret(token: string): string {
+  return encryptSecret(token, SECRET_INFOS.youtubeToken);
+}
+
+export function decryptYouTubeSecret(payload: string): string {
+  return decryptSecret(payload, SECRET_INFOS.youtubeToken);
+}
+
+export function encryptTikTokSecret(token: string): string {
+  return encryptSecret(token, SECRET_INFOS.tiktokToken);
+}
+
+export function decryptTikTokSecret(payload: string): string {
+  return decryptSecret(payload, SECRET_INFOS.tiktokToken);
 }
