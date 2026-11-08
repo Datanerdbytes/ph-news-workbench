@@ -91,8 +91,8 @@ export function firstSuccess(results: CrosspostResult[]) {
 
 /**
  * Builds the shared composer response. Pass `notify` to also record a
- * notification for publish failures — the actor already sees the route's
- * toast, so they are excluded; other members learn from the bell.
+ * notification for publish failures — every member sees them in the bell,
+ * actor included, so failed posts stay visible once the toast is gone.
  */
 export async function crosspostResponse(
   results: CrosspostResult[],
@@ -123,7 +123,6 @@ export async function crosspostResponse(
             'Facebook rejected the post on every selected Page.'
         ),
         link: kindComposerPath(notify.kind),
-        excludeUserIds: [notify.actorUserId],
       });
     }
     return NextResponse.json(
@@ -153,7 +152,6 @@ export async function crosspostResponse(
         }`
       ),
       link: kindComposerPath(notify.kind),
-      excludeUserIds: [notify.actorUserId],
     });
   }
 
