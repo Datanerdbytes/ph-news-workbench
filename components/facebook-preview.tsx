@@ -1,5 +1,6 @@
 import {
   Globe2,
+  Link2,
   MessageCircle,
   MoreHorizontal,
   Share2,
@@ -13,14 +14,28 @@ import { imageSrc } from "@/lib/format";
 type FacebookPreviewProps = {
   text: string;
   imageUrls?: string[];
+  /** A link field turns the post into a share card preview. */
+  link?: string;
   pageName?: string;
   pagePicture?: string | null;
   connected?: boolean;
 };
 
+/** The domain a link-share card would show, with a schemeless fallback. */
+function linkHostname(link: string): string {
+  try {
+    return new URL(
+      /^\w+:\/\//.test(link) ? link : `https://${link}`
+    ).hostname.replace(/^www\./, "");
+  } catch {
+    return link;
+  }
+}
+
 export function FacebookPreview({
   text,
   imageUrls = [],
+  link,
   pageName = "Philippine News",
   pagePicture,
   connected = false,
@@ -76,6 +91,27 @@ export function FacebookPreview({
               <p className="mt-3 rounded-md bg-neutral-50 px-3 py-5 text-center text-[12px] italic text-neutral-400">
                 Your draft will appear here.
               </p>
+            )}
+
+            {link && (
+              <div className="mt-3 overflow-hidden rounded-md border border-neutral-200 bg-neutral-50">
+                <div className="flex aspect-[16/9] items-center justify-center bg-gradient-to-br from-neutral-200 to-neutral-300">
+                  <Link2 className="size-8 text-neutral-500" aria-hidden />
+                </div>
+                <div className="border-t border-neutral-200 px-3 py-2">
+                  <p className="truncate text-[9px] font-semibold uppercase tracking-wider text-neutral-400">
+                    {linkHostname(link)}
+                  </p>
+                  <div
+                    aria-hidden
+                    className="mt-1 h-2.5 w-3/4 rounded-sm bg-neutral-300"
+                  />
+                  <div
+                    aria-hidden
+                    className="mt-1.5 h-2 w-full rounded-sm bg-neutral-200"
+                  />
+                </div>
+              </div>
             )}
 
             {imageUrls.length === 1 && (
