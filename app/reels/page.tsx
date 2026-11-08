@@ -312,7 +312,7 @@ export default function ReelsPage() {
       </ComposerCard>
         </div>
 
-        <div className="self-start xl:sticky xl:top-5">
+        <div className="self-start xl:sticky xl:top-[70px]">
           <FinalReelPreview
             videoUrl={fileUrl}
             caption={caption}

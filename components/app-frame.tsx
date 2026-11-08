@@ -242,8 +242,14 @@ export function AppFrame({
     >
       <div
         className={cn(
+          // Regular pages scroll the document naturally — a nested
+          // fixed-height scroll chain (h-dvh + overflow-hidden + inner
+          // overflow-y-auto) clipped content with no recovery in some
+          // browser/zoom states. The sticky sidebar and header keep their
+          // positions during document scroll; only `fill` pages (app-like
+          // panes that manage their own internal scrolling) keep the chain.
           "lg:grid lg:grid-cols-[250px_minmax(0,1fr)]",
-          fill ? "h-full" : "min-h-dvh lg:h-dvh lg:overflow-hidden"
+          fill ? "h-full" : "min-h-dvh"
         )}
       >
         <aside
@@ -455,7 +461,7 @@ export function AppFrame({
           />
         )}
 
-        <div className="flex min-h-0 min-w-0 flex-col lg:h-full">
+        <div className={cn("flex min-h-0 min-w-0 flex-col", fill && "lg:h-full")}>
           <header className="sticky top-0 z-30 flex h-[58px] shrink-0 items-center gap-3 border-b border-border bg-card/90 px-4 backdrop-blur-md sm:px-6">
             <button
               type="button"
@@ -488,8 +494,10 @@ export function AppFrame({
 
           <main
             className={cn(
-              "flex min-h-0 flex-1 flex-col",
-              fill ? "overflow-clip" : "lg:overflow-y-auto"
+              // fill pages: app-like pane, exact viewport height, internal
+              // areas scroll. Regular pages: content-sized — the document
+              // itself scrolls, so nothing can clip below the fold.
+              fill ? "flex min-h-0 flex-1 flex-col overflow-clip" : "flex flex-col"
             )}
           >
             {children}
