@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { upload } from '@vercel/blob/client';
@@ -22,6 +22,8 @@ import {
   type PublishResult,
 } from '@/components/publishing/publish-page';
 import { bakeReelAnimation } from '@/lib/reels/bake';
+import { normalizeVideo } from '@/lib/reels/browser-normalize';
+import { fetchDownloadedVideo, parseVideoParam } from '@/lib/reels/import-download';
 import {
   defaultPresetValues,
   getPreset,
@@ -29,37 +31,6 @@ import {
 } from '@/lib/reels/presets';
 
 const MAX_BYTES = 1024 * 1024 * 1024;
-
-/**
- * Run a video blob through the normalizer (H.264 1080×1920). Returns the
- * original blob wrapped as a File when normalization is unavailable, so every
- * caller can keep going with a postable file either way.
- */
-async function normalizeVideo(
-  blob: Blob,
-  name: string
-): Promise<{ file: File; normalized: boolean; error?: string }> {
-  const form = new FormData();
-  form.append('video', blob, name);
-  const res = await fetch('/api/reels/prepare', { method: 'POST', body: form });
-  if (!res.ok) {
-    const data = (await res.json().catch(() => null)) as
-      | { error?: string }
-      | null;
-    const base = name.replace(/\.[^.]+$/, '');
-    return {
-      file: new File([blob], name, { type: blob.type || 'video/mp4' }),
-      normalized: false,
-      error: data?.error ?? 'The video could not be normalized.',
-    };
-  }
-  const out = await res.blob();
-  const base = name.replace(/\.[^.]+$/, '');
-  return {
-    file: new File([out], `${base}.mp4`, { type: 'video/mp4' }),
-    normalized: true,
-  };
-}
 
 export default function ReelsPage() {
   const pages = useManagedPages();
@@ -78,25 +49,33 @@ export default function ReelsPage() {
   );
   const [renderPct, setRenderPct] = useState<number | null>(null);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [normalizePct, setNormalizePct] = useState<number | null>(null);
   const preset = getPreset(presetId);
 
   /**
    * Picked videos are normalized to H.264 1080×1920 before anything else:
    * Safari cannot preview AV1/HEVC downloads, and Facebook prefers standard
-   * encodings. Falls back to the original file when normalization is
-   * unavailable (non-local runtime).
+   * encodings. Server-side when available, otherwise in-browser (ffmpeg.wasm)
+   * for clips the browser cannot play; playable originals pass through as-is.
    */
-  async function handlePick(picked: File | null) {
+  const handlePick = useCallback(async (picked: File | null) => {
     setFile(picked);
     if (!picked) return;
     setNormalizing(true);
+    setNormalizePct(null);
     try {
-      const { file: normalized, error } = await normalizeVideo(picked, picked.name);
+      const {
+        file: normalized,
+        normalized: didNormalize,
+        error,
+      } = await normalizeVideo(picked, picked.name, setNormalizePct);
       setFile(normalized);
       if (error) throw new Error(error);
-      toast.success('Video normalized', {
-        description: 'Converted to H.264 1080×1920 — previews everywhere and uploads cleanly.',
-      });
+      if (didNormalize) {
+        toast.success('Video normalized', {
+          description: 'Converted to H.264 1080×1920 — previews everywhere and uploads cleanly.',
+        });
+      }
     } catch (error) {
       toast.warning('Using the original video', {
         description:
@@ -104,9 +83,31 @@ export default function ReelsPage() {
       });
     } finally {
       setNormalizing(false);
+      setNormalizePct(null);
     }
-  }
+  }, []);
 
+  // A download handed over from the Downloads page arrives as ?video=<jobId>.
+  useEffect(() => {
+    const jobId = parseVideoParam(window.location.search);
+    if (!jobId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { file: downloaded } = await fetchDownloadedVideo(jobId);
+        if (!cancelled) await handlePick(downloaded);
+      } catch (error) {
+        if (cancelled) return;
+        toast.error('Could not open the download', {
+          description:
+            error instanceof Error ? error.message : 'The download is unavailable.',
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [handlePick]);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -230,7 +231,9 @@ export default function ReelsPage() {
         />
         {normalizing && (
           <p className="text-[10.5px] text-muted-foreground">
-            Normalizing the video to H.264 1080×1920… (a few seconds)
+            {normalizePct != null
+              ? `Converting to H.264 in your browser… ${Math.round(normalizePct * 100)}%`
+              : 'Normalizing the video to H.264 1080×1920… (a few seconds)'}
           </p>
         )}
 

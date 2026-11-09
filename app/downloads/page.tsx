@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
+  Clapperboard,
   Clipboard,
   Clock3,
   Download,
@@ -697,10 +698,18 @@ export default function DownloadsPage() {
                         </p>
                       </div>
                       <a
+                        href={`/reels?video=${previewJob.id}`}
+                        aria-label={`Use ${previewJob.fileName} as a reel`}
+                        title="Use as reel"
+                        className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                      >
+                        <Clapperboard className="size-3.5" aria-hidden="true" />
+                      </a>
+                      <a
                         href={`/api/downloads/${previewJob.id}/file?download=1`}
                         aria-label={`Download ${previewJob.fileName}`}
                         title="Download the video file"
-                        className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                        className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                       >
                         <Download className="size-3.5" aria-hidden="true" />
                       </a>
@@ -931,6 +940,16 @@ export default function DownloadsPage() {
                     <Download className="size-3" aria-hidden="true" />
                     {job.source === "disk" ? "Local file" : "Cloud file"}
                   </span>
+                )}
+                {job.status === "done" && (
+                  <a
+                    href={`/reels?video=${job.id}`}
+                    aria-label={`Use ${job.fileName ?? job.platform} as a reel`}
+                    title="Use as reel"
+                    className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  >
+                    <Clapperboard className="size-3.5" aria-hidden="true" />
+                  </a>
                 )}
                 {(job.status === "done" || job.status === "failed") &&
                   job.source !== "disk" && (
