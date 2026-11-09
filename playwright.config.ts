@@ -1,9 +1,12 @@
 import { defineConfig } from "@playwright/test";
+import { envLocal } from "./e2e/helpers/env";
 
-// Sign-in only works from the origin pinned in .env.local (BETTER_AUTH_URL /
-// BETTER_AUTH_TRUSTED_ORIGINS → :3001), so the suite must run there. When the
+// Sign-in only works from the origin auth trusts, so run on the port pinned by
+// BETTER_AUTH_URL in .env.local instead of a hardcoded copy that can drift from
+// the dev server (the source of INVALID_ORIGIN sign-in failures). When the
 // developer's dev server is already up it is reused; otherwise one is booted.
-const PORT = 3001;
+const authURL = new URL(envLocal().BETTER_AUTH_URL || "http://localhost:3000");
+const PORT = Number(authURL.port) || 3000;
 const baseURL = `http://localhost:${PORT}`;
 const authFile = "e2e/.auth/owner.json";
 
