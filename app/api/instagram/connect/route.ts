@@ -3,17 +3,12 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { buildAuthorizationUrl, facebookConfigured } from '@/lib/facebook';
 import { INSTAGRAM_SCOPES } from '@/lib/instagram';
+import { safeNext } from '@/lib/oauth-return';
 
 export const dynamic = 'force-dynamic';
 
 const NEXT_COOKIE = 'fb_oauth_next';
 const CHANNEL_COOKIE = 'fb_oauth_channel';
-
-/** Only same-origin paths may be used as a post-OAuth landing spot. */
-function safeNext(value: string | null): string | null {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
-  return value;
-}
 
 /** Same Meta app + same callback as Facebook; scopes stack IG publishing on. */
 export async function GET(request: Request) {

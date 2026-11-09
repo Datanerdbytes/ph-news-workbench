@@ -2,16 +2,11 @@ import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { buildGoogleAuthorizationUrl, googleConfigured } from '@/lib/youtube';
+import { returnUrl, safeNext } from '@/lib/oauth-return';
 
 export const dynamic = 'force-dynamic';
 
 const NEXT_COOKIE = 'yt_oauth_next';
-
-/** Only same-origin paths may be used as a post-OAuth landing spot. */
-function safeNext(value: string | null): string | null {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
-  return value;
-}
 
 export async function GET(request: Request) {
   const next = safeNext(new URL(request.url).searchParams.get('next'));
@@ -22,9 +17,9 @@ export async function GET(request: Request) {
   }
 
   if (!googleConfigured()) {
-    const target = new URL(next ?? '/youtube', request.url);
-    target.searchParams.set('google', 'unconfigured');
-    return NextResponse.redirect(target);
+    return NextResponse.redirect(
+      returnUrl(request, next ?? '/youtube', 'google', 'unconfigured')
+    );
   }
 
   const state = randomBytes(24).toString('base64url');

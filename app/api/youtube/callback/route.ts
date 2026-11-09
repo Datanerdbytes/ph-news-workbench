@@ -5,6 +5,11 @@ import { auth } from '@/lib/auth';
 import { sql } from '@/lib/db';
 import { getWorkspaceForUser } from '@/lib/workspaces';
 import {
+  clearOAuthCookies,
+  resolveReturnPath,
+  returnUrl,
+} from '@/lib/oauth-return';
+import {
   exchangeGoogleCode,
   fetchYouTubeChannel,
   googleConfigured,
@@ -25,23 +30,18 @@ function matchesState(actual: string, expected: string): boolean {
 }
 
 function finish(request: NextRequest, outcome: string) {
-  const next = request.cookies.get(NEXT_COOKIE)?.value ?? '';
-  const origin = next.startsWith('/') && !next.startsWith('//') ? next : '/youtube';
   // A successful grant lands in the YouTube composer; failures return to
   // wherever Connect was clicked so the outcome toast is seen there.
-  const path = outcome === 'connected' ? '/youtube' : origin;
-  const url = new URL(path, request.url);
-  url.searchParams.set('google', outcome);
-  const response = NextResponse.redirect(url);
-  for (const name of [STATE_COOKIE, NEXT_COOKIE]) {
-    response.cookies.set(name, '', {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: 0,
-    });
-  }
+  const path = resolveReturnPath(
+    request.cookies.get(NEXT_COOKIE)?.value ?? null,
+    outcome,
+    '/youtube',
+    '/youtube'
+  );
+  const response = NextResponse.redirect(
+    returnUrl(request, path, 'google', outcome)
+  );
+  clearOAuthCookies(response, [STATE_COOKIE, NEXT_COOKIE]);
   return response;
 }
 

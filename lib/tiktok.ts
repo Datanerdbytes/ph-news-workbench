@@ -173,9 +173,15 @@ export async function ensureFreshTikTokToken(
     );
   }
   const scopes = fresh.scope.length ? fresh.scope : connection.scopes;
+  // TikTok rotates refresh tokens on each exchange; a dropped one strands the
+  // connection once the superseded token ages out.
+  const rotatedRefresh = fresh.refreshToken?.trim()
+    ? encryptTikTokSecret(fresh.refreshToken.trim())
+    : null;
   await sql`
     UPDATE tiktok_connections
     SET access_token = ${encryptTikTokSecret(fresh.accessToken)},
+        refresh_token = COALESCE(${rotatedRefresh}, tiktok_connections.refresh_token),
         scopes = ${scopes.join(',')},
         expires_at = ${fresh.expiresAt},
         updated_at = now()

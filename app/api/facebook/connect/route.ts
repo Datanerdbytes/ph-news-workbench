@@ -2,22 +2,11 @@ import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { buildAuthorizationUrl, facebookConfigured } from '@/lib/facebook';
+import { returnUrl, safeNext } from '@/lib/oauth-return';
 
 export const dynamic = 'force-dynamic';
 
 const NEXT_COOKIE = 'fb_oauth_next';
-
-/** Only same-origin paths may be used as a post-OAuth landing spot. */
-function safeNext(value: string | null): string | null {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return null;
-  return value;
-}
-
-function outcome(request: Request, code: string, next: string | null) {
-  const url = new URL(next ?? '/', request.url);
-  url.searchParams.set('facebook', code);
-  return url;
-}
 
 export async function GET(request: Request) {
   const next = safeNext(new URL(request.url).searchParams.get('next'));
@@ -28,7 +17,9 @@ export async function GET(request: Request) {
   }
 
   if (!facebookConfigured()) {
-    return NextResponse.redirect(outcome(request, 'unconfigured', next));
+    return NextResponse.redirect(
+      returnUrl(request, next ?? '/', 'facebook', 'unconfigured')
+    );
   }
 
   const state = randomBytes(24).toString('base64url');

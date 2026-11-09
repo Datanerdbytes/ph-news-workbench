@@ -7,6 +7,7 @@ import { sql } from "@/lib/db";
 import {
   buildTikTokAuthorizationUrl,
   createPkcePair,
+  decryptTikTokSecret,
   exchangeTikTokCode,
   fetchTikTokPublishStatus,
   fetchTikTokUser,
@@ -139,6 +140,7 @@ describe("ensureFreshTikTokToken", () => {
     const ensureFreshTikTokToken = await importSubject();
     respond({
       access_token: "rotated-tt",
+      refresh_token: "rotated-refresh",
       scope: "user.info.basic,video.publish",
       expires_in: 86000,
     });
@@ -155,7 +157,45 @@ describe("ensureFreshTikTokToken", () => {
     expect(sqlMock).toHaveBeenCalledTimes(1);
     const query = (sqlMock.mock.calls[0][0] as TemplateStringsArray).join(" ");
     expect(query).toContain("UPDATE tiktok_connections");
+    expect(query).toContain("refresh_token = COALESCE");
     expect(sqlMock.mock.calls[0]).toContain("ws1");
+
+    const stored = (sqlMock.mock.calls[0] as unknown[])
+      .slice(1)
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => {
+        try {
+          return decryptTikTokSecret(value);
+        } catch {
+          return null;
+        }
+      });
+    expect(stored).toContain("rotated-refresh");
+  });
+
+  it("keeps the stored refresh token when TikTok does not rotate it", async () => {
+    process.env.BETTER_AUTH_SECRET = "test-secret-for-tiktok-tokens";
+    const ensureFreshTikTokToken = await importSubject();
+    respond({
+      access_token: "rotated-tt",
+      scope: "user.info.basic,video.publish",
+      expires_in: 86000,
+    });
+    await ensureFreshTikTokToken(
+      {
+        ...base,
+        accessToken: "stale",
+        refreshToken: "refresh-cipher",
+        expiresAt: new Date(Date.now() - 1000).toISOString(),
+      },
+      "ws1"
+    );
+
+    const values = (sqlMock.mock.calls[0] as unknown[]).slice(1);
+    expect(values).toContain(null);
+    const query = (sqlMock.mock.calls[0][0] as TemplateStringsArray).join(" ");
+    expect(query).toContain("refresh_token = COALESCE(");
+    expect(query).toContain("tiktok_connections.refresh_token");
   });
 
   it("fails as an auth error without a stored refresh token", async () => {
