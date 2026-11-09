@@ -39,12 +39,14 @@ import {
   useManagedPages,
 } from "@/components/publishing/publish-page";
 import { authClient } from "@/lib/auth-client";
+import { facebookToolsVisible } from "@/lib/platform-nav";
 
 type NavItem = {
   href?: string;
   label: string;
   icon: typeof LayoutDashboard;
   exact?: boolean;
+  facebookOnly?: boolean;
 };
 
 const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
@@ -52,7 +54,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Workspace",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/", label: "Story Queue", icon: Newspaper, exact: true },
+      { href: "/", label: "Story Queue", icon: Newspaper, exact: true, facebookOnly: true },
       { href: "/status", label: "Drafts", icon: FileText },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
     ],
@@ -60,13 +62,13 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Publish",
     items: [
-      { href: "/post", label: "Post", icon: PenLine },
-      { href: "/photos", label: "Photos", icon: Images },
-      { href: "/videos", label: "Videos", icon: Film },
+      { href: "/post", label: "Post", icon: PenLine, facebookOnly: true },
+      { href: "/photos", label: "Photos", icon: Images, facebookOnly: true },
+      { href: "/videos", label: "Videos", icon: Film, facebookOnly: true },
       { href: "/downloads", label: "Downloads", icon: Download },
-      { href: "/reels", label: "Reels", icon: Video },
-      { href: "/live", label: "Live", icon: Radio },
-      { href: "/stories", label: "Stories", icon: Sparkles },
+      { href: "/reels", label: "Reels", icon: Video, facebookOnly: true },
+      { href: "/live", label: "Live", icon: Radio, facebookOnly: true },
+      { href: "/stories", label: "Stories", icon: Sparkles, facebookOnly: true },
     ],
   },
   {
@@ -162,6 +164,13 @@ export function AppFrame({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const showFacebookTools = facebookToolsVisible(pathname);
+  const navGroups = showFacebookTools
+    ? NAV_GROUPS
+    : NAV_GROUPS.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => !item.facebookOnly),
+      }));
   const [navOpen, setNavOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [workspace, setWorkspace] = useState<{
@@ -295,16 +304,18 @@ export function AppFrame({
             </button>
           </div>
 
-          <Link
-            href="/"
-            className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-brand text-[12.5px] font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          >
-            <Plus className="size-4" aria-hidden />
-            New post
-          </Link>
+          {showFacebookTools && (
+            <Link
+              href="/"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-brand text-[12.5px] font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              <Plus className="size-4" aria-hidden />
+              New post
+            </Link>
+          )}
 
           <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-1">
-            {NAV_GROUPS.map((group) => (
+            {navGroups.map((group) => (
               <div key={group.title} className="flex flex-col gap-0.5">
                 <p className="px-2.5 pb-1.5 text-[9.5px] font-bold uppercase tracking-[0.14em] text-faint">
                   {group.title}
@@ -487,9 +498,13 @@ export function AppFrame({
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-              <StoryQueueQuickLink />
-              <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
-              <PublishQuickNav />
+              {showFacebookTools && (
+                <>
+                  <StoryQueueQuickLink />
+                  <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
+                  <PublishQuickNav />
+                </>
+              )}
               <NotificationBell />
               <FacebookConnectionButton />
             </div>

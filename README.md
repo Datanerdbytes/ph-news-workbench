@@ -69,6 +69,29 @@ OpenAI's `gpt-image-1`.
 Without a key, uploads still attach to the post; editing reports that no editing
 provider is configured.
 
+## Video downloads
+
+The Downloads page queues video jobs in the shared database; a local worker on
+your Mac runs yt-dlp and uploads the finished file to Vercel Blob, so downloads
+work from both the live app and local development.
+
+Start the worker and keep it running while you download:
+
+```bash
+node --env-file=.env.local download-worker.ts
+```
+
+It needs `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` in `.env.local`, plus yt-dlp
+in the Python environment at `~/python-project/Projects/YT_DLP/my_venv` (override
+with `YTDLP_PYTHON`). Videos save to
+`~/Downloads/VideoDownloader/<platform>/<job-id>` (override with
+`VIDEO_DOWNLOADER_ROOT`) and then sync to the workspace's cloud library, where
+the live app previews and serves them.
+
+The worker runs up to two downloads at once. Ctrl+C requeues anything active;
+jobs whose worker stops heartbeating for three minutes are requeued
+automatically, up to three attempts.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

@@ -54,7 +54,7 @@ type DownloadRecord = {
   statusMessage: string;
   fileName: string | null;
   saveLocation: string | null;
-  source?: "session" | "disk";
+  source?: "cloud" | "disk";
   error: string | null;
   createdAt: number;
 };
@@ -254,8 +254,8 @@ export default function DownloadsPage() {
         ].sort((a, b) => b.createdAt - a.createdAt).slice(0, 20));
         if (job.status === "done") {
           if (!notified) {
-            toast.success("Video saved to your Downloads folder", {
-              description: job.fileName ?? job.saveLocation ?? undefined,
+            toast.success("Video ready in your cloud library", {
+              description: job.fileName ?? undefined,
             });
             notified = true;
           }
@@ -338,8 +338,9 @@ export default function DownloadsPage() {
         ...current.filter((item) => item.id !== job.id),
       ].slice(0, 20));
       setActiveJobId(job.id);
-      toast.info(`${job.platform} download started`, {
-        description: "The video will be saved in ~/Downloads/VideoDownloader.",
+      toast.info(`${job.platform} download queued`, {
+        description:
+          "The local downloader picks it up, then syncs the video to your cloud library.",
       });
     } catch (error) {
       toast.error("Could not start the download", {
@@ -390,7 +391,7 @@ export default function DownloadsPage() {
             </h1>
             <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
               Keep the videos you love close by. Paste a link, choose a quality,
-              and save it locally.
+              and save it to your library.
             </p>
           </div>
           <a
@@ -430,7 +431,7 @@ export default function DownloadsPage() {
               </div>
               <p className="mt-2 max-w-[440px] text-[12px] leading-relaxed text-muted-foreground">
                 We’ll recognize the source automatically and prepare a clean
-                video file for your local library.
+                video file for your library.
               </p>
             </div>
 
@@ -488,7 +489,8 @@ export default function DownloadsPage() {
                 </div>
                 <p className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                   <LockKeyhole className="size-3" aria-hidden="true" />
-                  Downloads run on this Mac and save to your local Downloads folder.
+                  The downloader worker on your Mac saves the file, then syncs a
+                  copy to this workspace’s cloud library.
                 </p>
               </div>
 
@@ -607,6 +609,14 @@ export default function DownloadsPage() {
                   {" · "}
                   {elapsedTime(activeDownload.createdAt)}
                 </p>
+                {activeDownload.status === "queued" && (
+                  <p className="mt-1.5 text-[9.5px] leading-relaxed text-muted-foreground">
+                    Still queued? Start the worker on your Mac:{" "}
+                    <code className="rounded bg-white px-1 py-0.5 font-mono text-[9px]">
+                      node --env-file=.env.local download-worker.ts
+                    </code>
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -639,7 +649,8 @@ export default function DownloadsPage() {
                         Preview unavailable
                       </p>
                       <p className="text-[10px] leading-relaxed text-white/45">
-                        The file may have been moved from your Downloads folder.
+                        The file is no longer available. It may have been removed
+                        from the cloud library or your Downloads folder.
                       </p>
                     </div>
                   ) : (
@@ -660,7 +671,9 @@ export default function DownloadsPage() {
                     {previewJob.fileName}
                   </p>
                   <p className="mt-1 truncate font-mono text-[9.5px] text-white/40">
-                    Saved to ~/Downloads/VideoDownloader/{previewJob.platform}
+                    {previewJob.source === "disk"
+                      ? `Saved to ${previewJob.saveLocation}`
+                      : "Synced to your cloud library"}
                   </p>
                 </div>
 
@@ -672,7 +685,7 @@ export default function DownloadsPage() {
                       </span>
                       <div className="min-w-0">
                         <p className="text-[11px] font-semibold text-white/85">
-                          Ready on this device
+                          Ready to watch
                         </p>
                         <p className="mt-0.5 truncate text-[9.5px] text-white/45">
                           {previewJob.source === "disk"
@@ -680,13 +693,17 @@ export default function DownloadsPage() {
                             : previewJob.quality === "best"
                               ? "Best available quality"
                               : `Up to ${previewJob.quality}p`}{" "}
-                          · MP4 · Local file
+                          · MP4 · {previewJob.source === "disk" ? "Local file" : "Cloud file"}
                         </p>
                       </div>
-                      <Download
-                        className="ml-auto size-3.5 shrink-0 text-white/35"
-                        aria-hidden="true"
-                      />
+                      <a
+                        href={`/api/downloads/${previewJob.id}/file?download=1`}
+                        aria-label={`Download ${previewJob.fileName}`}
+                        title="Download the video file"
+                        className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                      >
+                        <Download className="size-3.5" aria-hidden="true" />
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -696,7 +713,7 @@ export default function DownloadsPage() {
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
                 <span className="size-1.5 rounded-full bg-white/70" />
-                Local-first
+                Cloud library
               </span>
               <span className="font-mono text-[9px] text-white/35">01 / 03</span>
             </div>
@@ -728,8 +745,8 @@ export default function DownloadsPage() {
                 to saved.
               </p>
               <p className="mt-2 max-w-[310px] text-[11px] leading-relaxed text-white/50">
-                Your video stays on your device. No account handoffs, no cloud
-                library to manage.
+                The downloader on your Mac does the heavy lifting, then syncs
+                the file to your workspace’s cloud library.
               </p>
             </div>
 
@@ -754,8 +771,8 @@ export default function DownloadsPage() {
               />
               <Step
                 number="03"
-                title="Save it locally"
-                description="yt-dlp saves the MP4 in your platform folder."
+                title="Save and sync"
+                description="yt-dlp saves the MP4 on your Mac; the worker uploads it to your cloud library."
                 last
               />
             </div>
@@ -810,9 +827,10 @@ export default function DownloadsPage() {
               <ShieldCheck className="size-5" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <h2 className="text-[12px] font-bold">Your device, your files</h2>
+              <h2 className="text-[12px] font-bold">Your downloader, your library</h2>
               <p className="mt-1 text-[10.5px] leading-relaxed text-muted-foreground">
-                Files save locally—nothing is uploaded to this workspace.
+                The worker on your Mac saves the file, then syncs a copy to this
+                workspace so it’s ready on any device.
               </p>
             </div>
             <FolderOpen className="ml-auto size-4 shrink-0 text-faint" aria-hidden="true" />
@@ -828,7 +846,7 @@ export default function DownloadsPage() {
               <div>
                 <h2 className="text-[12px] font-bold">Recent downloads</h2>
                 <p className="mt-0.5 text-[9.5px] text-muted-foreground">
-                  Your local download activity
+                  Your download activity across devices
                 </p>
               </div>
             </div>
@@ -877,7 +895,7 @@ export default function DownloadsPage() {
                         ? job.saveLocation
                         : job.status === "failed"
                           ? job.error
-                          : `Saving to ~/Downloads/VideoDownloader/${job.platform}`}
+                          : job.statusMessage || "Waiting for the local downloader…"}
                     </p>
                   </div>
                 )}
@@ -911,10 +929,11 @@ export default function DownloadsPage() {
                 {job.status === "done" && (
                   <span className="hidden items-center gap-1 text-[9px] font-medium text-muted-foreground sm:inline-flex">
                     <Download className="size-3" aria-hidden="true" />
-                    Local file
+                    {job.source === "disk" ? "Local file" : "Cloud file"}
                   </span>
                 )}
-                {(job.status === "done" || job.status === "failed") && (
+                {(job.status === "done" || job.status === "failed") &&
+                  job.source !== "disk" && (
                   <button
                     type="button"
                     onClick={() => void removeDownload(job.id)}
@@ -937,7 +956,7 @@ export default function DownloadsPage() {
               Your saved videos will show up here
             </p>
             <p className="mt-1 max-w-sm text-[10px] leading-relaxed text-muted-foreground">
-              Start a download and it will appear here with its local save path.
+              Start a download and it will appear here with its save location.
             </p>
             </div>
           )}
@@ -946,7 +965,7 @@ export default function DownloadsPage() {
         <footer className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[9.5px] text-muted-foreground/80">
           <span className="inline-flex items-center gap-1.5">
             <LockKeyhole className="size-3" aria-hidden="true" />
-            Local-first by design
+            Local downloader, cloud library
           </span>
           <span aria-hidden="true" className="text-border">•</span>
           <span>Only download content you have permission to save.</span>

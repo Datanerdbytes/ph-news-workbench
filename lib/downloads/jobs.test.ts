@@ -1,56 +1,77 @@
 import { describe, expect, it } from "vitest";
-import { downloadJobs, publicDownloadJob, type DownloadJob } from "./jobs";
+import {
+  ACTIVE_DOWNLOAD_STATUSES,
+  publicDownloadRow,
+  type DownloadJobRow,
+} from "./jobs";
 
-function job(overrides: Partial<DownloadJob> = {}): DownloadJob {
+function row(overrides: Partial<DownloadJobRow> = {}): DownloadJobRow {
   return {
     id: "job-1",
-    workspaceId: "ws1",
-    userId: "u1",
-    platform: "youtube",
-    quality: "1080p",
+    platform: "YouTube",
+    quality: "1080",
     status: "downloading",
     progress: 42,
-    statusMessage: "42%",
-    filePath: null,
+    status_message: "Downloading video…",
+    file_name: null,
+    blob_url: null,
+    save_location: null,
     error: null,
-    logs: ["started"],
-    createdAt: 1_700_000_000_000,
+    created_at_ms: 1_700_000_000_000,
     ...overrides,
   };
 }
 
-describe("publicDownloadJob", () => {
+describe("publicDownloadRow", () => {
   it("projects the fields the client may see", () => {
-    expect(publicDownloadJob(job())).toEqual({
+    expect(publicDownloadRow(row())).toEqual({
       id: "job-1",
-      platform: "youtube",
-      quality: "1080p",
+      platform: "YouTube",
+      quality: "1080",
       status: "downloading",
       progress: 42,
-      statusMessage: "42%",
+      statusMessage: "Downloading video…",
       fileName: null,
       saveLocation: null,
+      source: "cloud",
       error: null,
       createdAt: 1_700_000_000_000,
     });
   });
 
-  it("derives the file name from either path separator", () => {
-    expect(publicDownloadJob(job({ filePath: "/tmp/dl/clip.mp4" })).fileName).toBe(
-      "clip.mp4"
+  it("keeps the worker's local save path when present", () => {
+    const projected = publicDownloadRow(
+      row({
+        status: "done",
+        file_name: "clip.mp4",
+        save_location: "/Users/me/Downloads/VideoDownloader/YouTube/job-1/clip.mp4",
+        blob_url: "https://store.public.blob.vercel-storage.com/downloads/clip.mp4",
+      })
     );
-    expect(
-      publicDownloadJob(job({ filePath: "C:\\Downloads\\clip.mp4" })).fileName
-    ).toBe("clip.mp4");
-    expect(
-      publicDownloadJob(job({ filePath: "/tmp/dl" })).fileName
-    ).toBe("dl");
+    expect(projected.fileName).toBe("clip.mp4");
+    expect(projected.saveLocation).toBe(
+      "/Users/me/Downloads/VideoDownloader/YouTube/job-1/clip.mp4"
+    );
+  });
+
+  it("falls back to the cloud library when only the blob copy exists", () => {
+    const projected = publicDownloadRow(
+      row({
+        status: "done",
+        blob_url: "https://store.public.blob.vercel-storage.com/downloads/clip.mp4",
+      })
+    );
+    expect(projected.saveLocation).toBe("Cloud library");
   });
 });
 
-describe("downloadJobs store", () => {
-  it("is the shared in-memory map", () => {
-    expect(downloadJobs).toBeInstanceOf(Map);
-    expect(downloadJobs.size).toBeGreaterThanOrEqual(0);
+describe("ACTIVE_DOWNLOAD_STATUSES", () => {
+  it("covers every non-terminal state", () => {
+    expect(ACTIVE_DOWNLOAD_STATUSES).toEqual([
+      "queued",
+      "fetching",
+      "downloading",
+      "finalizing",
+    ]);
   });
 });
