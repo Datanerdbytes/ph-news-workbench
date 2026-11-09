@@ -16,6 +16,8 @@ export default [
       'migrate-*.js',
       'seed-*.js',
       'test-*.js',
+      // Vendored ffmpeg.wasm ESM glue, served as-is to the browser.
+      'public/ffmpeg/**',
     ],
   },
   {

@@ -64,6 +64,186 @@ export function contentTypeFor(fileName: string): string {
   return "video/mp4";
 }
 
+/** Codecs of the downloaded file, as reported by ffprobe. */
+export type VideoStreams = {
+  videoCodec: string | null;
+  pixelFormat: string | null;
+  audioCodec: string | null;
+};
+
+export const EMPTY_VIDEO_STREAMS: VideoStreams = {
+  videoCodec: null,
+  pixelFormat: null,
+  audioCodec: null,
+};
+
+export function parseVideoStreams(probeJson: string): VideoStreams {
+  try {
+    const parsed = JSON.parse(probeJson) as {
+      streams?: { codec_type?: string; codec_name?: string; pix_fmt?: string }[];
+    };
+    const streams = parsed.streams ?? [];
+    const video = streams.find((stream) => stream.codec_type === "video");
+    const audio = streams.find((stream) => stream.codec_type === "audio");
+    return {
+      videoCodec: video?.codec_name ?? null,
+      pixelFormat: video?.pix_fmt ?? null,
+      audioCodec: audio?.codec_name ?? null,
+    };
+  } catch {
+    return { ...EMPTY_VIDEO_STREAMS };
+  }
+}
+
+/**
+ * Safari plays H.264 in yuv420p with AAC/MP3 audio and nothing else. Facebook
+ * downloads arrive as AV1 or HEVC, which Safari refuses to decode at all, so
+ * those are re-encoded locally before they reach the cloud library.
+ */
+export function isSafariFriendly(streams: VideoStreams): boolean {
+  if (streams.videoCodec !== "h264") return false;
+  if (streams.pixelFormat !== "yuv420p") return false;
+  return (
+    streams.audioCodec === null ||
+    streams.audioCodec === "aac" ||
+    streams.audioCodec === "mp3"
+  );
+}
+
+export function safariFriendlyFileName(fileName: string): string {
+  const base = fileName.replace(/\.[^.]+$/, "").trim() || "video";
+  return `${base} (H.264).mp4`;
+}
+
+/**
+ * Keeps the source resolution, never upscales, and caps the long edge at
+ * 1920px so a 4K download stays a reasonable upload.
+ */
+export function buildSafariConversionArgs(input: string, output: string): string[] {
+  return [
+    "-y",
+    "-v",
+    "error",
+    "-i",
+    input,
+    "-vf",
+    "scale='min(1920,iw)':'min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+    "-c:v",
+    "libx264",
+    "-crf",
+    "21",
+    "-preset",
+    "fast",
+    "-pix_fmt",
+    "yuv420p",
+    "-profile:v",
+    "high",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "160k",
+    "-ac",
+    "2",
+    "-movflags",
+    "+faststart",
+    output,
+  ];
+}
+
+function runCommand(
+  command: string,
+  args: string[],
+  timeoutMs: number
+): Promise<{ code: number | null; output: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    timer.unref();
+    child.once("error", () => {
+      clearTimeout(timer);
+      resolve({ code: -1, output });
+    });
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      resolve({ code, output });
+    });
+  });
+}
+
+export async function probeVideoStreams(file: string): Promise<VideoStreams> {
+  const { code, output } = await runCommand(
+    "ffprobe",
+    [
+      "-v",
+      "error",
+      "-show_entries",
+      "stream=codec_type,codec_name,pix_fmt",
+      "-of",
+      "json",
+      file,
+    ],
+    30_000
+  );
+  if (code !== 0) return { ...EMPTY_VIDEO_STREAMS };
+  return parseVideoStreams(output);
+}
+
+export async function convertToSafariFriendly(
+  input: string,
+  output: string
+): Promise<void> {
+  const { code, output: log } = await runCommand(
+    "ffmpeg",
+    buildSafariConversionArgs(input, output),
+    600_000
+  );
+  if (code !== 0) {
+    throw new Error(
+      `Could not convert the video to H.264: ${log.slice(-300) || "ffmpeg failed"}`
+    );
+  }
+}
+
+export type PreparedRendition = {
+  filePath: string;
+  fileName: string;
+  converted: boolean;
+};
+
+/**
+ * Returns the file that should reach the cloud library. Sources Safari cannot
+ * decode are re-encoded to H.264 first; sources that already play everywhere
+ * are passed through untouched.
+ */
+export async function prepareSafariFriendlyRendition(
+  sourcePath: string,
+  outputDirectory: string,
+  onStatus: (message: string) => void = () => {}
+): Promise<PreparedRendition> {
+  const sourceName = path.basename(sourcePath);
+  const streams = await probeVideoStreams(sourcePath);
+  if (isSafariFriendly(streams)) {
+    return { filePath: sourcePath, fileName: sourceName, converted: false };
+  }
+
+  onStatus("Converting to H.264 for Safari…");
+  await mkdir(outputDirectory, { recursive: true });
+  const target = path.join(outputDirectory, safariFriendlyFileName(sourceName));
+  await convertToSafariFriendly(sourcePath, target);
+  const info = await stat(target);
+  if (!info.isFile() || info.size === 0) {
+    throw new Error("The converted video file is empty.");
+  }
+  return { filePath: target, fileName: path.basename(target), converted: true };
+}
+
 // Vercel Blob derives the ?download=1 attachment name from the stored path, so
 // spaces and brackets would otherwise reach the user percent-encoded.
 export function blobFileName(fileName: string): string {
@@ -266,16 +446,47 @@ async function runJob(sql: Sql, job: ClaimedJob, active: Map<string, ActiveJob>,
         if (!fileInfo.isFile() || fileInfo.size === 0) {
           throw new Error("The downloaded file is empty.");
         }
-        const fileName = path.basename(state.filePath);
+
+        // Safari refuses to decode AV1 and HEVC, so the raw download would
+        // preview as "Invalid". Convert on this Mac, then sync the H.264
+        // rendition back. A conversion problem must never fail the download.
+        let uploadPath = state.filePath;
+        let uploadName = path.basename(state.filePath);
+        let uploadSize = fileInfo.size;
+        state.status = "finalizing";
+        try {
+          state.statusMessage = "Checking playback compatibility…";
+          await writeState(true);
+          const rendition = await prepareSafariFriendlyRendition(
+            state.filePath,
+            outputDirectory,
+            (message) => {
+              state.statusMessage = message;
+              void writeState(true);
+            }
+          );
+          if (rendition.converted) {
+            const convertedInfo = await stat(rendition.filePath);
+            uploadPath = rendition.filePath;
+            uploadName = rendition.fileName;
+            uploadSize = convertedInfo.size;
+          }
+        } catch (error) {
+          console.error(
+            `Keeping the original download for job ${job.id}:`,
+            error instanceof Error ? error.message : error
+          );
+        }
+
         state.status = "finalizing";
         state.statusMessage = "Uploading to the cloud library…";
         await writeState(true);
         const blob = await put(
-          `downloads/${job.workspace_id}/${job.id}/${blobFileName(fileName)}`,
-          createReadStream(state.filePath),
+          `downloads/${job.workspace_id}/${job.id}/${blobFileName(uploadName)}`,
+          createReadStream(uploadPath),
           {
             access: "public",
-            contentType: contentTypeFor(fileName),
+            contentType: contentTypeFor(uploadName),
             addRandomSuffix: false,
             allowOverwrite: true,
           }
@@ -285,11 +496,11 @@ async function runJob(sql: Sql, job: ClaimedJob, active: Map<string, ActiveJob>,
         await sql`
           UPDATE download_jobs
           SET status = 'done', progress = 100, status_message = 'Download complete.',
-              file_name = ${fileName}, blob_url = ${blob.url}, file_size = ${fileInfo.size},
-              save_location = ${state.filePath}, error = NULL, updated_at = now()
+              file_name = ${uploadName}, blob_url = ${blob.url}, file_size = ${uploadSize},
+              save_location = ${uploadPath}, error = NULL, updated_at = now()
           WHERE id = ${job.id}
         `;
-        console.log(`Done: ${fileName} is in the cloud library.`);
+        console.log(`Done: ${uploadName} is in the cloud library.`);
         active.delete(job.id);
       } catch (error) {
         await finishFailure(error instanceof Error ? error.message : "Download failed.");
