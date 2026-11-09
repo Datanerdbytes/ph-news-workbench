@@ -235,3 +235,36 @@ CREATE INDEX IF NOT EXISTS notifications_workspace_idx
 CREATE UNIQUE INDEX IF NOT EXISTS notifications_dedupe_unread_idx
   ON notifications (workspace_id, dedupe_key)
   WHERE dedupe_key IS NOT NULL AND read_at IS NULL;
+
+-- Download queue shared by the web app and the local downloader worker
+-- (download-worker.ts). The API only enqueues and reads rows; the worker
+-- claims queued jobs, runs yt-dlp on the user's machine, and uploads the
+-- finished file to Vercel Blob so the live app can serve it.
+CREATE TABLE IF NOT EXISTS download_jobs (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  platform TEXT NOT NULL,
+  url TEXT NOT NULL,
+  quality TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued'
+    CHECK (status IN ('queued', 'fetching', 'downloading', 'finalizing', 'done', 'failed')),
+  progress REAL,
+  status_message TEXT NOT NULL DEFAULT '',
+  file_name TEXT,
+  blob_url TEXT,
+  file_size BIGINT,
+  save_location TEXT,
+  error TEXT,
+  worker_id TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  claimed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS download_jobs_workspace_idx
+  ON download_jobs (workspace_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS download_jobs_queue_idx
+  ON download_jobs (status, created_at);

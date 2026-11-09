@@ -3,8 +3,8 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { NextResponse } from "next/server";
+import { sql } from "@/lib/db";
 import { downloadRoot, findDiskDownload, videoContentType } from "@/lib/downloads/disk-jobs";
-import { downloadJobs } from "@/lib/downloads/jobs";
 import { requireWorkspace, unauthorized } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -35,33 +35,36 @@ export async function GET(
   const access = await requireWorkspace(request);
   if (!access) return unauthorized();
 
-  if (process.env.NODE_ENV !== "development") {
-    return NextResponse.json(
-      { error: "Video preview is available only in the local development app." },
-      { status: 503 }
-    );
-  }
-
   const { id } = await params;
-  const isDiskJob = id.startsWith("disk-");
+  const forceDownload = new URL(request.url).searchParams.has("download");
 
-  let filePath: string | null;
-  if (isDiskJob) {
-    const disk = await findDiskDownload(id);
-    filePath = disk?.filePath ?? null;
-  } else {
-    const job = downloadJobs.get(id);
-    if (!job || job.workspaceId !== access.workspace.id) {
+  if (!id.startsWith("disk-")) {
+    const rows = await sql`
+      SELECT status, blob_url
+      FROM download_jobs
+      WHERE id = ${id} AND workspace_id = ${access.workspace.id}
+    `;
+    if (!rows.length) {
       return NextResponse.json({ error: "Download job not found." }, { status: 404 });
     }
-    if (job.status !== "done" || !job.filePath) {
+    if (rows[0].status !== "done" || !rows[0].blob_url) {
       return NextResponse.json(
         { error: "The video file is not ready yet." },
         { status: 409 }
       );
     }
-    filePath = job.filePath;
+    // The Blob CDN serves range requests natively; ?download=1 forces an
+    // attachment with the stored file name.
+    const target = forceDownload
+      ? `${rows[0].blob_url}?download=1`
+      : rows[0].blob_url;
+    const response = NextResponse.redirect(target, 302);
+    response.headers.set("Cache-Control", "no-store");
+    return response;
   }
+
+  const disk = await findDiskDownload(id);
+  const filePath = disk?.filePath ?? null;
   if (!filePath) {
     return NextResponse.json({ error: "Download job not found." }, { status: 404 });
   }
@@ -107,7 +110,7 @@ export async function GET(
     "Content-Length": String(end - start + 1),
     "Accept-Ranges": "bytes",
     "Cache-Control": "no-store",
-    "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    "Content-Disposition": `${forceDownload ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(fileName)}`,
   };
   if (range !== "full") {
     headers["Content-Range"] = `bytes ${start}-${end}/${size}`;

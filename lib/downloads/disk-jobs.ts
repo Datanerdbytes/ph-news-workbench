@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { readdir, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { publicDownloadJob } from "./jobs";
 
 export type DiskDownload = {
   id: string;
@@ -96,23 +95,19 @@ export function videoContentType(fileName: string) {
   return CONTENT_TYPES[path.extname(fileName).toLowerCase()] ?? "video/mp4";
 }
 
-/** Shapes a recovered file like a finished session job so the page renders it directly. */
+/** Shapes a recovered file like a finished job so the page renders it directly. */
 export function publicDiskDownload(disk: DiskDownload) {
   return {
-    ...publicDownloadJob({
-      id: disk.id,
-      workspaceId: "",
-      userId: "",
-      platform: disk.platform,
-      quality: "",
-      status: "done",
-      progress: null,
-      statusMessage: "",
-      filePath: disk.filePath,
-      error: null,
-      logs: [],
-      createdAt: disk.createdAt,
-    }),
+    id: disk.id,
+    platform: disk.platform,
+    quality: "",
+    status: "done" as const,
+    progress: null,
+    statusMessage: "",
+    fileName: disk.fileName,
+    saveLocation: disk.filePath,
+    error: null,
+    createdAt: disk.createdAt,
     source: "disk" as const,
   };
 }
