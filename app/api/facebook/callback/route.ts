@@ -5,6 +5,11 @@ import { auth } from '@/lib/auth';
 import { sql } from '@/lib/db';
 import { getWorkspaceForUser } from '@/lib/workspaces';
 import {
+  clearOAuthCookies,
+  resolveReturnPath,
+  returnUrl,
+} from '@/lib/oauth-return';
+import {
   exchangeCodeForToken,
   exchangeForLongLivedToken,
   facebookConfigured,
@@ -23,6 +28,8 @@ import {
 export const dynamic = 'force-dynamic';
 
 const STATE_COOKIE = 'fb_oauth_state';
+const NEXT_COOKIE = 'fb_oauth_next';
+const CHANNEL_COOKIE = 'fb_oauth_channel';
 
 function matchesState(actual: string, expected: string): boolean {
   const left = Buffer.from(actual);
@@ -31,17 +38,22 @@ function matchesState(actual: string, expected: string): boolean {
 }
 
 function finish(request: NextRequest, outcome: string) {
-  const url = new URL('/', request.url);
-  url.searchParams.set('facebook', outcome);
-
-  const response = NextResponse.redirect(url);
-  response.cookies.set(STATE_COOKIE, '', {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 0,
-  });
+  // Instagram starts this same flow; tag its outcome so only the Instagram
+  // hook reacts. Anything else reads as a Facebook connection result.
+  const channel = request.cookies.get(CHANNEL_COOKIE)?.value;
+  const isInstagram = channel === 'instagram';
+  // A successful grant drops the actor straight into that platform's
+  // publishing UI; failures return to wherever Connect was clicked.
+  const path = resolveReturnPath(
+    request.cookies.get(NEXT_COOKIE)?.value ?? null,
+    outcome,
+    isInstagram ? '/instagram' : '/post',
+    '/'
+  );
+  const response = NextResponse.redirect(
+    returnUrl(request, path, isInstagram ? 'instagram' : 'facebook', outcome)
+  );
+  clearOAuthCookies(response, [STATE_COOKIE, NEXT_COOKIE, CHANNEL_COOKIE]);
   return response;
 }
 

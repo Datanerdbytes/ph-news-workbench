@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { FacebookConnectionProvider } from "@/components/facebook-connection";
 import { InstagramConnectionProvider } from "@/components/instagram-connection";
+import { TikTokConnectionProvider } from "@/components/tiktok-connection";
 import { YouTubeConnectionProvider } from "@/components/youtube-connection";
 import { SessionProvider } from "@/components/session-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -69,7 +70,9 @@ export default async function RootLayout({
         <SessionProvider>
           <FacebookConnectionProvider>
             <InstagramConnectionProvider>
-              <YouTubeConnectionProvider>{children}</YouTubeConnectionProvider>
+              <YouTubeConnectionProvider>
+                <TikTokConnectionProvider>{children}</TikTokConnectionProvider>
+              </YouTubeConnectionProvider>
             </InstagramConnectionProvider>
           </FacebookConnectionProvider>
         </SessionProvider>

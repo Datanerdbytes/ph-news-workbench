@@ -12,6 +12,7 @@ import {
   Download,
   Film,
   FileText,
+  Globe,
   Images,
   LayoutDashboard,
   Newspaper,
@@ -73,6 +74,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/analytics", label: "Analytics", icon: ChartColumn },
       { href: "/accounts", label: "Accounts", icon: Users },
+      { href: "/platforms", label: "Platforms", icon: Globe },
     ],
   },
   {
@@ -128,6 +130,7 @@ function pageLabel(pathname: string) {
   if (pathname.startsWith("/status") || pathname.startsWith("/drafts"))
     return "Drafts";
   if (pathname.startsWith("/accounts")) return "Accounts";
+  if (pathname.startsWith("/platforms")) return "Platforms";
   if (pathname.startsWith("/analytics")) return "Analytics";
   if (pathname.startsWith("/team")) return "Team";
   if (pathname.startsWith("/settings")) return "Settings";

@@ -43,7 +43,7 @@ export default function LoginPage() {
         body: JSON.stringify({ token: inviteToken }),
       }).catch(() => {});
     }
-    router.push("/dashboard");
+    router.push("/platforms");
     router.refresh();
   }
 

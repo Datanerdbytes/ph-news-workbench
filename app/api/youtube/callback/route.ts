@@ -5,6 +5,11 @@ import { auth } from '@/lib/auth';
 import { sql } from '@/lib/db';
 import { getWorkspaceForUser } from '@/lib/workspaces';
 import {
+  clearOAuthCookies,
+  resolveReturnPath,
+  returnUrl,
+} from '@/lib/oauth-return';
+import {
   exchangeGoogleCode,
   fetchYouTubeChannel,
   googleConfigured,
@@ -16,6 +21,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 const STATE_COOKIE = 'yt_oauth_state';
+const NEXT_COOKIE = 'yt_oauth_next';
 
 function matchesState(actual: string, expected: string): boolean {
   const left = Buffer.from(actual);
@@ -24,16 +30,18 @@ function matchesState(actual: string, expected: string): boolean {
 }
 
 function finish(request: NextRequest, outcome: string) {
-  const url = new URL('/youtube', request.url);
-  url.searchParams.set('google', outcome);
-  const response = NextResponse.redirect(url);
-  response.cookies.set(STATE_COOKIE, '', {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 0,
-  });
+  // A successful grant lands in the YouTube composer; failures return to
+  // wherever Connect was clicked so the outcome toast is seen there.
+  const path = resolveReturnPath(
+    request.cookies.get(NEXT_COOKIE)?.value ?? null,
+    outcome,
+    '/youtube',
+    '/youtube'
+  );
+  const response = NextResponse.redirect(
+    returnUrl(request, path, 'google', outcome)
+  );
+  clearOAuthCookies(response, [STATE_COOKIE, NEXT_COOKIE]);
   return response;
 }
 

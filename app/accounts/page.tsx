@@ -4,16 +4,18 @@ import Link from "next/link";
 import {
   ArrowRight,
   Check,
-  Lock,
   Minus,
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
 import { AppFrame } from "@/components/app-frame";
 import { PlatformMark, type PlatformKind } from "@/components/platform-mark";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useFacebookConnection } from "@/components/facebook-connection";
+import { useInstagramConnection } from "@/components/instagram-connection";
 import { cn } from "cn";
+
+type CapabilityFlag = { label: string; on?: boolean };
 
 type Channel = {
   platform: PlatformKind;
@@ -22,22 +24,11 @@ type Channel = {
   gate: string;
   summary: string;
   requirements: string[];
+  capabilities: CapabilityFlag[];
+  note: string;
 };
 
 const DESIGNED: Channel[] = [
-  {
-    platform: "instagram",
-    name: "Instagram",
-    family: "Meta · Instagram Business",
-    gate: "Meta App Review",
-    summary:
-      "Publish feed posts and carousels to an Instagram Business account linked to the connected Page.",
-    requirements: [
-      "instagram_content_publish permission",
-      "Professional account linked to the Page",
-      "Every post needs at least one image or video",
-    ],
-  },
   {
     platform: "youtube",
     name: "YouTube",
@@ -48,9 +39,16 @@ const DESIGNED: Channel[] = [
     requirements: [
       "Google OAuth consent screen verification",
       "youtube.upload scope",
-      "Video file is required; text-only posts do not exist",
       "10,000 quota units a day is roughly six uploads",
     ],
+    capabilities: [
+      { label: "Text posts" },
+      { label: "Single photo" },
+      { label: "Video", on: true },
+      { label: "Carousel" },
+      { label: "Scheduled publishing", on: true },
+    ],
+    note: "Every upload needs a video file, so the composer blocks text-only drafts before they reach Google.",
   },
   {
     platform: "tiktok",
@@ -64,6 +62,14 @@ const DESIGNED: Channel[] = [
       "video.publish or photo.publish scope",
       "Media is required for every post",
     ],
+    capabilities: [
+      { label: "Text posts" },
+      { label: "Single photo", on: true },
+      { label: "Video", on: true },
+      { label: "Carousel" },
+      { label: "Draft review", on: true },
+    ],
+    note: "Posts arrive as drafts inside TikTok, so the composer shows the draft step rather than promising an instant publish.",
   },
   {
     platform: "linkedin",
@@ -77,6 +83,14 @@ const DESIGNED: Channel[] = [
       "Company Page admin role",
       "w_organization_social scope",
     ],
+    capabilities: [
+      { label: "Text posts", on: true },
+      { label: "Single photo", on: true },
+      { label: "Video", on: true },
+      { label: "Carousel" },
+      { label: "Scheduled publishing" },
+    ],
+    note: "Rights come from the company Page admin role, so drafts inherit the Page's audience and permissions.",
   },
 ];
 
@@ -125,7 +139,13 @@ const CAPABILITIES = [
 
 export default function AccountsPage() {
   const connection = useFacebookConnection();
+  const instagram = useInstagramConnection();
   const granted = connection.scopes ?? [];
+
+  const liveChannels =
+    connection.loading || instagram.loading
+      ? null
+      : (connection.connected ? 1 : 0) + (instagram.connected ? 1 : 0);
 
   return (
     <AppFrame>
@@ -137,8 +157,8 @@ export default function AccountsPage() {
             </p>
             <h1 className="page-title mt-1.5">Accounts</h1>
             <p className="mt-1.5 max-w-2xl text-[12.5px] leading-relaxed text-muted-foreground">
-              Connect where you publish. Facebook is live today; the other
-              channels are designed and waiting on platform access.
+              Connect where you publish. Facebook and Instagram are live today;
+              the other channels are designed and waiting on platform access.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -152,11 +172,15 @@ export default function AccountsPage() {
         <div className="mt-5 grid grid-cols-3 gap-2.5">
           <Summary
             label="Live channels"
-            value={connection.loading ? "—" : connection.connected ? 1 : 0}
-            hint={connection.loading ? "Checking status" : "Facebook Page"}
+            value={liveChannels ?? "—"}
+            hint={liveChannels === null ? "Checking status" : "Facebook + Instagram"}
           />
           <Summary label="Designed" value={DESIGNED.length} hint="Queued by review" />
-          <Summary label="Review gates" value={4} hint="One per network" />
+          <Summary
+            label="Review gates"
+            value={DESIGNED.length}
+            hint="One per network"
+          />
         </div>
 
         <section className="panel mt-4 overflow-hidden">
@@ -300,6 +324,162 @@ export default function AccountsPage() {
           </div>
         </section>
 
+        <section className="panel mt-4 overflow-hidden">
+          <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3.5">
+            <PlatformMark platform="instagram" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-[13px] font-semibold">Instagram</h2>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider",
+                    instagram.connected
+                      ? "bg-success-soft text-success"
+                      : "bg-warning-soft text-warning"
+                  )}
+                >
+                  {instagram.loading
+                    ? "Checking"
+                    : instagram.connected
+                      ? "Live"
+                      : "Not connected"}
+                </span>
+              </div>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Instagram Business · Graph API v23.0 · via the Facebook Page
+              </p>
+            </div>
+
+            <Button
+              variant={instagram.connected ? "outline" : "brand"}
+              size="sm"
+              onClick={instagram.connect}
+              disabled={instagram.loading}
+              className={cn(
+                "h-8 rounded-[7px] px-3 text-[11.5px]",
+                instagram.connected && "bg-card"
+              )}
+            >
+              {instagram.loading
+                ? "Checking…"
+                : instagram.connected
+                  ? "Reconnect"
+                  : "Connect Instagram"}
+            </Button>
+          </div>
+
+          <div className="grid gap-5 px-4 py-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+                Connection
+              </p>
+              {instagram.loading ? (
+                <p className="mt-2 text-[12px] text-muted-foreground">
+                  Checking the Instagram linkage…
+                </p>
+              ) : instagram.unreachable ? (
+                <p className="mt-2 text-[12px] text-muted-foreground">
+                  Status unavailable. The dev server or database may be down.
+                </p>
+              ) : instagram.connected ? (
+                <div className="mt-2">
+                  <p className="font-heading text-[19px] leading-tight">
+                    @{instagram.ig?.username}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Instagram ID{" "}
+                    <span className="font-mono text-[10.5px]">
+                      {instagram.ig?.id}
+                    </span>
+                    {instagram.pageId ? (
+                      <>
+                        {" · "}Page{" "}
+                        <span className="font-mono text-[10.5px]">
+                          {instagram.pageId}
+                        </span>
+                      </>
+                    ) : null}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {instagram.scopes.map((scope) => (
+                      <span
+                        key={scope}
+                        className="rounded-full border border-border bg-surface-2 px-2 py-0.5 font-mono text-[9.5px] text-muted-foreground"
+                      >
+                        {scope}
+                      </span>
+                    ))}
+                  </div>
+                  <Link
+                    href="/instagram"
+                    className="mt-3 inline-flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:text-brand-strong"
+                  >
+                    Open Instagram studio
+                    <ArrowRight className="size-3.5" aria-hidden />
+                  </Link>
+                </div>
+              ) : !instagram.configured ? (
+                <div className="mt-2">
+                  <p className="text-[12px] font-medium">
+                    Facebook app credentials are missing
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    Instagram rides the same Meta app. Add FACEBOOK_APP_ID and
+                    FACEBOOK_APP_SECRET to{" "}
+                    <span className="font-mono text-[10.5px]">.env.local</span>,
+                    then restart the dev server.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <p className="text-[12px] font-medium">
+                    {instagram.reason === "no_ig_account"
+                      ? "No Instagram account linked to the Page"
+                      : instagram.reason === "scope_missing"
+                        ? "Instagram permissions are missing"
+                        : instagram.reason === "probe_failed"
+                          ? "Instagram could not be verified"
+                          : "Not connected yet"}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    {instagram.reason === "scope_missing" && instagram.detail
+                      ? `Reconnect to grant ${instagram.detail}.`
+                      : instagram.reason === "probe_failed" && instagram.detail
+                        ? instagram.detail
+                        : instagram.detail ??
+                          "Connect a Page you manage, then link its professional Instagram account under Page settings → Linked accounts."}
+                  </p>
+                  <Button
+                    variant="brand"
+                    size="sm"
+                    onClick={instagram.connect}
+                    className="mt-3 h-8 rounded-[7px] px-3 text-[11.5px]"
+                  >
+                    Connect Instagram
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+                What the adapter supports
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Capability label="Feed photo" on />
+                <Capability label="Carousel" on />
+                <Capability label="Video / Reels" on />
+                <Capability label="Text-only post" />
+                <Capability label="Scheduled publishing" />
+              </div>
+              <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                Every post needs at least one image or video, so the composer
+                blocks text-only drafts before they reach Meta.
+              </p>
+            </div>
+          </div>
+        </section>
+
         <div className="mt-6 flex items-center justify-between gap-3">
           <h2 className="text-[13px] font-semibold">Designed and gated</h2>
           <span className="text-[10.5px] text-muted-foreground">
@@ -307,57 +487,87 @@ export default function AccountsPage() {
           </span>
         </div>
 
-        <div className="mt-2.5 grid gap-3 md:grid-cols-2">
-          {DESIGNED.map((channel) => (
-            <article key={channel.platform} className="panel p-4">
-              <div className="flex items-start gap-3">
-                <PlatformMark platform={channel.platform} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-[13px] font-semibold">
-                      {channel.name}
-                    </h3>
-                    <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-faint">
-                      Designed
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-[10.5px] text-muted-foreground">
-                    {channel.family}
+        {DESIGNED.map((channel) => (
+          <section
+            key={channel.platform}
+            className="panel mt-4 overflow-hidden"
+            aria-labelledby={`channel-${channel.platform}`}
+          >
+            <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3.5">
+              <PlatformMark platform={channel.platform} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2
+                    id={`channel-${channel.platform}`}
+                    className="text-[13px] font-semibold"
+                  >
+                    {channel.name}
+                  </h2>
+                  <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-warning">
+                    Not connected
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  {channel.family}
+                </p>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled
+                title={`Blocked by ${channel.gate}`}
+                className="h-8 rounded-[7px] bg-card px-3 text-[11.5px]"
+              >
+                Connect {channel.name}
+              </Button>
+            </div>
+
+            <div className="grid gap-5 px-4 py-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+                  Connection
+                </p>
+                <div className="mt-2">
+                  <p className="text-[12px] font-medium">
+                    Blocked by {channel.gate}
                   </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    {channel.summary}
+                  </p>
+                  <ul className="mt-3 flex flex-wrap gap-1.5">
+                    {channel.requirements.map((requirement) => (
+                      <li
+                        key={requirement}
+                        className="rounded-full border border-border bg-surface-2 px-2 py-0.5 font-mono text-[9.5px] text-muted-foreground"
+                      >
+                        {requirement}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
 
-              <p className="mt-3 text-[11.5px] leading-relaxed text-muted-foreground">
-                {channel.summary}
-              </p>
-
-              <ul className="mt-3 flex flex-col gap-1.5">
-                {channel.requirements.map((requirement) => (
-                  <li
-                    key={requirement}
-                    className="flex gap-1.5 text-[11px] leading-snug text-secondary-foreground"
-                  >
-                    <span
-                      className="mt-1.5 size-1 shrink-0 rounded-full bg-faint"
-                      aria-hidden
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+                  What the adapter supports
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {channel.capabilities.map((capability) => (
+                    <Capability
+                      key={capability.label}
+                      label={capability.label}
+                      on={capability.on}
                     />
-                    {requirement}
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-3.5 flex items-center justify-between gap-2 border-t border-border pt-3">
-                <span className="inline-flex items-center gap-1.5 text-[10.5px] font-medium text-warning">
-                  <Lock className="size-3" aria-hidden />
-                  Blocked by {channel.gate}
-                </span>
-                <span className="rounded-[7px] bg-surface-3 px-2.5 py-1 text-[10.5px] font-semibold text-faint">
-                  Awaiting access
-                </span>
+                  ))}
+                </div>
+                <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                  {channel.note}
+                </p>
               </div>
-            </article>
-          ))}
-        </div>
+            </div>
+          </section>
+        ))}
 
         <section className="panel mt-4 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -385,34 +595,45 @@ export default function AccountsPage() {
                 </tr>
               </thead>
               <tbody>
-                {CAPABILITIES.map((row) => (
-                  <tr
-                    key={row.channel}
-                    className="border-b border-border last:border-b-0"
-                  >
-                    <td className="px-4 py-2.5 text-[11.5px] font-semibold">
-                      {row.channel}
-                    </td>
-                    <Flag on={row.text} />
-                    <Flag on={row.photo} />
-                    <Flag on={row.video} />
-                    <td className="px-4 py-2.5 text-[11px] text-muted-foreground">
-                      {row.media ? "Yes" : "No"}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={cn(
-                          "rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider",
-                          row.gate === "Live"
-                            ? "bg-success-soft text-success"
-                            : "bg-surface-3 text-muted-foreground"
-                        )}
-                      >
-                        {row.gate}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {CAPABILITIES.map((row) => {
+                  const gate =
+                    row.channel === "Instagram"
+                      ? instagram.loading
+                        ? "Checking"
+                        : instagram.connected
+                          ? "Live"
+                          : "App Review"
+                      : row.gate;
+
+                  return (
+                    <tr
+                      key={row.channel}
+                      className="border-b border-border last:border-b-0"
+                    >
+                      <td className="px-4 py-2.5 text-[11.5px] font-semibold">
+                        {row.channel}
+                      </td>
+                      <Flag on={row.text} />
+                      <Flag on={row.photo} />
+                      <Flag on={row.video} />
+                      <td className="px-4 py-2.5 text-[11px] text-muted-foreground">
+                        {row.media ? "Yes" : "No"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider",
+                            gate === "Live"
+                              ? "bg-success-soft text-success"
+                              : "bg-surface-3 text-muted-foreground"
+                          )}
+                        >
+                          {gate}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -174,7 +174,9 @@ export function FacebookConnectionProvider({
       return;
     }
 
-    window.location.assign('/api/facebook/connect');
+    window.location.assign(
+      `/api/facebook/connect?next=${encodeURIComponent(window.location.pathname)}`
+    );
   }, [loading, status?.configured]);
 
   const disconnect = useCallback(async () => {

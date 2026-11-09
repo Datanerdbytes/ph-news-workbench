@@ -19,13 +19,22 @@ import { Button } from '@/components/ui/button';
 
 const CAPTION_MAX = 2200;
 
+/**
+ * Instagram business access rides Facebook Login (the Basic Display login
+ * was read-only and is retired), so the consent screen always comes from
+ * Meta — spell that out before anyone bounces off it.
+ */
+const FACEBOOK_LOGIN_EXPECTED =
+  ' The consent screen is Meta\u2019s Facebook Login, and that is expected \u2014 Instagram business publishing rides your Facebook account, not your Instagram login.';
+
 function gateReasonNode(reason: string | null, detail: string | null) {
   if (reason === 'no_ig_account') {
     return (
       <>
-        This Facebook Page has no professional Instagram account linked. Link one
-        in Instagram, then press Connect again — the grant now carries
-        instagram_basic and instagram_content_publish.
+        This Facebook Page has no professional Instagram account linked. Link
+        one in Instagram, then press Connect again &mdash; the grant now
+        carries instagram_basic and instagram_content_publish.
+        {FACEBOOK_LOGIN_EXPECTED}
       </>
     );
   }
@@ -33,7 +42,9 @@ function gateReasonNode(reason: string | null, detail: string | null) {
     return (
       <>
         The stored grant lacks {detail ?? 'Instagram publishing'} scopes. Press
-        Connect — the same Meta app re-auth stacks the missing scopes on.
+        Connect to re-consent &mdash; the Meta app stacks the missing scopes
+        on the same grant.
+        {FACEBOOK_LOGIN_EXPECTED}
       </>
     );
   }
@@ -41,6 +52,7 @@ function gateReasonNode(reason: string | null, detail: string | null) {
     <>
       Publishing tools post with the Instagram Graph API, so a business account
       must be connected first.
+      {FACEBOOK_LOGIN_EXPECTED}
     </>
   );
 }
