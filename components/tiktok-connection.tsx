@@ -159,7 +159,9 @@ export function TikTokConnectionProvider({
       return;
     }
 
-    window.location.assign('/api/tiktok/connect');
+    window.location.assign(
+      `/api/tiktok/connect?next=${encodeURIComponent(window.location.pathname)}`
+    );
   }, [loading, status?.configured]);
 
   const value = useMemo<TikTokConnectionValue>(

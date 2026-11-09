@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic';
 
 const STATE_COOKIE = 'tt_oauth_state';
 const VERIFIER_COOKIE = 'tt_pkce_verifier';
+const NEXT_COOKIE = 'tt_oauth_next';
 
 function matchesState(actual: string, expected: string): boolean {
   const left = Buffer.from(actual);
@@ -23,10 +24,15 @@ function matchesState(actual: string, expected: string): boolean {
 }
 
 function finish(request: NextRequest, outcome: string) {
-  const url = new URL('/tiktok', request.url);
+  const next = request.cookies.get(NEXT_COOKIE)?.value ?? '';
+  const origin = next.startsWith('/') && !next.startsWith('//') ? next : '/tiktok';
+  // A successful grant lands in the TikTok composer; failures return to
+  // wherever Connect was clicked so the outcome toast is seen there.
+  const path = outcome === 'connected' ? '/tiktok' : origin;
+  const url = new URL(path, request.url);
   url.searchParams.set('platform', outcome);
   const response = NextResponse.redirect(url);
-  for (const name of [STATE_COOKIE, VERIFIER_COOKIE]) {
+  for (const name of [STATE_COOKIE, VERIFIER_COOKIE, NEXT_COOKIE]) {
     response.cookies.set(name, '', {
       httpOnly: true,
       sameSite: 'lax',

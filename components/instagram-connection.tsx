@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { usePathname } from 'next/navigation';
@@ -34,29 +35,19 @@ type InstagramConnectionValue = {
   connected: boolean;
   unreachable: boolean;
   ig: InstagramAccountInfo | null;
+  scopes: string[];
+  pageId: string | null;
   reason: string | null;
   detail: string | null;
   connect: () => void;
   refresh: () => void;
 };
 
-const EMPTY_STATUS: InstagramStatus = {
-  configured: false,
-  connected: false,
-  ig: null,
-  scopes: [],
-  missingScopes: [],
-  reason: null,
-  detail: null,
-  pageId: null,
-};
-
 const InstagramConnectionContext =
   createContext<InstagramConnectionValue | null>(null);
 
-function notifyOutcome(pathname: string, status: InstagramStatus | null) {
-  const search = new URLSearchParams(pathname.split('?')[1] ?? '');
-  const outcome = search.get('facebook');
+function notifyOutcome(search: string, status: InstagramStatus | null) {
+  const outcome = new URLSearchParams(search).get('instagram');
   if (outcome === 'connected') {
     if (status?.connected) {
       toast.success('Instagram account ready', {
@@ -87,6 +78,7 @@ export function InstagramConnectionProvider({
   const [status, setStatus] = useState<InstagramStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [reachAttempt, setReachAttempt] = useState(0);
+  const flashHandled = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -112,17 +104,37 @@ export function InstagramConnectionProvider({
       .finally(() => {
         if (active) setLoading(false);
       });
-    notifyOutcome(pathname, status);
     return () => {
       active = false;
       controller.abort();
     };
-    // Re-probe when arriving with an OAuth outcome in the URL.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reachAttempt, pathname.split('?')[0]]);
+    // Re-probe on an OAuth round-trip or a manual refresh.
+  }, [reachAttempt, pathname]);
+
+  // The toast needs the settled status to tell "connected" from "no Instagram
+  // on the Page", so it waits for the probe instead of firing on arrival.
+  useEffect(() => {
+    if (loading || flashHandled.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('instagram')) return;
+    flashHandled.current = true;
+
+    notifyOutcome(window.location.search, status);
+
+    params.delete('instagram');
+    const search = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`
+    );
+  }, [loading, status]);
 
   const connect = useCallback(() => {
-    window.location.href = '/api/instagram/connect';
+    window.location.href = `/api/instagram/connect?next=${encodeURIComponent(
+      window.location.pathname
+    )}`;
   }, []);
 
   const refresh = useCallback(() => {
@@ -139,6 +151,8 @@ export function InstagramConnectionProvider({
       // unreachable — the gate copy switches to "reload and retry".
       unreachable: status === null && !loading,
       ig: status?.ig ?? null,
+      scopes: status?.scopes ?? [],
+      pageId: status?.pageId ?? null,
       reason: status?.reason ?? null,
       detail: status?.detail ?? null,
       connect,

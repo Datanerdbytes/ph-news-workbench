@@ -16,6 +16,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 const STATE_COOKIE = 'yt_oauth_state';
+const NEXT_COOKIE = 'yt_oauth_next';
 
 function matchesState(actual: string, expected: string): boolean {
   const left = Buffer.from(actual);
@@ -24,16 +25,23 @@ function matchesState(actual: string, expected: string): boolean {
 }
 
 function finish(request: NextRequest, outcome: string) {
-  const url = new URL('/youtube', request.url);
+  const next = request.cookies.get(NEXT_COOKIE)?.value ?? '';
+  const origin = next.startsWith('/') && !next.startsWith('//') ? next : '/youtube';
+  // A successful grant lands in the YouTube composer; failures return to
+  // wherever Connect was clicked so the outcome toast is seen there.
+  const path = outcome === 'connected' ? '/youtube' : origin;
+  const url = new URL(path, request.url);
   url.searchParams.set('google', outcome);
   const response = NextResponse.redirect(url);
-  response.cookies.set(STATE_COOKIE, '', {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 0,
-  });
+  for (const name of [STATE_COOKIE, NEXT_COOKIE]) {
+    response.cookies.set(name, '', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 0,
+    });
+  }
   return response;
 }
 

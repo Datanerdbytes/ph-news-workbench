@@ -155,7 +155,9 @@ export function YouTubeConnectionProvider({
       return;
     }
 
-    window.location.assign('/api/youtube/connect');
+    window.location.assign(
+      `/api/youtube/connect?next=${encodeURIComponent(window.location.pathname)}`
+    );
   }, [loading, status?.configured]);
 
   const value = useMemo<YouTubeConnectionValue>(
