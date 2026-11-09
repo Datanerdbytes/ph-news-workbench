@@ -93,7 +93,7 @@ const LINKEDIN: Omit<PlatformEntry, "state"> = {
   ],
   account: null,
   note: "Blocked by Community Management API access.",
-  action: "Sign in with LinkedIn",
+  action: "Connect LinkedIn",
   title: "Blocked by Community Management API access",
 };
 
@@ -138,10 +138,9 @@ export default function PlatformsPage() {
           : facebook.configured
             ? "Ready — sign in with the Facebook account that manages the Page."
             : "Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET to this environment.",
-      action: facebook.connected
-        ? "Manage connection"
-        : "Sign in with Facebook",
-      onAction: facebook.connected ? undefined : facebook.connect,
+      action: "Connect Facebook",
+      href: "/post",
+      onAction: facebook.connect,
       title: facebook.connected
         ? undefined
         : facebook.configured
@@ -181,10 +180,9 @@ export default function PlatformsPage() {
               ? "No professional Instagram account is linked to the Page yet."
               : "Ready — sign in through the Facebook Page that owns the account."
             : "Instagram uses the same Meta app credentials as Facebook.",
-      action: instagram.connected
-        ? "Manage connection"
-        : "Sign in with Instagram",
-      onAction: instagram.connected ? undefined : instagram.connect,
+      action: "Connect Instagram",
+      href: "/instagram",
+      onAction: instagram.connect,
       title: instagram.connected
         ? undefined
         : instagram.configured
@@ -219,9 +217,9 @@ export default function PlatformsPage() {
           : youtube.configured
             ? "Ready — sign in with a Google account that owns the channel."
             : "Add the Google OAuth client credentials to this environment.",
-      action: youtube.connected ? "Open YouTube studio" : "Sign in with YouTube",
+      action: "Connect YouTube",
       href: "/youtube",
-      onAction: youtube.connected ? undefined : youtube.connect,
+      onAction: youtube.connect,
       title: youtube.connected
         ? undefined
         : youtube.configured
@@ -259,9 +257,9 @@ export default function PlatformsPage() {
           : tiktok.configured
             ? "Ready — sign in with the TikTok business account to publish from."
             : "Add the TikTok client key and secret to this environment.",
-      action: tiktok.connected ? "Open TikTok studio" : "Sign in with TikTok",
+      action: "Connect TikTok",
       href: "/tiktok",
-      onAction: tiktok.connected ? undefined : tiktok.connect,
+      onAction: tiktok.connect,
       title: tiktok.connected
         ? undefined
         : tiktok.configured
@@ -443,12 +441,13 @@ function PlatformCard({ entry }: { entry: PlatformEntry }) {
           {entry.state === "live" ? (
             <Link
               href={entry.href ?? "/accounts"}
+              aria-label={`Launch ${entry.name}`}
               className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "h-8 w-full rounded-[7px] bg-card text-[11.5px]"
+                buttonVariants({ variant: "brand", size: "sm" }),
+                "h-8 w-full rounded-[7px] text-[11.5px]"
               )}
             >
-              {entry.action}
+              Launch
               <ArrowRight className="size-3.5" aria-hidden />
             </Link>
           ) : (
