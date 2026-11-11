@@ -4,17 +4,10 @@ import {
   fetchPageAudience,
   redactTokens,
 } from '@/lib/facebook';
-import { decryptToken } from '@/lib/facebook-token';
-import { sql } from '@/lib/db';
+import { resolvePageTargets } from '@/lib/publishing/connection';
 import { requireWorkspace, unauthorized } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
-
-type ConnectionRow = {
-  page_id: string;
-  page_name: string;
-  access_token: string;
-};
 
 const NO_STORE = { 'cache-control': 'no-store' } as const;
 
@@ -22,22 +15,17 @@ export async function GET(request: Request) {
   const access = await requireWorkspace(request);
   if (!access) return unauthorized();
 
-  const rows = (await sql`
-    SELECT page_id, page_name, access_token
-    FROM facebook_connections
-    WHERE workspace_id = ${access.workspace.id}
-    LIMIT 1`) as unknown as ConnectionRow[];
-
-  const connection = rows[0];
-  if (!connection) {
+  // Report on the page the workspace publishes as, not the legacy
+  // facebook_connections row, so analytics follow the selected page.
+  const [target] = await resolvePageTargets(access.workspace.id);
+  if (!target) {
     return NextResponse.json({ connected: false }, { headers: NO_STORE });
   }
 
   try {
-    const token = decryptToken(connection.access_token);
     const [audience, activity] = await Promise.all([
-      fetchPageAudience(connection.page_id, token),
-      fetchPageActivity(connection.page_id, token),
+      fetchPageAudience(target.id, target.accessToken),
+      fetchPageActivity(target.id, target.accessToken),
     ]);
 
     return NextResponse.json(
@@ -62,7 +50,7 @@ export async function GET(request: Request) {
       {
         connected: true,
         available: false,
-        pageName: connection.page_name,
+        pageName: target.name,
         reason,
       },
       { headers: NO_STORE }
