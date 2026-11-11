@@ -75,15 +75,24 @@ The Downloads page queues video jobs in the shared database; a local worker on
 your Mac runs yt-dlp and uploads the finished file to Vercel Blob, so downloads
 work from both the live app and local development.
 
-Start the worker and keep it running while you download:
+Install it once as a macOS LaunchAgent so queued downloads are picked up
+automatically — it starts at login and restarts if it crashes:
 
 ```bash
-node --env-file=.env.local download-worker.ts
+npm run worker:install
+```
+
+Or run it manually in a terminal (and keep it open while you download):
+
+```bash
+npm run worker
 ```
 
 It needs `DATABASE_URL` and `BLOB_READ_WRITE_TOKEN` in `.env.local`, plus yt-dlp
 in the Python environment at `~/python-project/Projects/YT_DLP/my_venv` (override
-with `YTDLP_PYTHON`). Videos save to
+with `YTDLP_PYTHON`). Check on the installed agent with
+`scripts/install-download-worker.sh --status`; logs land in
+`~/Library/Logs/ph-news-workbench-download-worker.log`. Videos save to
 `~/Downloads/VideoDownloader/<platform>/<job-id>` (override with
 `VIDEO_DOWNLOADER_ROOT`) and then sync to the workspace's cloud library, where
 the live app previews and serves them.
