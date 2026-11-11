@@ -222,12 +222,15 @@ export function ComposerCard({
   title,
   badge,
   aside,
+  asideWidth,
   children,
 }: {
   icon: React.ReactNode;
   title: string;
   badge?: string;
   aside?: React.ReactNode;
+  /** Grid template for the aside column; defaults to the shared 240px rail. */
+  asideWidth?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -246,7 +249,7 @@ export function ComposerCard({
       <div
         className={cn(
           'grid gap-5 p-5',
-          aside && 'lg:grid-cols-[minmax(0,1fr)_240px]'
+          aside && (asideWidth ?? 'lg:grid-cols-[minmax(0,1fr)_240px]')
         )}
       >
         <div className="min-w-0 space-y-4">{children}</div>

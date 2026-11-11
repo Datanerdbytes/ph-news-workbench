@@ -191,6 +191,7 @@ export default function VideosPage() {
         title="New video"
         badge="MP4/MOV · 1 GB max"
         aside={videoAside}
+        asideWidth="lg:grid-cols-[minmax(0,1fr)_320px]"
       >
         <FilePicker
           id="video-file"

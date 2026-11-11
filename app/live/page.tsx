@@ -214,6 +214,7 @@ export default function LivePage() {
           icon={<Radio className="size-4" />}
           title="Create live stream"
           aside={liveAside}
+          asideWidth="lg:grid-cols-[minmax(0,1fr)_320px]"
         >
           <div>
             <FieldLabel htmlFor="live-title" hint={`${title.length}/200`}>
