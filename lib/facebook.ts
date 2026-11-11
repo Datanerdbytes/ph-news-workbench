@@ -9,13 +9,11 @@ export const MAX_POST_IMAGES = 10;
 // without it /me/accounts omits those Pages entirely.
 export const FACEBOOK_SCOPES = [
   'pages_show_list',
+  // Covers reading /{page}/insights for Page metrics; the old read_insights
+  // login scope is deprecated and now rejected as an invalid scope.
   'pages_read_engagement',
   'pages_manage_posts',
   'business_management',
-  // The analytics page reads /{page}/insights; tokens minted without this
-  // scope get silent empty data instead of an error, so it must ride along
-  // on every grant.
-  'read_insights',
 ] as const;
 
 export class FacebookApiError extends Error {
