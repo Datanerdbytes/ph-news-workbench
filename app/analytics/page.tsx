@@ -6,12 +6,44 @@ import {
   CircleAlert,
   CircleCheck,
   FileText,
+  Heart,
+  MessageCircle,
+  Newspaper,
+  Share2,
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { useFacebookConnection } from "@/components/facebook-connection";
+import { PlatformMark } from "@/components/platform-mark";
 import { cn } from "cn";
+
+type TopPost = {
+  id: string;
+  message: string | null;
+  permalinkUrl: string | null;
+  createdAt: string;
+  shares: number | null;
+  reactions: number | null;
+  comments: number | null;
+};
+
+type InstagramPost = {
+  id: string;
+  caption: string | null;
+  permalink: string | null;
+  timestamp: string;
+  mediaType: string | null;
+  likes: number | null;
+  comments: number | null;
+};
+
+type InstagramOverview = {
+  username: string | null;
+  followers: number | null;
+  mediaCount: number | null;
+  recent: InstagramPost[];
+};
 
 type Totals = {
   drafts: number;
@@ -37,8 +69,20 @@ type PageInsights = {
   followers?: number | null;
   engagements7d?: number | null;
   mediaViews7d?: number | null;
+  topPosts?: TopPost[] | null;
+  topPostsError?: string | null;
+  instagram?: InstagramOverview | null;
+  instagramError?: string | null;
   reason?: string;
 };
+
+function shortDate(iso: string) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+  });
+}
 
 function lastFourteenDays() {
   const days: string[] = [];
@@ -202,6 +246,7 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="flex min-w-0 flex-col gap-3">
           <section className="rounded-xl border border-border bg-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -261,6 +306,79 @@ export default function AnalyticsPage() {
             </div>
           </section>
 
+          <section className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h2 className="text-[13px] font-semibold">Top posts</h2>
+                <p className="text-[10.5px] text-muted-foreground">
+                  Latest Facebook posts and how they landed
+                </p>
+              </div>
+              {insights?.topPosts?.length ? (
+                <Newspaper className="size-4 text-brand" aria-hidden />
+              ) : null}
+            </div>
+
+            {insights?.topPosts?.length ? (
+              <ul className="mt-3 flex flex-col gap-2">
+                {insights.topPosts.map((post) => (
+                  <li
+                    key={post.id}
+                    className="rounded-lg border border-border bg-surface-2 px-2.5 py-2"
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
+                        {shortDate(post.createdAt)}
+                      </p>
+                      <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground">
+                        {post.reactions !== null && (
+                          <span className="inline-flex items-center gap-1">
+                            <Heart className="size-3" aria-hidden />
+                            {post.reactions}
+                          </span>
+                        )}
+                        {post.comments !== null && (
+                          <span className="inline-flex items-center gap-1">
+                            <MessageCircle className="size-3" aria-hidden />
+                            {post.comments}
+                          </span>
+                        )}
+                        {post.shares !== null && (
+                          <span className="inline-flex items-center gap-1">
+                            <Share2 className="size-3" aria-hidden />
+                            {post.shares}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-[11.5px] leading-snug text-foreground">
+                      {post.message?.trim() || "(no text — media post)"}
+                    </p>
+                    {post.permalinkUrl && (
+                      <a
+                        href={post.permalinkUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-block text-[10px] font-semibold text-brand hover:underline"
+                      >
+                        View post
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                {insights?.topPostsError
+                  ? `Posts are unavailable right now: ${insights.topPostsError}`
+                  : insights?.connected
+                    ? "No published posts yet — publish one and it will show up here."
+                    : "Connect a Facebook Page to see its posts."}
+              </p>
+            )}
+          </section>
+          </div>
+
           <div className="flex flex-col gap-3">
             <section className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
@@ -296,6 +414,86 @@ export default function AnalyticsPage() {
                   />
                   <Metric label="Media views" value={insights?.mediaViews7d} />
                 </dl>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="flex items-center gap-1.5 text-[13px] font-semibold">
+                    <PlatformMark platform="instagram" className="size-3.5" />
+                    Instagram
+                  </h2>
+                  <p className="text-[10.5px] text-muted-foreground">
+                    {insights?.instagram?.username
+                      ? `@${insights.instagram.username}`
+                      : "Linked to your Facebook Page"}
+                  </p>
+                </div>
+                {insights?.instagram && (
+                  <span className="rounded-full bg-success/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-success">
+                    Live
+                  </span>
+                )}
+              </div>
+
+              {insights?.instagram ? (
+                <>
+                  <dl className="mt-3 grid grid-cols-2 gap-3">
+                    <Metric
+                      label="Followers"
+                      value={insights.instagram.followers}
+                    />
+                    <Metric
+                      label="Posts"
+                      value={insights.instagram.mediaCount}
+                    />
+                  </dl>
+                  {insights.instagram.recent.length > 0 && (
+                    <ul className="mt-3 flex flex-col gap-1.5">
+                      {insights.instagram.recent.slice(0, 3).map((post) => (
+                        <li
+                          key={post.id}
+                          className="rounded-lg border border-border bg-surface-2 px-2.5 py-1.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
+                              {shortDate(post.timestamp)}
+                              {post.mediaType
+                                ? ` · ${post.mediaType === "VIDEO" ? "Reel" : post.mediaType === "CAROUSEL_ALBUM" ? "Carousel" : "Post"}`
+                                : ""}
+                            </p>
+                            <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground">
+                              {post.likes !== null && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Heart className="size-3" aria-hidden />
+                                  {post.likes}
+                                </span>
+                              )}
+                              {post.comments !== null && (
+                                <span className="inline-flex items-center gap-1">
+                                  <MessageCircle className="size-3" aria-hidden />
+                                  {post.comments}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {post.caption && (
+                            <p className="mt-0.5 line-clamp-1 text-[10.5px] text-muted-foreground">
+                              {post.caption}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  {insights?.instagramError
+                    ? `Instagram insights are unavailable right now: ${insights.instagramError}`
+                    : "No professional Instagram account is linked to your Facebook Pages yet."}
+                </p>
               )}
             </section>
 

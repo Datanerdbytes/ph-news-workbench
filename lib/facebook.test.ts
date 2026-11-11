@@ -10,6 +10,8 @@ import {
   facebookRedirectUri,
   graphDelete,
   graphRequest,
+  fetchInstagramOverview,
+  fetchPageTopPosts,
   isFacebookLiveStarted,
   isFacebookPostPublished,
   isFacebookStillScheduled,
@@ -357,5 +359,115 @@ describe("isFacebookStillScheduled", () => {
 
     fetchMock().mockResolvedValue(graphError(190, "Session expired"));
     await expect(isFacebookStillScheduled("pg1", "ctr1", "tok")).resolves.toBeNull();
+  });
+});
+
+describe("fetchPageTopPosts", () => {
+  it("maps posts and retries without summaries when the edge rejects them", async () => {
+    const mock = fetchMock();
+    mock
+      .mockResolvedValueOnce(graphError(10, "needs pages_read_user_content"))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [
+            {
+              id: "p1",
+              message: "Hello",
+              permalink_url: "https://facebook.com/p1",
+              created_time: "2026-11-10T04:17:11+0000",
+              shares: { count: 2 },
+            },
+          ],
+        })
+      );
+
+    const posts = await fetchPageTopPosts("page-1", "tok");
+    expect(posts).toEqual([
+      {
+        id: "p1",
+        message: "Hello",
+        permalinkUrl: "https://facebook.com/p1",
+        createdAt: "2026-11-10T04:17:11+0000",
+        shares: 2,
+        reactions: null,
+        comments: null,
+      },
+    ]);
+    expect(mock).toHaveBeenCalledTimes(2);
+    const firstUrl = new URL(String(mock.mock.calls[0][0]));
+    const retryUrl = new URL(String(mock.mock.calls[1][0]));
+    expect(firstUrl.searchParams.get("fields")).toContain("likes.summary");
+    expect(retryUrl.searchParams.get("fields")).not.toContain("summary");
+  });
+
+  it("keeps reaction and comment counts when summaries are granted", async () => {
+    const mock = fetchMock();
+    mock.mockResolvedValueOnce(
+      jsonResponse({
+        data: [
+          {
+            id: "p1",
+            created_time: "2026-11-10T04:17:11+0000",
+            likes: { summary: { total_count: 7 } },
+            comments: { summary: { total_count: 1 } },
+          },
+        ],
+      })
+    );
+
+    const posts = await fetchPageTopPosts("page-1", "tok");
+    expect(posts[0]).toMatchObject({ reactions: 7, comments: 1 });
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("fetchInstagramOverview", () => {
+  it("returns null when the page has no linked Instagram account", async () => {
+    fetchMock().mockResolvedValue(jsonResponse({ id: "page-1" }));
+    await expect(fetchInstagramOverview("page-1", "tok")).resolves.toBeNull();
+  });
+
+  it("maps the account snapshot and recent media", async () => {
+    const mock = fetchMock();
+    mock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          instagram_business_account: {
+            id: "ig-1",
+            username: "neuralverse",
+            followers_count: 95,
+            media_count: 73,
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: [
+            {
+              id: "m1",
+              caption: "Reel caption",
+              permalink: "https://instagram.com/reel/m1",
+              timestamp: "2025-10-21T16:07:44+0000",
+              media_type: "VIDEO",
+              like_count: 3,
+              comments_count: 0,
+            },
+          ],
+        })
+      );
+
+    const overview = await fetchInstagramOverview("page-1", "tok");
+    expect(overview).toMatchObject({
+      username: "neuralverse",
+      followers: 95,
+      mediaCount: 73,
+    });
+    expect(overview?.recent[0]).toMatchObject({
+      id: "m1",
+      mediaType: "VIDEO",
+      likes: 3,
+      comments: 0,
+    });
+    expect(lastRequestedUrl(mock).pathname).toBe("/v23.0/ig-1/media");
   });
 });

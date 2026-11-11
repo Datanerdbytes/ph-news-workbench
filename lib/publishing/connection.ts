@@ -200,7 +200,8 @@ async function fetchPagePictureUrl(
 
 export async function resolvePageTargets(
   workspaceId: string,
-  requestedIds: string[] = []
+  requestedIds: string[] = [],
+  { all = false }: { all?: boolean } = {}
 ): Promise<PageTarget[]> {
   const rows = (await sql`
     SELECT page_id, page_name, access_token, is_primary
@@ -221,9 +222,11 @@ export async function resolvePageTargets(
     pages = fallback.map((row) => ({ ...row, is_primary: true }));
   }
 
-  const selected = requestedIds.length
-    ? pages.filter((page) => requestedIds.includes(page.page_id))
-    : pages.filter((page) => page.is_primary).slice(0, 1);
+  const selected = all
+    ? pages
+    : requestedIds.length
+      ? pages.filter((page) => requestedIds.includes(page.page_id))
+      : pages.filter((page) => page.is_primary).slice(0, 1);
 
   return selected.slice(0, 10).map((page) => ({
     id: page.page_id,

@@ -12,6 +12,12 @@ export const FACEBOOK_SCOPES = [
   // Covers reading /{page}/insights for Page metrics; the old read_insights
   // login scope is deprecated and now rejected as an invalid scope.
   'pages_read_engagement',
+  // NOTE: neither pages_read_user_content (reaction/comment summaries on
+  // /posts) nor instagram_insights (IG reach series) can be requested —
+  // Meta rejects both as invalid scopes for this app, and one bad scope
+  // fails the whole OAuth dialog. fetchPageTopPosts already retries
+  // without the summaries; if the app later passes App Review for these,
+  // add them here and reconnect to unlock the richer counts.
   'pages_manage_posts',
   'business_management',
 ] as const;
@@ -360,6 +366,170 @@ export async function fetchPageActivity(
   ]);
 
   return { engagements7d, mediaViews7d };
+}
+
+export type TopPost = {
+  id: string;
+  message: string | null;
+  permalinkUrl: string | null;
+  createdAt: string;
+  shares: number | null;
+  reactions: number | null;
+  comments: number | null;
+};
+
+type PostsEdgeBody = {
+  data?: {
+    id?: string;
+    message?: string;
+    permalink_url?: string;
+    created_time?: string;
+    shares?: { count?: number };
+    likes?: { summary?: { total_count?: number } };
+    comments?: { summary?: { total_count?: number } };
+  }[];
+};
+
+const TOP_POST_FIELDS = [
+  'id',
+  'message',
+  'permalink_url',
+  'created_time',
+  'shares',
+] as const;
+
+/**
+ * Recent published posts with the engagement that is readable today. Reaction
+ * and comment summaries additionally need pages_read_user_content; when the
+ * grant lacks them the summaries 400 the whole edge call, so they are
+ * requested optimistically and the request retried without them.
+ */
+export async function fetchPageTopPosts(
+  pageId: string,
+  accessToken: string,
+  limit = 5
+): Promise<TopPost[]> {
+  const enrichedFields = [
+    ...TOP_POST_FIELDS,
+    'likes.summary(true).limit(0)',
+    'comments.summary(true).limit(0)',
+  ].join(',');
+
+  let body: PostsEdgeBody;
+  try {
+    body = await graphRequest<PostsEdgeBody>(
+      `${pageId}/posts`,
+      { fields: enrichedFields, limit: String(limit) },
+      accessToken
+    );
+  } catch {
+    body = await graphRequest<PostsEdgeBody>(
+      `${pageId}/posts`,
+      { fields: TOP_POST_FIELDS.join(','), limit: String(limit) },
+      accessToken
+    );
+  }
+
+  return (body.data ?? [])
+    .filter((post) => typeof post.id === 'string')
+    .map((post) => ({
+      id: post.id!,
+      message: post.message ?? null,
+      permalinkUrl: post.permalink_url ?? null,
+      createdAt: post.created_time ?? '',
+      shares: typeof post.shares?.count === 'number' ? post.shares.count : null,
+      reactions:
+        typeof post.likes?.summary?.total_count === 'number'
+          ? post.likes.summary.total_count
+          : null,
+      comments:
+        typeof post.comments?.summary?.total_count === 'number'
+          ? post.comments.summary.total_count
+          : null,
+    }));
+}
+
+export type InstagramOverview = {
+  username: string | null;
+  followers: number | null;
+  mediaCount: number | null;
+  recent: {
+    id: string;
+    caption: string | null;
+    permalink: string | null;
+    timestamp: string;
+    mediaType: string | null;
+    likes: number | null;
+    comments: number | null;
+  }[];
+};
+
+type InstagramAccountBody = {
+  instagram_business_account?: {
+    id?: string;
+    username?: string;
+    followers_count?: number;
+    media_count?: number;
+  };
+};
+
+type InstagramMediaBody = {
+  data?: {
+    id?: string;
+    caption?: string;
+    permalink?: string;
+    timestamp?: string;
+    media_type?: string;
+    like_count?: number;
+    comments_count?: number;
+  }[];
+};
+
+/**
+ * Snapshot of the professional Instagram account linked to the page, plus its
+ * most recent posts with engagement. Returns null when no IG account is
+ * linked; account-level insights (reach, profile views) additionally need the
+ * instagram_insights scope and are not fetched here.
+ */
+export async function fetchInstagramOverview(
+  pageId: string,
+  accessToken: string
+): Promise<InstagramOverview | null> {
+  const account = await graphRequest<InstagramAccountBody>(
+    pageId,
+    { fields: 'instagram_business_account{id,username,followers_count,media_count}' },
+    accessToken
+  );
+  const ig = account.instagram_business_account;
+  if (!ig?.id) return null;
+
+  const media = await graphRequest<InstagramMediaBody>(
+    `${ig.id}/media`,
+    {
+      fields: 'id,caption,permalink,timestamp,media_type,like_count,comments_count',
+      limit: '5',
+    },
+    accessToken
+  );
+
+  return {
+    username: ig.username ?? null,
+    followers:
+      typeof ig.followers_count === 'number' ? ig.followers_count : null,
+    mediaCount: typeof ig.media_count === 'number' ? ig.media_count : null,
+    recent: (media.data ?? [])
+      .filter((item) => typeof item.id === 'string')
+      .map((item) => ({
+        id: item.id!,
+        caption: item.caption ?? null,
+        permalink: item.permalink ?? null,
+        timestamp: item.timestamp ?? '',
+        mediaType: item.media_type ?? null,
+        likes: typeof item.like_count === 'number' ? item.like_count : null,
+        comments:
+          typeof item.comments_count === 'number' ? item.comments_count : null,
+      })),
+  };
 }
 
 export function toArrayBuffer(bytes: Buffer): ArrayBuffer {
