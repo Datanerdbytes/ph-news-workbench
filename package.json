@@ -11,6 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "worker": "node --env-file=.env.local download-worker.ts",
+    "worker:install": "bash scripts/install-download-worker.sh",
     "prepare": "husky"
   },
   "dependencies": {

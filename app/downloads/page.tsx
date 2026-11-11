@@ -612,9 +612,9 @@ export default function DownloadsPage() {
                 </p>
                 {activeDownload.status === "queued" && (
                   <p className="mt-1.5 text-[9.5px] leading-relaxed text-muted-foreground">
-                    Still queued? Start the worker on your Mac:{" "}
+                    Still queued? Install the auto-start worker on your Mac:{" "}
                     <code className="rounded bg-white px-1 py-0.5 font-mono text-[9px]">
-                      node --env-file=.env.local download-worker.ts
+                      npm run worker:install
                     </code>
                   </p>
                 )}
