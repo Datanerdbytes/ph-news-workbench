@@ -15,6 +15,7 @@ import {
   ResultList,
   ScheduleField,
   defaultScheduleValue,
+  resolveScheduledFor,
   inputClass,
   textareaClass,
   useManagedPages,
@@ -30,6 +31,7 @@ export default function PostPage() {
   const [link, setLink] = useState('');
   const [scheduleOn, setScheduleOn] = useState(false);
   const [scheduledFor, setScheduledFor] = useState(defaultScheduleValue);
+  const [scheduleError, setScheduleError] = useState('');
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PublishResult[] | null>(null);
 
@@ -38,6 +40,17 @@ export default function PostPage() {
 
   async function post() {
     if (!canPublish) return;
+    let scheduledForIso: string | null = null;
+    if (scheduleOn) {
+      scheduledForIso = resolveScheduledFor(scheduledFor);
+      if (!scheduledForIso) {
+        setScheduleError(
+          'Pick a time between 10 minutes and 75 days from now.'
+        );
+        return;
+      }
+      setScheduleError('');
+    }
     setBusy(true);
     setResults(null);
     try {
@@ -48,8 +61,8 @@ export default function PostPage() {
           message,
           link: link.trim(),
           pageIds: pages.selected,
-          ...(scheduleOn
-            ? { scheduledFor: new Date(scheduledFor).toISOString() }
+          ...(scheduledForIso
+            ? { scheduledFor: scheduledForIso }
             : {}),
         }),
       });
@@ -61,6 +74,9 @@ export default function PostPage() {
       });
       setMessage('');
       setLink('');
+      // The next post publishes now unless scheduling is deliberately re-enabled.
+      setScheduleOn(false);
+      setScheduleError('');
     } catch (error) {
       toast.error('Post failed', {
         description:
@@ -138,7 +154,11 @@ export default function PostPage() {
           enabled={scheduleOn}
           onEnabled={setScheduleOn}
           value={scheduledFor}
-          onChange={setScheduledFor}
+          onChange={(next) => {
+            setScheduledFor(next);
+            setScheduleError('');
+          }}
+          error={scheduleError}
         />
 
         <div className="flex flex-wrap items-center gap-2">

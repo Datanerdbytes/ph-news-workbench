@@ -17,6 +17,7 @@ import {
   ResultList,
   ScheduleField,
   defaultScheduleValue,
+  resolveScheduledFor,
   textareaClass,
   useManagedPages,
   type PublishResult,
@@ -39,9 +40,14 @@ export default function ReelsPage() {
   const [caption, setCaption] = useState('');
   const [scheduleOn, setScheduleOn] = useState(false);
   const [scheduledFor, setScheduledFor] = useState(defaultScheduleValue);
+  const [scheduleError, setScheduleError] = useState('');
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PublishResult[] | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  // Each pick/clear bumps this; an in-flight normalization whose generation
+  // is stale must not touch state (previously a cleared file "resurrected"
+  // when its async normalize completed).
+  const pickGeneration = useRef(0);
 
   const [presetId, setPresetId] = useState<string | null>(null);
   const [presetValues, setPresetValues] = useState<Record<string, PresetValues>>(
@@ -59,6 +65,7 @@ export default function ReelsPage() {
    * for clips the browser cannot play; playable originals pass through as-is.
    */
   const handlePick = useCallback(async (picked: File | null) => {
+    const generation = ++pickGeneration.current;
     setFile(picked);
     if (!picked) return;
     setNormalizing(true);
@@ -69,6 +76,7 @@ export default function ReelsPage() {
         normalized: didNormalize,
         error,
       } = await normalizeVideo(picked, picked.name, setNormalizePct);
+      if (generation !== pickGeneration.current) return;
       setFile(normalized);
       if (error) throw new Error(error);
       if (didNormalize) {
@@ -77,15 +85,27 @@ export default function ReelsPage() {
         });
       }
     } catch (error) {
+      if (generation !== pickGeneration.current) return;
       toast.warning('Using the original video', {
         description:
           error instanceof Error ? error.message : 'Normalization failed.',
       });
     } finally {
-      setNormalizing(false);
-      setNormalizePct(null);
+      if (generation === pickGeneration.current) {
+        setNormalizing(false);
+        setNormalizePct(null);
+      }
     }
   }, []);
+
+  function clearFile() {
+    // Invalidates any in-flight normalization so the cleared file can't
+    // come back when the async work settles.
+    pickGeneration.current += 1;
+    setFile(null);
+    setNormalizing(false);
+    setNormalizePct(null);
+  }
 
   // A download handed over from the Downloads page arrives as ?video=<jobId>.
   useEffect(() => {
@@ -121,10 +141,21 @@ export default function ReelsPage() {
   }, [file]);
 
   async function post() {
-    if (!file) return;
+    if (!file || normalizing) return;
     if (file.size > MAX_BYTES) {
       toast.error('Reels must be 1 GB or smaller.');
       return;
+    }
+    let scheduledForIso: string | null = null;
+    if (scheduleOn) {
+      scheduledForIso = resolveScheduledFor(scheduledFor);
+      if (!scheduledForIso) {
+        setScheduleError(
+          'Pick a time between 10 minutes and 75 days from now.'
+        );
+        return;
+      }
+      setScheduleError('');
     }
     setBusy(true);
     setResults(null);
@@ -180,8 +211,8 @@ export default function ReelsPage() {
           videoType: uploadFile.type || 'video/mp4',
           caption,
           pageIds: pages.selected,
-          ...(scheduleOn
-            ? { scheduledFor: new Date(scheduledFor).toISOString() }
+          ...(scheduledForIso
+            ? { scheduledFor: scheduledForIso }
             : {}),
         }),
       });
@@ -194,6 +225,7 @@ export default function ReelsPage() {
       );
       setFile(null);
       setCaption('');
+      setScheduleOn(false);
     } catch (error) {
       toast.error('Reel upload failed', {
         description:
@@ -226,7 +258,7 @@ export default function ReelsPage() {
           hint="3s–45min"
           file={file}
           onPick={handlePick}
-          onClear={() => setFile(null)}
+          onClear={clearFile}
           icon={<Video className="size-3.5" />}
         />
         {normalizing && (
@@ -275,7 +307,11 @@ export default function ReelsPage() {
           enabled={scheduleOn}
           onEnabled={setScheduleOn}
           value={scheduledFor}
-          onChange={setScheduledFor}
+          onChange={(next) => {
+            setScheduledFor(next);
+            setScheduleError('');
+          }}
+          error={scheduleError}
         />
 
         <div className="flex flex-wrap items-center gap-2">
@@ -283,18 +319,22 @@ export default function ReelsPage() {
             variant="brand"
             size="sm"
             onClick={post}
-            disabled={!file || busy || !pages.selected.length}
+            disabled={
+              !file || normalizing || busy || !pages.selected.length
+            }
           >
             <Video className="size-3.5" aria-hidden />
             {uploadPct != null
               ? `Staging ${Math.round(uploadPct)}%…`
               : renderPct != null
                 ? `Rendering ${Math.round(renderPct * 100)}%…`
-                : busy
-                  ? 'Publishing…'
-                  : scheduleOn
-                    ? 'Schedule reel'
-                    : 'Post reel'}
+                : normalizing
+                  ? 'Normalizing…'
+                  : busy
+                    ? 'Publishing…'
+                    : scheduleOn
+                      ? 'Schedule reel'
+                      : 'Post reel'}
           </Button>
           <span className="text-[10px] text-muted-foreground">
             {uploadPct != null
