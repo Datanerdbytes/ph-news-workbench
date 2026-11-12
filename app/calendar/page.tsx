@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { Button } from "@/components/ui/button";
 import { ConfirmIconButton } from "@/components/ui/confirm-button";
+import { ErrorState } from "@/components/ui/error-state";
 import { StatusPill } from "@/components/status-pill";
 import { cn } from "cn";
 import { formatDateTime } from "@/lib/format";
@@ -50,6 +51,7 @@ export default function CalendarPage() {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [runningDue, setRunningDue] = useState(false);
   // One shared clock for every "is it due yet?" comparison in the render —
   // refreshed on the same minute cadence as load().
@@ -61,8 +63,10 @@ export default function CalendarPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not load the calendar.");
       setPosts(Array.isArray(data) ? data : []);
+      setLoadError(false);
     } catch (error) {
       if (quiet) return;
+      setLoadError(true);
       toast.error("Could not load the calendar", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
@@ -406,6 +410,12 @@ export default function CalendarPage() {
                     );
                   })}
                 </ul>
+              ) : loadError ? (
+                <ErrorState
+                  compact
+                  title="Couldn't load the calendar"
+                  onRetry={() => load()}
+                />
               ) : (
                 <div className="px-4 py-8 text-center">
                   <CalendarDays className="mx-auto size-5 text-faint" aria-hidden />

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { AssistantChat } from '@/components/assistant-chat';
 import { Button } from '@/components/ui/button';
 import { ConfirmButton } from '@/components/ui/confirm-button';
+import { ErrorState } from '@/components/ui/error-state';
 import { cn } from 'cn';
 import {
   ComposerCard,
@@ -58,6 +59,7 @@ export default function LivePage() {
   const [streams, setStreams] = useState<Stream[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [fresh, setFresh] = useState<Stream | null>(null);
 
   const [title, setTitle] = useState('');
@@ -72,7 +74,9 @@ export default function LivePage() {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? 'Could not load live streams.');
       setStreams(data.streams ?? []);
+      setLoadError(false);
     } catch (error) {
+      setLoadError(true);
       toast.error('Live streams unavailable', {
         description: error instanceof Error ? error.message : undefined,
       });
@@ -325,7 +329,14 @@ export default function LivePage() {
                 Loading live streams…
               </p>
             )}
-            {!loading && !streams.length && (
+            {!loading && !streams.length && loadError && (
+              <ErrorState
+                compact
+                title="Couldn't load live streams"
+                onRetry={() => load()}
+              />
+            )}
+            {!loading && !streams.length && !loadError && (
               <p className="px-5 py-6 text-xs text-muted-foreground">
                 No live streams yet. Create one above to get an RTMPS server and key.
               </p>

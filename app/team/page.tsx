@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
+import { ErrorState } from "@/components/ui/error-state";
 import { cn } from "cn";
 import { formatDateTime } from "@/lib/format";
 
@@ -36,6 +37,7 @@ export default function TeamPage() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [role, setRole] = useState("editor");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -53,7 +55,9 @@ export default function TeamPage() {
       setMembers(Array.isArray(memberData.members) ? memberData.members : []);
       setInvites(Array.isArray(inviteData.invites) ? inviteData.invites : []);
       setRole(memberData.role ?? "editor");
+      setLoadError(false);
     } catch (error) {
+      setLoadError(true);
       toast.error("Could not load the team", {
         description: error instanceof Error ? error.message : "Please try again.",
       });
@@ -136,17 +140,17 @@ export default function TeamPage() {
         <div className="mt-5 grid grid-cols-3 gap-2.5">
           <SummaryCard
             label="Members"
-            value={loading ? "—" : String(members.length)}
+            value={loading || loadError ? "—" : String(members.length)}
             icon={Users}
           />
           <SummaryCard
             label="Open invites"
-            value={loading ? "—" : String(invites.length)}
+            value={loading || loadError ? "—" : String(invites.length)}
             icon={Mail}
           />
           <SummaryCard
             label="Your role"
-            value={loading ? "—" : role === "owner" ? "Owner" : "Editor"}
+            value={loading || loadError ? "—" : role === "owner" ? "Owner" : "Editor"}
             icon={ShieldCheck}
           />
         </div>
@@ -165,6 +169,12 @@ export default function TeamPage() {
                   </div>
                 ))}
               </div>
+            ) : loadError ? (
+              <ErrorState
+                compact
+                title="Couldn't load members"
+                onRetry={load}
+              />
             ) : (
               <ul className="divide-y divide-border">
                 {members.map((member) => (
@@ -211,6 +221,12 @@ export default function TeamPage() {
               <div className="animate-pulse px-4 py-4">
                 <div className="h-3 w-2/3 rounded bg-muted" />
               </div>
+            ) : loadError ? (
+              <ErrorState
+                compact
+                title="Couldn't load invites"
+                onRetry={load}
+              />
             ) : invites.length ? (
               <ul className="divide-y divide-border">
                 {invites.map((invite) => (

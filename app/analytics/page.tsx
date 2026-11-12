@@ -12,10 +12,10 @@ import {
   Share2,
   Sparkles,
 } from "lucide-react";
-import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { useFacebookConnection } from "@/components/facebook-connection";
 import { PlatformMark } from "@/components/platform-mark";
+import { ErrorState } from "@/components/ui/error-state";
 import { cn } from "cn";
 
 type TopPost = {
@@ -112,6 +112,9 @@ export default function AnalyticsPage() {
   const [daily, setDaily] = useState<Day[]>([]);
   const [insights, setInsights] = useState<PageInsights | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [insightsError, setInsightsError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const connection = useFacebookConnection();
 
   useEffect(() => {
@@ -124,17 +127,18 @@ export default function AnalyticsPage() {
       .then((data) => {
         setTotals(data.totals ?? null);
         setDaily(Array.isArray(data.daily) ? data.daily : []);
+        setLoadError(false);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          toast.error("Could not load analytics");
+          setLoadError(true);
         }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, []);
+  }, [reloadKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -142,13 +146,16 @@ export default function AnalyticsPage() {
       signal: controller.signal,
       cache: "no-store",
     })
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("failed"))))
       .then((data) => {
-        if (data) setInsights(data);
+        setInsights(data);
+        setInsightsError(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!controller.signal.aborted) setInsightsError(true);
+      });
     return () => controller.abort();
-  }, []);
+  }, [reloadKey]);
 
   const series = useMemo(() => {
     const byDay = new Map(daily.map((entry) => [entry.day, entry]));
@@ -186,11 +193,21 @@ export default function AnalyticsPage() {
     },
     {
       label: "AI spend",
-      value: totals ? `$${totals.cost.toFixed(3)}` : "$0.000",
-      hint: totals ? `${totals.tokens.toLocaleString()} tokens used` : "No usage yet",
+      value: totals ? `$${totals.cost.toFixed(3)}` : "—",
+      hint: totals
+        ? `${totals.tokens.toLocaleString()} tokens used`
+        : loadError
+          ? "Couldn't load usage"
+          : "No usage yet",
       icon: Sparkles,
     },
   ];
+
+  function retryAnalytics() {
+    setLoading(true);
+    setLoadError(false);
+    setReloadKey((key) => key + 1);
+  }
 
   return (
     <AppFrame>
@@ -235,7 +252,7 @@ export default function AnalyticsPage() {
                   <Icon className="size-4 text-brand" aria-hidden />
                 </div>
                 <p className="mt-2 font-heading text-2xl font-semibold leading-none">
-                  {loading ? "—" : card.value}
+                  {loading || loadError ? "—" : card.value}
                 </p>
                 <p className="mt-1.5 text-[10.5px] text-muted-foreground">
                   {card.hint}
@@ -262,7 +279,15 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex h-40 items-end gap-1.5 sm:gap-2">
+            {loadError ? (
+              <ErrorState
+                compact
+                className="mt-4"
+                title="Couldn't load activity"
+                onRetry={retryAnalytics}
+              />
+            ) : (
+              <div className="mt-4 flex h-40 items-end gap-1.5 sm:gap-2">
               {series.map((entry) => {
                 const total = entry.drafts + entry.published + entry.scheduled;
                 const scale = (value: number) => `${(value / peak) * 100}%`;
@@ -303,7 +328,8 @@ export default function AnalyticsPage() {
                   </div>
                 );
               })}
-            </div>
+              </div>
+            )}
           </section>
 
           <section className="rounded-xl border border-border bg-card p-4">
@@ -403,6 +429,10 @@ export default function AnalyticsPage() {
                 <p className="mt-3 text-[11px] text-muted-foreground">
                   Insights are unavailable right now
                   {insights.reason ? `: ${insights.reason}` : "."}
+                </p>
+              ) : insightsError ? (
+                <p className="mt-3 text-[11px] text-destructive">
+                  Couldn&apos;t load Page insights. Try refreshing the page.
                 </p>
               ) : (
                 <dl className="mt-3 grid grid-cols-2 gap-3">

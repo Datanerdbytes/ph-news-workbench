@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { Button } from "@/components/ui/button";
 import { ConfirmIconButton } from "@/components/ui/confirm-button";
+import { ErrorState } from "@/components/ui/error-state";
 import { cn } from "cn";
 
 type PlatformId = "youtube" | "facebook" | "instagram" | "x" | "reddit" | "tiktok";
@@ -184,6 +185,7 @@ export default function DownloadsPage() {
   const [busy, setBusy] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
+  const [loadError, setLoadError] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewErrorId, setPreviewErrorId] = useState<string | null>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
@@ -207,6 +209,7 @@ export default function DownloadsPage() {
         if (active) {
           const jobs = (data.jobs ?? []) as DownloadRecord[];
           setDownloads(jobs);
+          setLoadError(false);
           const running = jobs.find(
             (job) =>
               job.status === "queued" ||
@@ -223,6 +226,7 @@ export default function DownloadsPage() {
       })
       .catch((error) => {
         if (active) {
+          setLoadError(true);
           toast.error("Could not load recent downloads", {
             description: error instanceof Error ? error.message : undefined,
           });
@@ -867,7 +871,12 @@ export default function DownloadsPage() {
             {downloads.length} {downloads.length === 1 ? "job" : "jobs"}
             </span>
           </div>
-          {downloads.length ? (
+          {loadError ? (
+            <ErrorState
+              compact
+              title="Couldn't load recent downloads"
+            />
+          ) : downloads.length ? (
             <ul className="divide-y divide-border">
             {downloads.map((job) => (
               <li

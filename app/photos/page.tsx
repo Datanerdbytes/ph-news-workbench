@@ -53,6 +53,7 @@ export default function PhotosPage() {
 
   const [albums, setAlbums] = useState<Album[]>([]);
   const [albumsLoaded, setAlbumsLoaded] = useState(false);
+  const [albumsError, setAlbumsError] = useState(false);
   const [albumId, setAlbumId] = useState('');
   const connection = useFacebookConnection();
 
@@ -63,7 +64,9 @@ export default function PhotosPage() {
       if (!res.ok) throw new Error(data?.error ?? 'Could not load albums.');
       setAlbums(data.albums ?? []);
       setAlbumsLoaded(true);
+      setAlbumsError(false);
     } catch (error) {
+      setAlbumsError(true);
       toast.error('Albums unavailable', {
         description: error instanceof Error ? error.message : undefined,
       });
@@ -392,6 +395,18 @@ export default function PhotosPage() {
                       </option>
                     ))}
                   </select>
+                  {albumsError && (
+                    <p className="mt-1.5 text-[11px] text-destructive">
+                      Couldn&apos;t load albums.{' '}
+                      <button
+                        type="button"
+                        className="underline underline-offset-2"
+                        onClick={() => void loadAlbums()}
+                      >
+                        Retry
+                      </button>
+                    </p>
+                  )}
                 </div>
                 {imagePicker}
                 <div>

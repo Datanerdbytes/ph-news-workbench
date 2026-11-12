@@ -95,6 +95,8 @@ function DefaultPagePicker({ connected }: { connected: boolean }) {
 
 export default function SettingsPage() {
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
+  const [workspaceError, setWorkspaceError] = useState(false);
+  const [prefsError, setPrefsError] = useState(false);
   const [name, setName] = useState("");
   const [model, setModel] = useState("");
   const [saving, setSaving] = useState(false);
@@ -118,12 +120,18 @@ export default function SettingsPage() {
     fetch("/api/workspace", { signal: controller.signal, cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!data) return;
+        if (!data) {
+          setWorkspaceError(true);
+          return;
+        }
         setWorkspace(data);
         setName(data.name ?? "");
         setModel(data.aiModel ?? data.defaultModel ?? "");
+        setWorkspaceError(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!controller.signal.aborted) setWorkspaceError(true);
+      });
     return () => controller.abort();
   }, []);
 
@@ -134,9 +142,14 @@ export default function SettingsPage() {
       .then((data) => {
         if (data && isThemeId(data.theme)) {
           setTheme(data.theme);
+          setPrefsError(false);
+        } else if (!data) {
+          setPrefsError(true);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!controller.signal.aborted) setPrefsError(true);
+      });
     return () => controller.abort();
   }, []);
 
@@ -274,6 +287,12 @@ export default function SettingsPage() {
               ? "Shown across the sidebar and shared with your team."
               : "Only workspace owners can rename the workspace."}
           </p>
+          {workspaceError && (
+            <p className="mt-1.5 text-[11px] text-destructive">
+              Couldn&apos;t load your workspace settings — values below may be
+              out of date.
+            </p>
+          )}
           <form onSubmit={saveWorkspace} className="mt-3 flex flex-wrap gap-2">
             <label className="sr-only" htmlFor="workspace-name">
               Workspace name
@@ -394,6 +413,12 @@ export default function SettingsPage() {
           <p className="text-[10.5px] text-muted-foreground">
             Color combination for your account. Applies everywhere you sign in.
           </p>
+          {prefsError && (
+            <p className="mt-1.5 text-[11px] text-destructive">
+              Couldn&apos;t load your saved theme — showing the default until
+              it loads.
+            </p>
+          )}
           <div
             className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
             role="radiogroup"

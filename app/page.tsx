@@ -30,6 +30,7 @@ import {
 import { StatusPill, statusMeta } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { ConfirmIconButton } from '@/components/ui/confirm-button';
+import { ErrorState } from '@/components/ui/error-state';
 import { Input } from '@/components/ui/input';
 import {
   formatCost,
@@ -136,6 +137,8 @@ export default function Home() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [itemsLoading, setItemsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [draftLoadFailed, setDraftLoadFailed] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -158,6 +161,7 @@ export default function Home() {
       const data = await res.json();
       const list: Item[] = Array.isArray(data) ? data : (data.rows ?? []);
       setItems(list);
+      setLoadError(false);
       setNextCursor(typeof data.nextCursor === 'number' ? data.nextCursor : null);
       setHasMore(Boolean(data.hasMore));
       setCounts(data.counts ?? null);
@@ -169,7 +173,7 @@ export default function Home() {
         return list[0] ?? null;
       });
     } catch {
-      toast.error('Could not load the news feed');
+      setLoadError(true);
     } finally {
       setItemsLoading(false);
     }
@@ -237,11 +241,15 @@ export default function Home() {
   }
 
   async function loadSavedDraft(item: Item) {
+    setDraftLoadFailed(false);
     try {
       const res = await fetch(`/api/drafts/${item.draft_id}`, {
         cache: 'no-store',
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setDraftLoadFailed(true);
+        return;
+      }
       const data = await res.json();
       if (selectionRef.current !== item.id) return;
       if (typeof data.text === 'string') setDraft(data.text);
@@ -253,7 +261,8 @@ export default function Home() {
         });
       }
     } catch {
-      // Selection still works; the editor just starts empty.
+      // Selection still works; flag it so the editor isn't mistaken for "no draft yet".
+      setDraftLoadFailed(true);
     }
   }
 
@@ -570,8 +579,9 @@ export default function Home() {
                     Story Queue
                   </h1>
                   <p className="text-sm text-muted-foreground">
-                    {pendingCount} pending · {draftedCount} drafted ·{' '}
-                    {totalStories} total
+                    {loadError ? "—" : pendingCount} pending ·{' '}
+                    {loadError ? "—" : draftedCount} drafted ·{' '}
+                    {loadError ? "—" : totalStories} total
                   </p>
                 </div>
               </div>
@@ -847,6 +857,12 @@ export default function Home() {
                 <div className="mx-auto w-full max-w-[1180px] p-4 sm:p-6">
                 {itemsLoading ? (
                   <WorkspaceSkeleton />
+                ) : loadError ? (
+                  <ErrorState
+                    title="Couldn't load the news feed"
+                    description="Your stories are safe — the feed just couldn't be fetched right now."
+                    onRetry={load}
+                  />
                 ) : !selected ? (
                   <EmptyWorkspace onRefresh={refresh} />
                 ) : (
@@ -938,6 +954,15 @@ export default function Home() {
                       )}
 
                       <div className="p-5">
+                        {draftLoadFailed && !draft && (
+                          <p
+                            role="status"
+                            className="mb-3 flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-[11px] text-destructive"
+                          >
+                            Couldn&apos;t load your saved draft — the editor
+                            started empty. Select the story again to retry.
+                          </p>
+                        )}
                         <textarea
                           value={draft}
                           onChange={(event) => setDraft(event.target.value)}

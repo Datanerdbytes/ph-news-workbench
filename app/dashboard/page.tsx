@@ -21,6 +21,7 @@ import { FacebookMark } from "@/components/facebook-mark";
 import { PlatformMark } from "@/components/platform-mark";
 import { StatusPill } from "@/components/status-pill";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
 import { useFacebookConnection } from "@/components/facebook-connection";
 import { TimeAgo } from "@/components/time-ago";
 import { authClient } from "@/lib/auth-client";
@@ -128,6 +129,7 @@ export default function DashboardPage() {
   const [stories, setStories] = useState<Story[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
@@ -170,7 +172,9 @@ export default function DashboardPage() {
         setNextCursor(null);
         setHasMore(false);
       }
+      setLoadError(false);
     } catch (error) {
+      setLoadError(true);
       toast.error("Could not load the dashboard", {
         description:
           error instanceof Error ? error.message : "Please try again.",
@@ -292,7 +296,9 @@ export default function DashboardPage() {
             <p className="mt-1.5 max-w-2xl text-[12.5px] leading-relaxed text-muted-foreground">
               {loading
                 ? "Loading your workspace…"
-                : `${ready} draft${ready === 1 ? "" : "s"} ready for review, ${pending} stor${
+                : loadError
+                  ? "Couldn't load the workspace just now — try refreshing."
+                  : `${ready} draft${ready === 1 ? "" : "s"} ready for review, ${pending} stor${
                     pending === 1 ? "y" : "ies"
                   } in the story queue. ${
                     connection.loading
@@ -337,21 +343,21 @@ export default function DashboardPage() {
             value={ready}
             hint="Drafts ready to check"
             icon={FileText}
-            loading={loading}
+            loading={loading || loadError}
           />
           <StatCard
             label="Stories in queue"
             value={pending}
             hint={`${stories.length} tracked in total`}
             icon={Newspaper}
-            loading={loading}
+            loading={loading || loadError}
           />
           <StatCard
             label="Failed drafts"
             value={failed}
             hint={failed ? "Needs attention" : "No failures"}
             icon={TriangleAlert}
-            loading={loading}
+            loading={loading || loadError}
             tone={failed ? "text-destructive" : undefined}
           />
           <article className="panel col-span-2 p-4 xl:col-span-1">
@@ -491,6 +497,13 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
+            ) : loadError ? (
+              <ErrorState
+                compact
+                className="m-4"
+                title="Couldn't load recent activity"
+                onRetry={load}
+              />
             ) : (
               <div className="px-4 py-12 text-center">
                 <Clock className="mx-auto size-5 text-faint" aria-hidden />
