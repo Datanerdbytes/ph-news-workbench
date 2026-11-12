@@ -10,6 +10,7 @@ import {
 import { cn } from 'cn';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { focusFirstIn, trapTabFocus } from '@/lib/dialog-a11y';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -40,6 +41,11 @@ export function AssistantChat({
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  // The FAB stays mounted (hidden while the dialog is open) so focus can
+  // return to it on close instead of dropping to <body>.
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
 
   useEffect(() => {
     setMessages([]);
@@ -51,11 +57,27 @@ export function AssistantChat({
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, busy, open]);
 
+  // Move focus into the dialog on open; restore it to the FAB on close.
+  useEffect(() => {
+    if (open) {
+      wasOpen.current = true;
+      if (panelRef.current) focusFirstIn(panelRef.current);
+      return;
+    }
+    if (!wasOpen.current) return;
+    wasOpen.current = false;
+    fabRef.current?.focus();
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') {
+        setOpen(false);
+        return;
+      }
+      if (panelRef.current) trapTabFocus(panelRef.current, event);
     }
 
     window.addEventListener('keydown', onKeyDown);
@@ -121,27 +143,30 @@ export function AssistantChat({
 
   return (
     <>
-      {!open && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-haspopup="dialog"
-          className="group fixed bottom-5 right-5 z-[60] flex items-center gap-2.5 rounded-full border border-ink/10 bg-ink py-1.5 pl-1.5 pr-2.5 text-paper shadow-paper-sm transition-all hover:-translate-y-0.5 hover:shadow-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:pr-4"
-        >
-          <span className="grid size-9 place-items-center rounded-full bg-brand">
-            <Sparkles className="size-4" aria-hidden />
-          </span>
-          <span className="hidden text-[13px] font-semibold sm:block">
-            Ask AI
-          </span>
-          <span className="sr-only sm:hidden">Open the AI assistant</span>
-        </button>
-      )}
+      <button
+        type="button"
+        ref={fabRef}
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        className={cn(
+          "group fixed bottom-5 right-5 z-[60] flex items-center gap-2.5 rounded-full border border-ink/10 bg-ink py-1.5 pl-1.5 pr-2.5 text-paper shadow-paper-sm transition-all hover:-translate-y-0.5 hover:shadow-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:pr-4",
+          open && "hidden"
+        )}
+      >
+        <span className="grid size-9 place-items-center rounded-full bg-brand">
+          <Sparkles className="size-4" aria-hidden />
+        </span>
+        <span className="hidden text-[13px] font-semibold sm:block">
+          Ask AI
+        </span>
+        <span className="sr-only sm:hidden">Open the AI assistant</span>
+      </button>
 
       {open && (
         <div className="fixed inset-x-3 bottom-3 z-[60] sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-[392px]">
           <section
             id={PANEL_ID}
+            ref={panelRef}
             role="dialog"
             aria-label="AI assistant"
             className="flex max-h-[min(72vh,600px)] flex-col overflow-hidden rounded-xl border border-border/80 bg-card paper-shadow"
