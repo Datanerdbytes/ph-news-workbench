@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "cn";
 import { notificationSeverity } from "@/lib/notification-meta";
+import { focusFirstIn, useDismissable } from "@/lib/dialog-a11y";
 import { TimeAgo } from "@/components/time-ago";
 
 type NotificationRow = {
@@ -114,6 +115,8 @@ export function NotificationBell() {
   const [unread, setUnread] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   // Keep the polling fetch stable: the router comes from context and its
   // push is only needed inside the toast action, so hold it in a ref instead
   // of depending on the instance identity.
@@ -174,22 +177,19 @@ export function NotificationBell() {
     setOpen(false);
   }, [pathname]);
 
+  const closePanel = useCallback(
+    (reason: "escape" | "outside") => {
+      setOpen(false);
+      if (reason === "escape") triggerRef.current?.focus();
+    },
+    [setOpen]
+  );
+
+  useDismissable(open, closePanel, containerRef);
+
   useEffect(() => {
     if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    if (panelRef.current) focusFirstIn(panelRef.current);
   }, [open]);
 
   async function openPanel() {
@@ -249,10 +249,11 @@ export function NotificationBell() {
     <div ref={containerRef} className="relative flex items-center">
       <button
         type="button"
-        onClick={() => (open ? setOpen(false) : void openPanel())}
+        ref={triggerRef}
+        onClick={() => (open ? closePanel("escape") : void openPanel())}
         aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
         aria-expanded={open}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         title="Notifications"
         className="relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
@@ -266,7 +267,8 @@ export function NotificationBell() {
 
       {open && (
         <div
-          role="menu"
+          ref={panelRef}
+          role="dialog"
           aria-label="Notifications"
           className="absolute right-0 top-[calc(100%+6px)] z-50 w-80 rounded-lg border border-border bg-card shadow-lg"
         >
@@ -275,7 +277,6 @@ export function NotificationBell() {
             {unread > 0 && (
               <button
                 type="button"
-                role="menuitem"
                 onClick={() => void onMarkAll()}
                 className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[10.5px] font-medium text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               >
@@ -298,7 +299,6 @@ export function NotificationBell() {
                   <button
                     key={row.id}
                     type="button"
-                    role="menuitem"
                     onClick={() => void onRowClick(row)}
                     className={cn(
                       "flex w-full items-start gap-2.5 rounded-md px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",

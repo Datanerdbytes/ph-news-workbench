@@ -196,7 +196,7 @@ describe("NotificationBell", () => {
 
     await openPanel();
     fireEvent.click(
-      screen.getByRole("menuitem", { name: "Mark all read" })
+      screen.getByRole("button", { name: "Mark all read" })
     );
     await flush();
 
@@ -208,7 +208,7 @@ describe("NotificationBell", () => {
     expect(readCall![1]?.body).toBe(JSON.stringify({ all: true }));
     expect(screen.queryByText("2")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("menuitem", { name: "Mark all read" })
+      screen.queryByRole("button", { name: "Mark all read" })
     ).toBeNull();
   });
 
@@ -224,7 +224,7 @@ describe("NotificationBell", () => {
     await openPanel();
 
     fireEvent.click(
-      screen.getByRole("menuitem", { name: /Notification 3/ })
+      screen.getByRole("button", { name: /Notification 3/ })
     );
     await flush();
 
@@ -235,7 +235,7 @@ describe("NotificationBell", () => {
     expect(JSON.parse(String(readCall![1]?.body))).toEqual({ id: 3 });
     // Panel closes after navigation.
     expect(
-      screen.queryByRole("menuitem", { name: "Mark all read" })
+      screen.queryByRole("button", { name: "Mark all read" })
     ).toBeNull();
   });
 });

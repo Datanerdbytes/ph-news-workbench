@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -40,6 +40,12 @@ import {
 } from "@/components/publishing/publish-page";
 import { authClient } from "@/lib/auth-client";
 import { facebookToolsVisible } from "@/lib/platform-nav";
+import {
+  focusFirstIn,
+  trapTabFocus,
+  useDismissable,
+  useMediaQuery,
+} from "@/lib/dialog-a11y";
 
 type NavItem = {
   href?: string;
@@ -179,6 +185,14 @@ export function AppFrame({
     memberCount: number;
   } | null>(null);
   const accountRef = useRef<HTMLDivElement>(null);
+  const accountTriggerRef = useRef<HTMLButtonElement>(null);
+  const accountPanelRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+  // The drawer is a hidden overlay below lg only — inert keeps the closed
+  // drawer out of the tab order and the a11y tree without touching the
+  // always-visible desktop sidebar.
+  const isDesktopNav = useMediaQuery("(min-width: 1024px)");
   const { data: session } = authClient.useSession();
   const connection = useFacebookConnection();
   // The sidebar's Publishing card mirrors the page selection shared with the
@@ -208,22 +222,19 @@ export function AppFrame({
     setAccountOpen(false);
   }, [pathname]);
 
+  const closeAccountMenu = useCallback(
+    (reason: "escape" | "outside") => {
+      setAccountOpen(false);
+      if (reason === "escape") accountTriggerRef.current?.focus();
+    },
+    [setAccountOpen]
+  );
+
+  useDismissable(accountOpen, closeAccountMenu, accountRef);
+
   useEffect(() => {
     if (!accountOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!accountRef.current?.contains(event.target as Node)) {
-        setAccountOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setAccountOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    if (accountPanelRef.current) focusFirstIn(accountPanelRef.current);
   }, [accountOpen]);
 
   async function signOut() {
@@ -235,13 +246,22 @@ export function AppFrame({
   useEffect(() => {
     if (!navOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setNavOpen(false);
+      if (event.key === "Escape") {
+        setNavOpen(false);
+        hamburgerRef.current?.focus();
+        return;
+      }
+      if (drawerRef.current) trapTabFocus(drawerRef.current, event);
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+    const raf = requestAnimationFrame(() => {
+      if (drawerRef.current) focusFirstIn(drawerRef.current);
+    });
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      cancelAnimationFrame(raf);
     };
   }, [navOpen]);
 
@@ -252,6 +272,12 @@ export function AppFrame({
         fill ? "fixed inset-0 overflow-clip" : "min-h-dvh"
       )}
     >
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-lg focus:border focus:border-border focus:bg-card focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:shadow-lg"
+      >
+        Skip to content
+      </a>
       <div
         className={cn(
           // Regular pages scroll the document naturally — a nested
@@ -265,6 +291,8 @@ export function AppFrame({
         )}
       >
         <aside
+          ref={drawerRef}
+          inert={!isDesktopNav && !navOpen}
           className={cn(
             "fixed inset-y-0 left-0 z-50 flex w-[264px] flex-col gap-4 border-r border-border bg-card p-3 transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-auto lg:translate-x-0 lg:shadow-none",
             navOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
@@ -423,9 +451,12 @@ export function AppFrame({
             <div ref={accountRef} className="relative">
               <button
                 type="button"
-                onClick={() => setAccountOpen((open) => !open)}
+                ref={accountTriggerRef}
+                onClick={() =>
+                  accountOpen ? setAccountOpen(false) : setAccountOpen(true)
+                }
                 aria-expanded={accountOpen}
-                aria-haspopup="menu"
+                aria-haspopup="dialog"
                 className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               >
                 <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-3 text-[10.5px] font-bold text-secondary-foreground">
@@ -445,7 +476,9 @@ export function AppFrame({
 
               {accountOpen && (
                 <div
-                  role="menu"
+                  ref={accountPanelRef}
+                  role="dialog"
+                  aria-label="Account"
                   className="absolute inset-x-0 bottom-[calc(100%+6px)] z-50 rounded-lg border border-border bg-card p-1 shadow-lg"
                 >
                   <p className="truncate px-2 py-1.5 text-[10px] text-muted-foreground">
@@ -453,7 +486,6 @@ export function AppFrame({
                   </p>
                   <button
                     type="button"
-                    role="menuitem"
                     onClick={() => void signOut()}
                     className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[11.5px] font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                   >
@@ -470,7 +502,10 @@ export function AppFrame({
           <button
             type="button"
             aria-label="Close navigation"
-            onClick={() => setNavOpen(false)}
+            onClick={() => {
+              setNavOpen(false);
+              hamburgerRef.current?.focus();
+            }}
             className="fixed inset-0 z-40 bg-ink/40 lg:hidden"
           />
         )}
@@ -479,6 +514,7 @@ export function AppFrame({
           <header className="sticky top-0 z-30 flex h-[58px] shrink-0 items-center gap-3 border-b border-border bg-card/90 px-4 backdrop-blur-md sm:px-6">
             <button
               type="button"
+              ref={hamburgerRef}
               onClick={() => setNavOpen(true)}
               aria-label="Open navigation"
               className="grid size-8 place-items-center rounded-[7px] border border-border bg-card text-secondary-foreground hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
@@ -511,6 +547,7 @@ export function AppFrame({
           </header>
 
           <main
+            id="main-content"
             className={cn(
               // fill pages: app-like pane, exact viewport height, internal
               // areas scroll. Regular pages: content-sized — the document
@@ -556,27 +593,26 @@ function PublishQuickNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
 
+  const close = useCallback(
+    (reason: "escape" | "outside") => {
+      setOpen(false);
+      if (reason === "escape") triggerRef.current?.focus();
+    },
+    [setOpen]
+  );
+
+  useDismissable(open, close, containerRef);
+
   useEffect(() => {
     if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    if (panelRef.current) focusFirstIn(panelRef.current);
   }, [open]);
 
   return (
@@ -610,9 +646,10 @@ function PublishQuickNav() {
 
       <button
         type="button"
+        ref={triggerRef}
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         className="flex items-center gap-1 rounded-[7px] border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
       >
         Publish
@@ -624,7 +661,9 @@ function PublishQuickNav() {
 
       {open && (
         <div
-          role="menu"
+          ref={panelRef}
+          role="dialog"
+          aria-label="Publishing tools"
           className="absolute right-0 top-[calc(100%+6px)] z-50 w-60 rounded-lg border border-border bg-card p-1 shadow-lg"
         >
           {PUBLISH_LINKS.map(({ href, label, hint, icon: Icon }) => {
@@ -633,7 +672,6 @@ function PublishQuickNav() {
               <Link
                 key={href}
                 href={href}
-                role="menuitem"
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
@@ -694,23 +732,22 @@ function FacebookConnectionButton() {
   const status = facebookStatus(connection);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const closeMenu = useCallback(
+    (reason: "escape" | "outside") => {
+      setMenuOpen(false);
+      if (reason === "escape") triggerRef.current?.focus();
+    },
+    [setMenuOpen]
+  );
+
+  useDismissable(menuOpen, closeMenu, menuRef);
 
   useEffect(() => {
     if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    if (panelRef.current) focusFirstIn(panelRef.current);
   }, [menuOpen]);
 
   function handleClick() {
@@ -729,6 +766,7 @@ function FacebookConnectionButton() {
     <div ref={menuRef} className="relative shrink-0">
       <button
         type="button"
+        ref={triggerRef}
         onClick={handleClick}
         aria-label={
           connection.connected
@@ -736,6 +774,7 @@ function FacebookConnectionButton() {
             : "Connect Facebook Page"
         }
         aria-expanded={connection.connected ? menuOpen : undefined}
+        aria-haspopup={connection.connected ? "dialog" : undefined}
         title={title}
         className="relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
@@ -751,6 +790,8 @@ function FacebookConnectionButton() {
 
       {menuOpen && connection.connected && (
         <div
+          ref={panelRef}
+          role="dialog"
           aria-label="Facebook Page connection"
           className="absolute right-0 top-[calc(100%+6px)] z-50 w-60 rounded-lg border border-border bg-card p-3 shadow-lg"
         >
