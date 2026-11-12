@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { cn } from 'cn';
 import { AppFrame } from '@/components/app-frame';
 import { Button } from '@/components/ui/button';
+import { ErrorState } from '@/components/ui/error-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { timeAgo } from '@/lib/format';
@@ -354,6 +355,7 @@ function DeleteConfirmDialog({
 export default function SourcesPage() {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -369,7 +371,9 @@ export default function SourcesPage() {
       if (!res.ok) throw new Error('Failed to load feeds');
       const data = await res.json();
       setFeeds(data.feeds ?? []);
+      setLoadError(false);
     } catch (error) {
+      setLoadError(true);
       toast.error('Could not load sources', {
         description: error instanceof Error ? error.message : 'Please try again.',
       });
@@ -535,7 +539,13 @@ export default function SourcesPage() {
           </Button>
         </div>
 
-        {feeds.length === 0 ? (
+        {loadError ? (
+          <ErrorState
+            className="mt-5"
+            title="Couldn't load your sources"
+            onRetry={loadFeeds}
+          />
+        ) : feeds.length === 0 ? (
           <div className="mt-5 rounded-xl border border-dashed border-border bg-card/50 p-8 text-center">
             <div className="mx-auto grid size-11 place-items-center rounded-full bg-secondary">
               <Globe className="size-5 text-muted-foreground" aria-hidden />

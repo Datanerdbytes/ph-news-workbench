@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { AppFrame } from '@/components/app-frame';
 import { StatusPill } from '@/components/status-pill';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { ErrorState } from '@/components/ui/error-state';
 import { formatDateTime } from '@/lib/format';
 
 type Draft = {
@@ -30,6 +31,7 @@ type Draft = {
 export default function StatusPage() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
@@ -38,7 +40,9 @@ export default function StatusPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Could not load drafts.');
       setDrafts(Array.isArray(data) ? data : []);
+      setLoadError(false);
     } catch (error) {
+      setLoadError(true);
       toast.error('Could not load drafts', {
         description:
           error instanceof Error ? error.message : 'Please try again.',
@@ -139,7 +143,7 @@ export default function StatusPage() {
                 />
               </div>
               <p className="mt-2 font-heading text-3xl tabular-nums">
-                {stat.value}
+                {loadError ? "—" : stat.value}
               </p>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
                 {stat.hint}
@@ -204,6 +208,13 @@ export default function StatusPage() {
                 </Link>
               ))}
             </div>
+          ) : loadError ? (
+            <ErrorState
+              compact
+              className="m-5"
+              title="Couldn't load drafts"
+              onRetry={load}
+            />
           ) : (
             <div className="px-6 py-16 text-center">
               <FileText
