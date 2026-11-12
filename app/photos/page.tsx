@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { FolderPlus, Images, ImagePlus } from 'lucide-react';
+import { FolderPlus, Images, ImagePlus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { upload } from '@vercel/blob/client';
 import { AssistantChat } from '@/components/assistant-chat';
@@ -18,6 +18,7 @@ import {
   ResultList,
   ScheduleField,
   defaultScheduleValue,
+  resolveScheduledFor,
   inputClass,
   textareaClass,
   useManagedPages,
@@ -44,9 +45,11 @@ export default function PhotosPage() {
   const pages = useManagedPages();
   const [tab, setTab] = useState<Tab>('feed');
   const [images, setImages] = useState<string[]>([]);
+  const [staging, setStaging] = useState(false);
   const [message, setMessage] = useState('');
   const [scheduleOn, setScheduleOn] = useState(false);
   const [scheduledFor, setScheduledFor] = useState(defaultScheduleValue);
+  const [scheduleError, setScheduleError] = useState('');
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PublishResult[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -100,6 +103,9 @@ export default function PhotosPage() {
     }
     // Stage straight to Blob — sidesteps the serverless request-body limit
     // and lets Facebook fetch the photos by URL instead of base64 payloads.
+    // Publishing stays gated on `staging` so a post can't go out missing
+    // the images that are still uploading.
+    setStaging(true);
     try {
       const staged: string[] = [];
       for (const file of accepted) {
@@ -122,6 +128,8 @@ export default function PhotosPage() {
             ? error.message
             : 'The image could not be staged.',
       });
+    } finally {
+      setStaging(false);
     }
   }
 
@@ -143,11 +151,24 @@ export default function PhotosPage() {
   function restart() {
     setImages([]);
     setMessage('');
+    setScheduleOn(false);
+    setScheduleError('');
     setResults(null);
   }
 
   async function publishPost() {
-    if (!images.length) return;
+    if (!images.length || staging) return;
+    let scheduledForIso: string | null = null;
+    if (scheduleOn) {
+      scheduledForIso = resolveScheduledFor(scheduledFor);
+      if (!scheduledForIso) {
+        setScheduleError(
+          'Pick a time between 10 minutes and 75 days from now.'
+        );
+        return;
+      }
+      setScheduleError('');
+    }
     setBusy(true);
     setResults(null);
     try {
@@ -159,7 +180,7 @@ export default function PhotosPage() {
           images,
           message,
           pageIds: pages.selected,
-          scheduledFor: scheduleOn ? new Date(scheduledFor).toISOString() : null,
+          scheduledFor: scheduledForIso,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -179,6 +200,7 @@ export default function PhotosPage() {
   }
 
   async function addToAlbum() {
+    if (!albumId || !images.length || staging) return;
     setBusy(true);
     try {
       const res = await fetch('/api/photos', {
@@ -239,9 +261,13 @@ export default function PhotosPage() {
             type="button"
             onClick={() => inputRef.current?.click()}
             className="grid size-20 place-items-center rounded-lg border border-dashed border-border bg-background/60 text-muted-foreground transition-colors hover:text-foreground"
-            aria-label="Add images"
+            aria-label={staging ? 'Uploading images' : 'Add images'}
           >
-            <ImagePlus className="size-5" aria-hidden />
+            {staging ? (
+              <Loader2 className="size-5 animate-spin" aria-hidden />
+            ) : (
+              <ImagePlus className="size-5" aria-hidden />
+            )}
           </button>
         )}
       </div>
@@ -338,17 +364,29 @@ export default function PhotosPage() {
                 enabled={scheduleOn}
                 onEnabled={setScheduleOn}
                 value={scheduledFor}
-                onChange={setScheduledFor}
+                onChange={(next) => {
+                  setScheduledFor(next);
+                  setScheduleError('');
+                }}
+                error={scheduleError}
               />
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="brand"
                   size="sm"
                   onClick={publishPost}
-                  disabled={!images.length || busy || !pages.selected.length}
+                  disabled={
+                    !images.length || staging || busy || !pages.selected.length
+                  }
                 >
                   <ImagePlus className="size-3.5" aria-hidden />
-                  {busy ? 'Publishing…' : scheduleOn ? 'Schedule post' : 'Publish post'}
+                  {staging
+                    ? 'Uploading images…'
+                    : busy
+                      ? 'Publishing…'
+                      : scheduleOn
+                        ? 'Schedule post'
+                        : 'Publish post'}
                 </Button>
                 <span className="text-[10px] text-muted-foreground">
                   {images.length > 1
@@ -423,10 +461,14 @@ export default function PhotosPage() {
                   variant="brand"
                   size="sm"
                   onClick={addToAlbum}
-                  disabled={!albumId || !images.length || busy}
+                  disabled={!albumId || !images.length || busy || staging}
                 >
                   <ImagePlus className="size-3.5" aria-hidden />
-                  {busy ? 'Uploading…' : 'Add photos'}
+                  {staging
+                    ? 'Uploading images…'
+                    : busy
+                      ? 'Uploading…'
+                      : 'Add photos'}
                 </Button>
               </ComposerCard>
             </div>

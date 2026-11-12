@@ -15,6 +15,7 @@ import {
   ResultList,
   ScheduleField,
   defaultScheduleValue,
+  resolveScheduledFor,
   inputClass,
   textareaClass,
   useManagedPages,
@@ -32,6 +33,7 @@ export default function VideosPage() {
   const [targeting, setTargeting] = useState('');
   const [scheduleOn, setScheduleOn] = useState(false);
   const [scheduledFor, setScheduledFor] = useState(defaultScheduleValue);
+  const [scheduleError, setScheduleError] = useState('');
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PublishResult[] | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -151,6 +153,17 @@ export default function VideosPage() {
         return;
       }
     }
+    let scheduledForIso: string | null = null;
+    if (scheduleOn) {
+      scheduledForIso = resolveScheduledFor(scheduledFor);
+      if (!scheduledForIso) {
+        setScheduleError(
+          'Pick a time between 10 minutes and 75 days from now.'
+        );
+        return;
+      }
+      setScheduleError('');
+    }
 
     setBusy(true);
     setResults(null);
@@ -161,7 +174,7 @@ export default function VideosPage() {
       form.append('description', description);
       if (thumbnail) form.append('thumbnail', thumbnail);
       if (targeting.trim()) form.append('feedTargeting', targeting.trim());
-      if (scheduleOn) form.append('scheduledFor', new Date(scheduledFor).toISOString());
+      if (scheduledForIso) form.append('scheduledFor', scheduledForIso);
       form.append('pageIds', JSON.stringify(pages.selected));
 
       const res = await fetch('/api/videos', { method: 'POST', body: form });
@@ -175,6 +188,10 @@ export default function VideosPage() {
       setThumbnail(null);
       setTitle('');
       setDescription('');
+      // Don't leak geo-targeting or the schedule toggle into the next video.
+      setTargeting('');
+      setScheduleOn(false);
+      setScheduleError('');
     } catch (error) {
       toast.error('Video upload failed', {
         description: error instanceof Error ? error.message : undefined,
@@ -276,7 +293,11 @@ export default function VideosPage() {
           enabled={scheduleOn}
           onEnabled={setScheduleOn}
           value={scheduledFor}
-          onChange={setScheduledFor}
+          onChange={(next) => {
+            setScheduledFor(next);
+            setScheduleError('');
+          }}
+          error={scheduleError}
         />
 
         <div className="flex flex-wrap items-center gap-2">

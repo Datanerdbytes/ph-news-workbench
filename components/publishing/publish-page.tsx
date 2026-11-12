@@ -422,12 +422,17 @@ export function ScheduleField({
   onEnabled,
   value,
   onChange,
+  error,
 }: {
   enabled: boolean;
   onEnabled: (value: boolean) => void;
   value: string;
   onChange: (value: string) => void;
+  error?: string;
 }) {
+  // Bounds for the native picker; typed values are re-checked by
+  // resolveScheduledFor() before submit.
+  const bounds = scheduleBounds();
   return (
     <div>
       <label className="flex items-center gap-2 text-xs font-medium">
@@ -443,10 +448,18 @@ export function ScheduleField({
         <>
           <input
             type="datetime-local"
+            aria-label="Publish date and time"
+            min={bounds.min}
+            max={bounds.max}
             value={value}
             onChange={(event) => onChange(event.target.value)}
             className={cn(inputClass, 'mt-1.5')}
           />
+          {error && (
+            <p role="alert" className="mt-1 text-[11px] text-destructive">
+              {error}
+            </p>
+          )}
           <p className="mt-1 text-[10px] text-muted-foreground">
             10 minutes to 75 days from now. Facebook publishes it from its own
             queue.
@@ -457,11 +470,46 @@ export function ScheduleField({
   );
 }
 
+function toLocalInput(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** Allowed schedule window: 10 minutes to 75 days from now. */
+export function scheduleBounds(now = new Date()) {
+  return {
+    min: toLocalInput(new Date(now.getTime() + 10 * 60 * 1000)),
+    max: toLocalInput(new Date(now.getTime() + 75 * 24 * 60 * 60 * 1000)),
+  };
+}
+
+/**
+ * Validates the schedule field before submit: returns the ISO string to
+ * send, or null when the value is missing, unparseable, or outside the
+ * 10-minute-to-75-day window (caller shows an inline error instead of
+ * letting `new Date(...).toISOString()` throw).
+ */
+export function resolveScheduledFor(
+  value: string,
+  now = new Date()
+): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const time = date.getTime();
+  if (
+    time < now.getTime() + 10 * 60 * 1000 ||
+    time > now.getTime() + 75 * 24 * 60 * 60 * 1000
+  ) {
+    return null;
+  }
+  return date.toISOString();
+}
+
 export function defaultScheduleValue() {
   const date = new Date(Date.now() + 24 * 60 * 60 * 1000);
   date.setHours(9, 0, 0, 0);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return toLocalInput(date);
 }
 
 export type PublishResult = {

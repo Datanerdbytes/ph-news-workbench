@@ -25,6 +25,8 @@ import { useFacebookConnection } from '@/components/facebook-connection';
 import { FacebookPreview } from '@/components/facebook-preview';
 import {
   PageSelector,
+  resolveScheduledFor,
+  scheduleBounds,
   useManagedPages,
 } from '@/components/publishing/publish-page';
 import { StatusPill, statusMeta } from '@/components/status-pill';
@@ -151,6 +153,7 @@ export default function Home() {
   const [rowDeleting, setRowDeleting] = useState<number | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleError, setScheduleError] = useState('');
   const [scheduledFor, setScheduledFor] = useState(defaultScheduleValue);
   const [scheduling, setScheduling] = useState(false);
 
@@ -406,10 +409,16 @@ export default function Home() {
   }
 
   async function schedulePost() {
-    if (!selected || !draft.trim() || !scheduledFor) return;
+    if (!selected || !draft.trim()) return;
+    const whenIso = resolveScheduledFor(scheduledFor);
+    if (!whenIso) {
+      setScheduleError('Pick a time between 10 minutes and 75 days from now.');
+      return;
+    }
+    setScheduleError('');
     setScheduling(true);
     try {
-      const when = new Date(scheduledFor);
+      const when = new Date(whenIso);
       const res = await fetch('/api/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -418,7 +427,7 @@ export default function Home() {
           draftId: selected.draft_id ?? undefined,
           text: draft,
           imageUrls: images,
-          scheduledFor: when.toISOString(),
+          scheduledFor: whenIso,
           pageId: pages.selected[0],
         }),
       });
@@ -433,6 +442,8 @@ export default function Home() {
         }),
       });
       setScheduleOpen(false);
+      // Refresh the queue so the row's status stops showing its pre-schedule state.
+      await load();
     } catch (error) {
       toast.error('Scheduling failed', {
         description:
@@ -1165,12 +1176,24 @@ export default function Home() {
                               <input
                                 id="scheduled-for"
                                 type="datetime-local"
+                                aria-label="Publish date and time"
+                                min={scheduleBounds().min}
+                                max={scheduleBounds().max}
                                 value={scheduledFor}
-                                onChange={(event) =>
-                                  setScheduledFor(event.target.value)
-                                }
+                                onChange={(event) => {
+                                  setScheduledFor(event.target.value);
+                                  setScheduleError('');
+                                }}
                                 className="h-8 rounded-md border border-input bg-background px-2 text-[11.5px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                               />
+                              {scheduleError && (
+                                <p
+                                  role="alert"
+                                  className="w-full text-right text-[11px] text-destructive"
+                                >
+                                  {scheduleError}
+                                </p>
+                              )}
                               <Button
                                 size="sm"
                                 variant="brand"

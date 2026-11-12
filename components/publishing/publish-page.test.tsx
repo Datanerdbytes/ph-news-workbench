@@ -13,6 +13,8 @@ vi.mock("@/components/app-frame", async () => {
 
 import {
   PlatformPublishPage,
+  ScheduleField,
+  resolveScheduledFor,
   type PlatformConnectionState,
 } from "./publish-page";
 
@@ -85,5 +87,59 @@ describe("PlatformPublishPage", () => {
     expect(
       screen.queryByRole("button", { name: "Connect Instagram" })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("resolveScheduledFor", () => {
+  const now = new Date("2026-11-13T09:00:00Z");
+
+  it("accepts a value inside the 10-minute-to-75-day window", () => {
+    // datetime-local values parse as *local* time — build the expectation
+    // from the same string so the test is timezone-independent.
+    expect(resolveScheduledFor("2026-11-14T09:00", now)).toBe(
+      new Date("2026-11-14T09:00").toISOString()
+    );
+  });
+
+  it("rejects missing, unparseable, and out-of-window values", () => {
+    expect(resolveScheduledFor("", now)).toBeNull();
+    expect(resolveScheduledFor("not-a-date", now)).toBeNull();
+    // 5 minutes out — below the 10-minute floor.
+    expect(resolveScheduledFor("2026-11-13T09:05", now)).toBeNull();
+    // 80 days out — past the 75-day ceiling.
+    expect(resolveScheduledFor("2027-02-01T09:00", now)).toBeNull();
+  });
+});
+
+describe("ScheduleField", () => {
+  it("labels the datetime input and shows an inline error when given one", () => {
+    const { rerender } = render(
+      <ScheduleField
+        enabled={false}
+        onEnabled={() => {}}
+        value=""
+        onChange={() => {}}
+      />
+    );
+    expect(
+      screen.queryByLabelText("Publish date and time")
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <ScheduleField
+        enabled
+        onEnabled={() => {}}
+        value="2026-11-14T09:00"
+        onChange={() => {}}
+        error="Pick a time between 10 minutes and 75 days from now."
+      />
+    );
+    const input = screen.getByLabelText("Publish date and time");
+    expect(input).toBeInTheDocument();
+    expect(input.getAttribute("min")).toBeTruthy();
+    expect(input.getAttribute("max")).toBeTruthy();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Pick a time between 10 minutes and 75 days from now."
+    );
   });
 });
