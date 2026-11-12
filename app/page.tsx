@@ -29,6 +29,7 @@ import {
 } from '@/components/publishing/publish-page';
 import { StatusPill, statusMeta } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
+import { ConfirmIconButton } from '@/components/ui/confirm-button';
 import { Input } from '@/components/ui/input';
 import {
   formatCost,
@@ -757,16 +758,15 @@ export default function Home() {
                           )}
                         </button>
                         {item.draft_id ? (
-                          <button
-                            type="button"
-                            aria-label={`Delete draft for ${item.title}`}
+                          <ConfirmIconButton
+                            onConfirm={() => deleteDraftFor(item)}
+                            idleLabel={`Delete draft for ${item.title}`}
+                            armedLabel="Click again to delete this draft"
                             title="Delete draft"
-                            onClick={() => deleteDraftFor(item)}
                             disabled={rowDeleting === item.id}
                             className="absolute right-1.5 top-2.5 rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
-                          >
-                            <Trash2 className="size-3.5" aria-hidden />
-                          </button>
+                            icon={<Trash2 className="size-3.5" aria-hidden />}
+                          />
                         ) : null}
                       </div>
                     );
