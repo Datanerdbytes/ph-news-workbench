@@ -43,7 +43,7 @@ export function InstagramPreview({
             </p>
           </div>
         </div>
-        <MoreHorizontal className="size-4 text-muted-foreground" aria-hidden />
+        <MoreHorizontal className="size-4 text-faint" aria-hidden />
       </div>
 
       <div className="relative aspect-square border-y border-border bg-surface-2">
@@ -53,7 +53,7 @@ export function InstagramPreview({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={imageUrl} alt="Post media" className="h-full w-full object-cover" />
         ) : (
-          <div className="grid h-full place-items-center text-faint">
+          <div className="grid h-full place-items-center text-muted-foreground">
             <ImageIcon className="size-8" aria-hidden />
             <span className="sr-only">No image selected yet</span>
           </div>
@@ -82,7 +82,7 @@ export function InstagramPreview({
               <span className="font-semibold">{username}</span> {caption}
             </>
           ) : (
-            <span className="text-faint">Your caption appears here…</span>
+            <span className="text-muted-foreground">Your caption appears here…</span>
           )}
         </p>
       </div>

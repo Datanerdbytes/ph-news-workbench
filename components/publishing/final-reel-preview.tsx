@@ -90,7 +90,7 @@ export function FinalReelPreview({
           />
           {ready ? 'Ready to post' : 'Awaiting reel'}
         </span>
-        <span className="font-mono text-[9px] uppercase text-white/35">
+        <span className="font-mono text-[9px] uppercase text-white/60">
           Facebook
         </span>
       </div>

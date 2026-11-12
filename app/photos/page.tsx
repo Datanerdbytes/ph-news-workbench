@@ -260,7 +260,7 @@ export default function PhotosPage() {
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="grid size-20 place-items-center rounded-lg border border-dashed border-border bg-background/60 text-muted-foreground transition-colors hover:text-foreground"
+            className="grid size-20 place-items-center rounded-lg border border-dashed border-border bg-background/60 text-faint transition-colors hover:text-foreground"
             aria-label={staging ? 'Uploading images' : 'Add images'}
           >
             {staging ? (

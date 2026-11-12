@@ -246,7 +246,7 @@ export default function AnalyticsPage() {
                 className="rounded-xl border border-border bg-card p-4"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                     {card.label}
                   </p>
                   <Icon className="size-4 text-brand" aria-hidden />
@@ -319,7 +319,7 @@ export default function AnalyticsPage() {
                       )}
                       {total === 0 && <div className="h-0.5 w-full bg-border" />}
                     </div>
-                    <div className="text-center text-[9px] leading-tight text-faint">
+                    <div className="text-center text-[9px] leading-tight text-muted-foreground">
                       <p>{label.weekday}</p>
                       <p className="font-semibold text-muted-foreground">
                         {label.day}
@@ -353,7 +353,7 @@ export default function AnalyticsPage() {
                     className="rounded-lg border border-border bg-surface-2 px-2.5 py-2"
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                         {shortDate(post.createdAt)}
                       </p>
                       <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground">
@@ -487,7 +487,7 @@ export default function AnalyticsPage() {
                           className="rounded-lg border border-border bg-surface-2 px-2.5 py-1.5"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                               {shortDate(post.timestamp)}
                               {post.mediaType
                                 ? ` · ${post.mediaType === "VIDEO" ? "Reel" : post.mediaType === "CAROUSEL_ALBUM" ? "Carousel" : "Post"}`
@@ -554,7 +554,7 @@ export default function AnalyticsPage() {
                     "rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
                     connection.connected
                       ? "bg-success/10 text-success"
-                      : "bg-surface-3 text-faint"
+                      : "bg-surface-3 text-muted-foreground"
                   )}
                 >
                   {connection.connected ? "Live" : "Off"}
@@ -565,7 +565,7 @@ export default function AnalyticsPage() {
                   key={channel}
                   className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-2 opacity-70"
                 >
-                  <span className="grid size-7 place-items-center rounded-md bg-surface-3 text-[10px] font-bold text-faint">
+                  <span className="grid size-7 place-items-center rounded-md bg-surface-3 text-[10px] font-bold text-muted-foreground">
                     {channel.slice(0, 2).toUpperCase()}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -576,7 +576,7 @@ export default function AnalyticsPage() {
                       Adapter planned
                     </p>
                   </div>
-                  <span className="rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-faint">
+                  <span className="rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                     Soon
                   </span>
                 </li>
@@ -593,7 +593,7 @@ export default function AnalyticsPage() {
 function Metric({ label, value }: { label: string; value?: number | null }) {
   return (
     <div>
-      <dt className="text-[9.5px] font-bold uppercase tracking-[0.12em] text-faint">
+      <dt className="text-[9.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </dt>
       <dd className="mt-0.5 font-heading text-lg font-semibold leading-none">

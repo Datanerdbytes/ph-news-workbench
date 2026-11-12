@@ -460,7 +460,7 @@ export default function DashboardPage() {
                               className="text-[10.5px] tabular-nums text-muted-foreground"
                             />
                             {kind && (
-                              <span className="text-[9px] font-bold uppercase tracking-wider text-faint px-1.5 py-0.5 rounded bg-surface-2">
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground px-1.5 py-0.5 rounded bg-surface-2">
                                 {kind.toUpperCase()}
                               </span>
                             )}
@@ -585,7 +585,7 @@ export default function DashboardPage() {
                     className={cn(
                       "rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider",
                       connection.loading
-                        ? "bg-surface-3 text-faint"
+                        ? "bg-surface-3 text-muted-foreground"
                         : connection.connected
                           ? "bg-success-soft text-success"
                           : "bg-warning-soft text-warning"
@@ -612,11 +612,11 @@ export default function DashboardPage() {
                       <p className="text-[11.5px] font-medium text-muted-foreground">
                         {channel.name}
                       </p>
-                      <p className="truncate text-[10px] text-faint">
+                      <p className="truncate text-[10px] text-muted-foreground">
                         {channel.gate}
                       </p>
                     </div>
-                    <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-faint">
+                    <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">
                       Designed
                     </span>
                   </div>
@@ -660,7 +660,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-[10.5px] text-faint">
+        <p className="mt-6 text-[10.5px] text-muted-foreground">
           Figures update from your workspace records. Analytics arrive once
           channel insights are connected.
         </p>
@@ -690,7 +690,7 @@ function StatCard({
         <span className="text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
           {label}
         </span>
-        <Icon className={cn("size-4 text-faint", tone)} aria-hidden />
+        <Icon className={cn("size-4 text-muted-foreground", tone)} aria-hidden />
       </div>
       <p className="mt-3 font-heading text-[30px] leading-none tabular-nums">
         {loading ? "—" : value}

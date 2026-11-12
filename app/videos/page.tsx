@@ -62,7 +62,7 @@ export default function VideosPage() {
           />
           {file ? "Ready to publish" : "Upload preview"}
         </span>
-        <span className="font-mono text-[9px] uppercase text-white/35">Preview</span>
+        <span className="font-mono text-[9px] uppercase text-white/60">Preview</span>
       </div>
 
       <div className="relative mt-4 flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
@@ -82,12 +82,12 @@ export default function VideosPage() {
             <p className="text-[10px] font-semibold text-white/75">
               Can’t preview this file
             </p>
-            <p className="text-[9.5px] leading-relaxed text-white/40">
+            <p className="text-[9.5px] leading-relaxed text-white/60">
               Its format may not play here, but it can still be published as-is.
             </p>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2 px-4 text-center text-white/35">
+          <div className="flex flex-col items-center gap-2 px-4 text-center text-white/60">
             <span className="grid size-9 place-items-center rounded-full border border-white/25 bg-white/10">
               <Play
                 className="ml-0.5 size-3.5 fill-white/70 text-white/70"
@@ -108,7 +108,7 @@ export default function VideosPage() {
           <p className="truncate text-[12px] font-semibold text-white/90">
             {file.name}
           </p>
-          <p className="mt-1 truncate font-mono text-[9px] text-white/40">
+          <p className="mt-1 truncate font-mono text-[9px] text-white/60">
             {(file.size / (1024 * 1024)).toFixed(1)} MB · ready to publish
           </p>
         </div>
@@ -124,7 +124,7 @@ export default function VideosPage() {
               <p className="text-[10px] font-semibold text-white/85">
                 Chunked upload
               </p>
-              <p className="mt-0.5 text-[9px] leading-relaxed text-white/45">
+              <p className="mt-0.5 text-[9px] leading-relaxed text-white/60">
                 Title, description &amp; thumbnail · up to 45 minutes · 1 GB.
               </p>
             </div>

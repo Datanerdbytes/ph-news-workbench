@@ -107,7 +107,7 @@ function EmptyWorkspace({ onRefresh }: { onRefresh: () => void }) {
     <div className="grid min-h-[55vh] place-items-center rounded-xl border border-dashed border-border bg-card/50 p-8 text-center">
       <div className="max-w-sm">
         <span className="mx-auto grid size-11 place-items-center rounded-full bg-secondary">
-          <Newspaper className="size-5 text-muted-foreground" aria-hidden />
+          <Newspaper className="size-5 text-faint" aria-hidden />
         </span>
         <h2 className="mt-4 font-heading text-2xl">The desk is quiet</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -675,7 +675,7 @@ export default function Home() {
               <div className="border-b border-border/60 px-3 py-2">
                 <div className="relative">
                   <Search
-                    className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                    className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-faint"
                     aria-hidden
                   />
                   <Input
@@ -795,7 +795,7 @@ export default function Home() {
                 ) : (
                   <div className="px-6 py-12 text-center">
                     <Newspaper
-                      className="mx-auto size-5 text-muted-foreground/60"
+                      className="mx-auto size-5 text-faint/60"
                       aria-hidden
                     />
                     <p className="mt-2 text-sm font-medium">No stories found</p>
@@ -852,7 +852,7 @@ export default function Home() {
                   type="button"
                   onClick={() => setPane('queue')}
                   aria-label="Back to story queue"
-                  className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 md:hidden"
+                  className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-card text-faint transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 md:hidden"
                 >
                   <ArrowLeft className="size-3.5" aria-hidden />
                 </button>
@@ -979,7 +979,7 @@ export default function Home() {
                           onChange={(event) => setDraft(event.target.value)}
                           placeholder="Generate a draft from the source story, or start writing here…"
                           aria-label="Facebook post draft"
-                          className="min-h-[260px] w-full resize-y bg-transparent text-[15px] leading-7 text-foreground outline-none placeholder:text-muted-foreground/70"
+                          className="min-h-[260px] w-full resize-y bg-transparent text-[15px] leading-7 text-foreground outline-none placeholder:text-muted-foreground"
                         />
                       </div>
 
@@ -999,7 +999,7 @@ export default function Home() {
                                 type="button"
                                 onClick={() => removeImage(index)}
                                 aria-label={`Remove attachment ${index + 1}`}
-                                className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:border-destructive/40 hover:text-destructive"
+                                className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border border-border bg-card text-faint shadow-sm transition-colors hover:border-destructive/40 hover:text-destructive"
                               >
                                 <X className="size-3" aria-hidden />
                               </button>
@@ -1011,7 +1011,7 @@ export default function Home() {
                             disabled={imagesBusy || images.length >= MAX_IMAGES}
                             aria-label="Add images to the post"
                             title={`Attach up to ${MAX_IMAGES} images`}
-                            className="grid size-16 place-items-center rounded-md border border-dashed border-border text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                            className="grid size-16 place-items-center rounded-md border border-dashed border-border text-faint transition-colors hover:border-brand/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {imagesBusy ? (
                               <RefreshCw

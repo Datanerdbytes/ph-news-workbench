@@ -102,7 +102,7 @@ export default function StoriesPage() {
           />
           {storySource ? 'Ready to publish' : 'Upload preview'}
         </span>
-        <span className="font-mono text-[9px] uppercase text-white/35">Story</span>
+        <span className="font-mono text-[9px] uppercase text-white/60">Story</span>
       </div>
 
       <div className="relative mt-4 flex aspect-[9/16] max-h-[300px] w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
@@ -113,7 +113,7 @@ export default function StoriesPage() {
               <p className="text-[10px] font-semibold text-white/75">
                 Can’t preview this item
               </p>
-              <p className="text-[9.5px] leading-relaxed text-white/40">
+              <p className="text-[9.5px] leading-relaxed text-white/60">
                 It can still be published as-is.
               </p>
             </div>
@@ -138,7 +138,7 @@ export default function StoriesPage() {
             />
           )
         ) : (
-          <div className="flex flex-col items-center gap-2 px-4 text-center text-white/35">
+          <div className="flex flex-col items-center gap-2 px-4 text-center text-white/60">
             <span className="grid size-9 place-items-center rounded-full border border-white/25 bg-white/10">
               {kind === 'photo' ? (
                 <ImagePlus className="size-3.5" aria-hidden />
@@ -160,14 +160,14 @@ export default function StoriesPage() {
           <p className="truncate text-[12px] font-semibold text-white/90">
             {photo.name}
           </p>
-          <p className="mt-1 truncate font-mono text-[9px] text-white/40">
+          <p className="mt-1 truncate font-mono text-[9px] text-white/60">
             {(photo.size / (1024 * 1024)).toFixed(1)} MB · ready to publish
           </p>
         </div>
       )}
       {kind === 'photo' && !photo && photoUrl.trim() && (
         <div className="mt-3 min-w-0">
-          <p className="truncate font-mono text-[9px] text-white/40">
+          <p className="truncate font-mono text-[9px] text-white/60">
             {photoUrl.trim()}
           </p>
         </div>
@@ -177,7 +177,7 @@ export default function StoriesPage() {
           <p className="truncate text-[12px] font-semibold text-white/90">
             {video.name}
           </p>
-          <p className="mt-1 truncate font-mono text-[9px] text-white/40">
+          <p className="mt-1 truncate font-mono text-[9px] text-white/60">
             {(video.size / (1024 * 1024)).toFixed(1)} MB · ready to publish
           </p>
         </div>
@@ -193,7 +193,7 @@ export default function StoriesPage() {
               <p className="text-[10px] font-semibold text-white/85">
                 How a story posts
               </p>
-              <p className="mt-0.5 text-[9px] leading-relaxed text-white/45">
+              <p className="mt-0.5 text-[9px] leading-relaxed text-white/60">
                 Vertical 9:16 assets fill the Story tray best.
               </p>
             </div>

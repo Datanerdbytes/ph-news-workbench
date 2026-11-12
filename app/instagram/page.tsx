@@ -171,7 +171,7 @@ export default function InstagramPage() {
                   Publishes to the linked professional account of your primary
                   Facebook Page.
                 </p>
-                <p className="text-faint">
+                <p className="text-muted-foreground">
                   Square 1:1 media works best. Captions up to{' '}
                   {CAPTION_MAX.toLocaleString()} characters.
                 </p>

@@ -146,7 +146,7 @@ export default function YouTubePage() {
                   Uploads publish straight from the browser-stage to YouTube&apos;s
                   resumable upload endpoint.
                 </p>
-                <p className="text-faint">
+                <p className="text-muted-foreground">
                   Upload quota is ~6 videos per day on Google&apos;s default
                   allocation — it resets at midnight Pacific.
                 </p>

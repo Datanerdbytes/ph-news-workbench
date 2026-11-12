@@ -129,7 +129,7 @@ export default function PostPage() {
           </FieldLabel>
           <div className="relative">
             <Link2
-              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-faint"
               aria-hidden
             />
             <input

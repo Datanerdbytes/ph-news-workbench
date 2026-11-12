@@ -143,12 +143,12 @@ export default function TikTokPage() {
                   when the post opens (PULL_FROM_URL).
                 </p>
                 {sandbox ? (
-                  <p className="text-faint">
+                  <p className="text-muted-foreground">
                     Sandbox approval: posts land as private (only you) until
                     TikTok clears the Content Posting API for this app.
                   </p>
                 ) : (
-                  <p className="text-faint">
+                  <p className="text-muted-foreground">
                     Public posting is approved for this app.
                   </p>
                 )}

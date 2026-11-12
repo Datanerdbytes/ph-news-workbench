@@ -170,7 +170,7 @@ function Step({
       </span>
       <div className="pb-5">
         <p className="text-[13px] font-semibold text-white/90">{title}</p>
-        <p className="mt-1 text-[11.5px] leading-relaxed text-white/45">
+        <p className="mt-1 text-[11.5px] leading-relaxed text-white/60">
           {description}
         </p>
       </div>
@@ -406,7 +406,7 @@ export default function DownloadsPage() {
             href="#how-it-works"
             className="mb-0.5 inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-[11.5px] font-semibold text-secondary-foreground shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
-            <CircleHelp className="size-3.5 text-muted-foreground" aria-hidden="true" />
+            <CircleHelp className="size-3.5 text-faint" aria-hidden="true" />
             How it works
           </a>
         </header>
@@ -469,7 +469,7 @@ export default function DownloadsPage() {
                 </div>
                 <div className="group flex min-h-[58px] items-center gap-2 rounded-xl border border-input bg-card p-1.5 transition-all focus-within:border-brand/60 focus-within:ring-4 focus-within:ring-brand/10">
                   <Link2
-                    className="ml-2 size-4 shrink-0 text-muted-foreground/75 transition-colors group-focus-within:text-brand"
+                    className="ml-2 size-4 shrink-0 text-faint/75 transition-colors group-focus-within:text-brand"
                     aria-hidden="true"
                   />
                   <input
@@ -480,7 +480,7 @@ export default function DownloadsPage() {
                     onChange={(event) => setUrl(event.target.value)}
                     placeholder="https://youtu.be/…"
                     autoComplete="url"
-                    className="h-10 min-w-0 flex-1 border-0 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/55 focus:ring-0"
+                    className="h-10 min-w-0 flex-1 border-0 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus:ring-0"
                   />
                   <button
                     type="button"
@@ -523,7 +523,7 @@ export default function DownloadsPage() {
                       <option value="480">Up to 480p</option>
                     </select>
                     <ChevronDown
-                      className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                      className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-faint"
                       aria-hidden="true"
                     />
                   </div>
@@ -644,7 +644,7 @@ export default function DownloadsPage() {
                     <span className="size-1.5 rounded-full bg-[#79d2ae]" />
                     Download complete
                   </span>
-                  <span className="font-mono text-[9px] uppercase text-white/35">
+                  <span className="font-mono text-[9px] uppercase text-white/60">
                     {previewJob.platform} · {previewJob.quality}
                   </span>
                 </div>
@@ -656,7 +656,7 @@ export default function DownloadsPage() {
                       <p className="text-[11.5px] font-semibold text-white/80">
                         Preview unavailable
                       </p>
-                      <p className="text-[10px] leading-relaxed text-white/45">
+                      <p className="text-[10px] leading-relaxed text-white/60">
                         The file is no longer available. It may have been removed
                         from the cloud library or your Downloads folder.
                       </p>
@@ -678,7 +678,7 @@ export default function DownloadsPage() {
                   <p className="truncate text-[13px] font-semibold text-white/90">
                     {previewJob.fileName}
                   </p>
-                  <p className="mt-1 truncate font-mono text-[9.5px] text-white/40">
+                  <p className="mt-1 truncate font-mono text-[9.5px] text-white/60">
                     {previewJob.source === "disk"
                       ? `Saved to ${previewJob.saveLocation}`
                       : "Synced to your cloud library"}
@@ -695,7 +695,7 @@ export default function DownloadsPage() {
                         <p className="text-[11px] font-semibold text-white/85">
                           Ready to watch
                         </p>
-                        <p className="mt-0.5 truncate text-[9.5px] text-white/45">
+                        <p className="mt-0.5 truncate text-[9.5px] text-white/60">
                           {previewJob.source === "disk"
                             ? "Recovered from your Downloads folder"
                             : previewJob.quality === "best"
@@ -731,7 +731,7 @@ export default function DownloadsPage() {
                 <span className="size-1.5 rounded-full bg-white/70" />
                 Cloud library
               </span>
-              <span className="font-mono text-[9px] text-white/35">01 / 03</span>
+              <span className="font-mono text-[9px] text-white/60">01 / 03</span>
             </div>
 
             <div className="relative mx-auto my-6 flex h-[112px] w-full max-w-[310px] items-center justify-center">
@@ -760,7 +760,7 @@ export default function DownloadsPage() {
                 <br />
                 to saved.
               </p>
-              <p className="mt-2 max-w-[310px] text-[11px] leading-relaxed text-white/50">
+              <p className="mt-2 max-w-[310px] text-[11px] leading-relaxed text-white/60">
                 The downloader on your Mac does the heavy lifting, then syncs
                 the file to your workspace’s cloud library.
               </p>
@@ -958,7 +958,7 @@ export default function DownloadsPage() {
                     href={`/reels?video=${job.id}`}
                     aria-label={`Use ${job.fileName ?? job.platform} as a reel`}
                     title="Use as reel"
-                    className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                   >
                     <Clapperboard className="size-3.5" aria-hidden="true" />
                   </a>
@@ -973,7 +973,7 @@ export default function DownloadsPage() {
                     busyIcon={
                       <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                     }
-                    className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                    className="grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
                     icon={<Trash2 className="size-3.5" aria-hidden="true" />}
                   />
                 )}
@@ -982,7 +982,7 @@ export default function DownloadsPage() {
             </ul>
           ) : (
             <div className="flex flex-col items-center px-5 py-7 text-center">
-            <span className="grid size-11 place-items-center rounded-2xl border border-dashed border-line-strong bg-surface-2 text-muted-foreground">
+            <span className="grid size-11 place-items-center rounded-2xl border border-dashed border-line-strong bg-surface-2 text-faint">
               <ArrowDownToLine className="size-5" aria-hidden="true" />
             </span>
             <p className="mt-3 text-[11.5px] font-semibold text-secondary-foreground">

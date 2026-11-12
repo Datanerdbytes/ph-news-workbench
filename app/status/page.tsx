@@ -218,7 +218,7 @@ export default function StatusPage() {
           ) : (
             <div className="px-6 py-16 text-center">
               <FileText
-                className="mx-auto size-5 text-muted-foreground/60"
+                className="mx-auto size-5 text-faint/60"
                 aria-hidden
               />
               <p className="mt-2 text-sm font-medium">No drafts yet</p>

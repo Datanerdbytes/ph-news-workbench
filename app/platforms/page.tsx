@@ -71,7 +71,7 @@ const STATE_PILL: Record<CardState, string> = {
 };
 
 const NOTE_TONE: Record<CardState, string> = {
-  checking: "text-faint",
+  checking: "text-muted-foreground",
   live: "text-secondary-foreground",
   ready: "text-secondary-foreground",
   setup: "text-warning",
@@ -341,7 +341,7 @@ export default function PlatformsPage() {
         </div>
 
         <section className="panel mt-4 flex flex-wrap items-center gap-3 px-4 py-3.5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-muted-foreground">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-faint">
             <Lock className="size-4" aria-hidden />
           </span>
           <p className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-muted-foreground">
@@ -407,7 +407,7 @@ function PlatformCard({ entry }: { entry: PlatformEntry }) {
                 "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10.5px] font-medium",
                 capability.on
                   ? "border-success/25 bg-success-soft text-success"
-                  : "border-border bg-surface-2 text-faint"
+                  : "border-border bg-surface-2 text-muted-foreground"
               )}
             >
               {capability.on ? (
@@ -422,7 +422,7 @@ function PlatformCard({ entry }: { entry: PlatformEntry }) {
 
         <div className="mt-3 rounded-[8px] border border-border bg-surface-2 px-2.5 py-2">
           <div className="flex items-start justify-between gap-3">
-            <span className="shrink-0 text-[9.5px] font-bold uppercase tracking-[0.12em] text-faint">
+            <span className="shrink-0 text-[9.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
               {entry.account ? "Account" : "Access"}
             </span>
             <span

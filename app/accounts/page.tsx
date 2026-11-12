@@ -237,7 +237,7 @@ export default function AccountsPage() {
 
           <div className="grid gap-5 px-4 py-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
                 Connection
               </p>
               {connection.loading ? (
@@ -270,7 +270,7 @@ export default function AccountsPage() {
                         </span>
                       ))
                     ) : (
-                      <span className="text-[11px] text-faint">
+                      <span className="text-[11px] text-muted-foreground">
                         Scopes are not reported for this connection.
                       </span>
                     )}
@@ -309,7 +309,7 @@ export default function AccountsPage() {
             </div>
 
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
                 What the adapter supports
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -373,7 +373,7 @@ export default function AccountsPage() {
 
           <div className="grid gap-5 px-4 py-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
                 Connection
               </p>
               {instagram.loading ? (
@@ -465,7 +465,7 @@ export default function AccountsPage() {
             </div>
 
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
                 What the adapter supports
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -528,7 +528,7 @@ export default function AccountsPage() {
 
             <div className="grid gap-5 px-4 py-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+                <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
                   Connection
                 </p>
                 <div className="mt-2">
@@ -552,7 +552,7 @@ export default function AccountsPage() {
               </div>
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+                <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground">
                   What the adapter supports
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -589,7 +589,7 @@ export default function AccountsPage() {
                     (heading) => (
                       <th
                         key={heading}
-                        className="px-4 py-2 text-[9.5px] font-bold uppercase tracking-[0.12em] text-faint"
+                        className="px-4 py-2 text-[9.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
                       >
                         {heading}
                       </th>
@@ -717,7 +717,7 @@ function Capability({ label, on }: { label: string; on?: boolean }) {
         "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10.5px] font-medium",
         on
           ? "border-success/25 bg-success-soft text-success"
-          : "border-border bg-surface-2 text-faint"
+          : "border-border bg-surface-2 text-muted-foreground"
       )}
     >
       {on ? (

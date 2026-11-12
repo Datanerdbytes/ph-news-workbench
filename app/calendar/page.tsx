@@ -303,7 +303,7 @@ export default function CalendarPage() {
                             ? "bg-ink font-semibold text-paper"
                             : inMonth
                               ? "text-foreground"
-                              : "text-faint"
+                              : "text-muted-foreground"
                         )}
                       >
                         {day.getDate()}

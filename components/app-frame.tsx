@@ -326,7 +326,7 @@ export function AppFrame({
               type="button"
               onClick={() => setNavOpen(false)}
               aria-label="Close navigation"
-              className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
+              className="grid size-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
             >
               <X className="size-4" aria-hidden />
             </button>
@@ -345,7 +345,7 @@ export function AppFrame({
           <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-1">
             {navGroups.map((group) => (
               <div key={group.title} className="flex flex-col gap-0.5">
-                <p className="px-2.5 pb-1.5 text-[9.5px] font-bold uppercase tracking-[0.14em] text-faint">
+                <p className="px-2.5 pb-1.5 text-[9.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                   {group.title}
                 </p>
                 {group.items.map((item) => {
@@ -365,7 +365,7 @@ export function AppFrame({
                           aria-hidden
                         />
                         {item.label}
-                        <span className="ml-auto rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-faint">
+                        <span className="ml-auto rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                           Soon
                         </span>
                       </span>
@@ -404,7 +404,7 @@ export function AppFrame({
               href="/accounts"
               className="rounded-lg border border-border bg-surface-2 px-3 py-2.5 transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
-              <p className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-faint">
+              <p className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 Publishing
               </p>
               <div className="mt-1.5 flex items-center gap-2">

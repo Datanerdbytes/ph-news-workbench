@@ -333,7 +333,7 @@ export default function SettingsPage() {
           <h2 className="text-[13px] font-semibold">Account</h2>
           <dl className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
-              <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
+              <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Name
               </dt>
               <dd className="mt-0.5 text-[12.5px] font-medium">
@@ -341,7 +341,7 @@ export default function SettingsPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-faint">
+              <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Email
               </dt>
               <dd className="mt-0.5 truncate text-[12.5px] font-medium">

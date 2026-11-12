@@ -37,6 +37,7 @@
   --color-ink: var(--ink);
   --color-paper: var(--paper);
   --color-facebook: var(--facebook);
+  --color-facebook-strong: var(--facebook-strong);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-info: var(--info);
@@ -92,6 +93,9 @@
   --ink: #161b23;
   --paper: #ffffff;
   --facebook: #1877f2;
+  /* AA-safe text variant of the Facebook blue (~5.5:1 on white) for small
+     status text that the raw brand color can't carry at 10px. */
+  --facebook-strong: #0d63d8;
 
   --success: #0d7355;
   --success-soft: #e7f5ef;
