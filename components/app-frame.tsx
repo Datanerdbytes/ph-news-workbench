@@ -29,8 +29,8 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "cn";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { FacebookMark } from "@/components/facebook-mark";
 import { useFacebookConnection } from "@/components/facebook-connection";
 import { NotificationBell } from "@/components/notifications";
@@ -692,22 +692,33 @@ function facebookStatus(connection: ReturnType<typeof useFacebookConnection>) {
 function FacebookConnectionButton() {
   const connection = useFacebookConnection();
   const status = facebookStatus(connection);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
 
   function handleClick() {
-    if (connection.connected) {
-      toast(`${connection.page?.name ?? "Facebook Page"} connected`, {
-        description: "Facebook Page connection",
-        action: {
-          label: "Disconnect",
-          onClick: () => {
-            void connection.disconnect();
-          },
-        },
-      });
+    if (!connection.connected) {
+      connection.connect();
       return;
     }
-
-    connection.connect();
+    setMenuOpen((open) => !open);
   }
 
   const title = connection.connected
@@ -715,25 +726,57 @@ function FacebookConnectionButton() {
     : status.label;
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      aria-label={
-        connection.connected
-          ? "Manage Facebook Page connection"
-          : "Connect Facebook Page"
-      }
-      title={title}
-      className="relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-    >
-      <FacebookMark className="size-5" />
-      <span
-        className={cn(
-          "absolute right-1 top-1 size-1.5 rounded-full ring-2 ring-card",
-          status.dot
-        )}
-        aria-hidden
-      />
-    </button>
+    <div ref={menuRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={handleClick}
+        aria-label={
+          connection.connected
+            ? "Manage Facebook Page connection"
+            : "Connect Facebook Page"
+        }
+        aria-expanded={connection.connected ? menuOpen : undefined}
+        title={title}
+        className="relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      >
+        <FacebookMark className="size-5" />
+        <span
+          className={cn(
+            "absolute right-1 top-1 size-1.5 rounded-full ring-2 ring-card",
+            status.dot
+          )}
+          aria-hidden
+        />
+      </button>
+
+      {menuOpen && connection.connected && (
+        <div
+          aria-label="Facebook Page connection"
+          className="absolute right-0 top-[calc(100%+6px)] z-50 w-60 rounded-lg border border-border bg-card p-3 shadow-lg"
+        >
+          <p className="truncate text-[12px] font-semibold">
+            {connection.page?.name ?? "Facebook Page"}
+          </p>
+          <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+            Connected — posts publish to this Page.
+          </p>
+          <div className="mt-2.5 flex justify-end">
+            <ConfirmButton
+              size="sm"
+              variant="ghost"
+              onConfirm={() => {
+                setMenuOpen(false);
+                return connection.disconnect();
+              }}
+              confirmLabel="Confirm disconnect"
+              busyLabel="Disconnecting…"
+              className="h-7 px-2 text-[11px] font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            >
+              Disconnect
+            </ConfirmButton>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

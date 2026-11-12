@@ -15,6 +15,7 @@ import {
   FolderOpen,
   HardDriveDownload,
   Link2,
+  Loader2,
   LockKeyhole,
   Play,
   RefreshCw,
@@ -28,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { Button } from "@/components/ui/button";
+import { ConfirmIconButton } from "@/components/ui/confirm-button";
 import { cn } from "cn";
 
 type PlatformId = "youtube" | "facebook" | "instagram" | "x" | "reddit" | "tiktok";
@@ -367,6 +369,7 @@ export default function DownloadsPage() {
         );
         setPreviewId(next?.id ?? null);
       }
+      toast.success("Removed from recent downloads");
     } catch (error) {
       toast.error("Could not remove download history", {
         description: error instanceof Error ? error.message : undefined,
@@ -953,15 +956,17 @@ export default function DownloadsPage() {
                 )}
                 {(job.status === "done" || job.status === "failed") &&
                   job.source !== "disk" && (
-                  <button
-                    type="button"
-                    onClick={() => void removeDownload(job.id)}
-                    aria-label={`Remove ${job.fileName ?? job.platform} from recent downloads`}
+                  <ConfirmIconButton
+                    onConfirm={() => removeDownload(job.id)}
+                    idleLabel={`Remove ${job.fileName ?? job.platform} from recent downloads`}
+                    armedLabel="Click again to remove this download"
                     title="Remove from recent downloads"
-                    className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                  >
-                    <Trash2 className="size-3.5" aria-hidden="true" />
-                  </button>
+                    busyIcon={
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                    }
+                    className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                    icon={<Trash2 className="size-3.5" aria-hidden="true" />}
+                  />
                 )}
               </li>
             ))}

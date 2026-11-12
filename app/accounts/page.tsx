@@ -11,6 +11,7 @@ import {
 import { AppFrame } from "@/components/app-frame";
 import { PlatformMark, type PlatformKind } from "@/components/platform-mark";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { useFacebookConnection } from "@/components/facebook-connection";
 import { useInstagramConnection } from "@/components/instagram-connection";
 import { cn } from "cn";
@@ -210,15 +211,17 @@ export default function AccountsPage() {
             </div>
 
             {connection.connected ? (
-              <Button
+              <ConfirmButton
                 variant="outline"
                 size="sm"
-                onClick={() => void connection.disconnect()}
+                onConfirm={() => connection.disconnect()}
                 disabled={connection.refreshing}
+                confirmLabel="Confirm disconnect"
+                busyLabel="Disconnecting…"
                 className="h-8 rounded-[7px] bg-card px-3 text-[11.5px]"
               >
-                {connection.refreshing ? "Disconnecting…" : "Disconnect"}
-              </Button>
+                Disconnect
+              </ConfirmButton>
             ) : (
               <Button
                 variant="facebook"

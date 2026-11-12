@@ -5,6 +5,7 @@ import { Copy, Radio, RefreshCw, Square, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { AssistantChat } from '@/components/assistant-chat';
 import { Button } from '@/components/ui/button';
+import { ConfirmButton } from '@/components/ui/confirm-button';
 import { cn } from 'cn';
 import {
   ComposerCard,
@@ -504,10 +505,18 @@ function StreamCard({
             <MessageSquare className="size-3.5" aria-hidden />
             {commentsBusy ? 'Loading…' : 'Live comments'}
           </Button>
-          <Button size="sm" variant="destructive" onClick={end} disabled={busy || ended}>
-            <Square className="size-3.5" aria-hidden />
+          <ConfirmButton
+            size="sm"
+            variant="destructive"
+            onConfirm={end}
+            disabled={busy || ended}
+            confirmLabel="Confirm end"
+            busyLabel="Ending…"
+            cancelLabel="Keep streaming"
+            icon={<Square className="size-3.5" aria-hidden />}
+          >
             End stream
-          </Button>
+          </ConfirmButton>
         </div>
         {comments && (
           <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-2">

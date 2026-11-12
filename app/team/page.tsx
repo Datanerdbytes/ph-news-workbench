@@ -5,6 +5,7 @@ import { Check, Copy, Mail, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { cn } from "cn";
 import { formatDateTime } from "@/lib/format";
 
@@ -91,6 +92,7 @@ export default function TeamPage() {
       return;
     }
     setInvites((current) => current.filter((invite) => invite.id !== id));
+    toast.success("Invite revoked");
   }
 
   async function copyLink(id: string) {
@@ -222,7 +224,7 @@ export default function TeamPage() {
                           Expires {formatDateTime(invite.expires_at)}
                         </p>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1">
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                         <Button
                           variant="outline"
                           size="sm"
@@ -237,13 +239,16 @@ export default function TeamPage() {
                           {copied === invite.id ? "Copied" : "Copy link"}
                         </Button>
                         {role === "owner" && (
-                          <button
-                            type="button"
-                            onClick={() => void revokeInvite(invite.id)}
-                            className="rounded-md px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                          <ConfirmButton
+                            size="sm"
+                            variant="ghost"
+                            onConfirm={() => revokeInvite(invite.id)}
+                            confirmLabel="Confirm revoke"
+                            busyLabel="Revoking…"
+                            className="h-7 px-2 text-[11px] font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                           >
                             Revoke
-                          </button>
+                          </ConfirmButton>
                         )}
                       </div>
                     </div>

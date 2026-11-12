@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Play, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, Loader2, Play, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { Button } from "@/components/ui/button";
+import { ConfirmIconButton } from "@/components/ui/confirm-button";
 import { StatusPill } from "@/components/status-pill";
 import { cn } from "cn";
 import { formatDateTime } from "@/lib/format";
@@ -184,12 +185,12 @@ export default function CalendarPage() {
       toast.error("Could not cancel the post", {
         description:
           data?.error ??
-          "The post could not be cancelled. Please try again.",
+          "The post could not be canceled. Please try again.",
       });
       return;
     }
     setPosts((current) => current.filter((post) => post.id !== id));
-    toast("Scheduled post canceled");
+    toast.success("Scheduled post canceled");
   }
 
   return (
@@ -390,14 +391,16 @@ export default function CalendarPage() {
                               {post.news_title ?? post.text}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => void cancelPost(post.id)}
-                            aria-label="Cancel scheduled post"
-                            className="rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                          >
-                            <X className="size-3.5" aria-hidden />
-                          </button>
+                          <ConfirmIconButton
+                            onConfirm={() => cancelPost(post.id)}
+                            idleLabel="Cancel scheduled post"
+                            armedLabel="Click again to cancel this scheduled post"
+                            busyIcon={
+                              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                            }
+                            className="rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                            icon={<X className="size-3.5" aria-hidden />}
+                          />
                         </div>
                       </li>
                     );

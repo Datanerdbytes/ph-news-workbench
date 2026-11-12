@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { useFacebookConnection } from "@/components/facebook-connection";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import {
   PageAvatar,
   useManagedPages,
@@ -500,15 +501,16 @@ export default function SettingsPage() {
               </p>
             </div>
             {connection.connected ? (
-              <Button
-                type="button"
+              <ConfirmButton
                 variant="outline"
                 className="h-8"
+                onConfirm={() => connection.disconnect()}
                 disabled={connection.refreshing}
-                onClick={() => void connection.disconnect()}
+                confirmLabel="Confirm disconnect"
+                busyLabel="Disconnecting…"
               >
-                {connection.refreshing ? "…" : "Disconnect"}
-              </Button>
+                Disconnect
+              </ConfirmButton>
             ) : (
               <Button
                 type="button"
