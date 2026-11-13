@@ -44,7 +44,10 @@ describe("buildGoogleAuthorizationUrl", () => {
     expect(url.searchParams.get("access_type")).toBe("offline");
     expect(url.searchParams.get("prompt")).toBe("consent");
     expect(url.searchParams.get("scope")).toBe(
-      "https://www.googleapis.com/auth/youtube.upload"
+      [
+        "https://www.googleapis.com/auth/youtube.upload",
+        "https://www.googleapis.com/auth/youtube.readonly",
+      ].join(" ")
     );
     expect(url.searchParams.get("state")).toBe("st-1");
     expect(url.searchParams.get("redirect_uri")).toBe(
