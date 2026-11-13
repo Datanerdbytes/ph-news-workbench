@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FolderPlus, Images, ImagePlus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { upload } from '@vercel/blob/client';
+import { deleteStagedBlob } from '@/lib/blob-cleanup';
 import { AssistantChat } from '@/components/assistant-chat';
 import { FacebookPreview } from '@/components/facebook-preview';
 import { FacebookAlbumPreview } from '@/components/facebook-album-preview';
@@ -137,12 +138,7 @@ export default function PhotosPage() {
     setImages((current) => {
       const removed = current[index];
       if (removed && removed.startsWith('http')) {
-        // Best-effort staging cleanup; the blob is transient either way.
-        void fetch('/api/blob', {
-          method: 'DELETE',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ url: removed }),
-        }).catch(() => {});
+        deleteStagedBlob(removed);
       }
       return current.filter((_, i) => i !== index);
     });
