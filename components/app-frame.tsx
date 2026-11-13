@@ -326,7 +326,7 @@ export function AppFrame({
               type="button"
               onClick={() => setNavOpen(false)}
               aria-label="Close navigation"
-              className="grid size-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
+              className="tap-target grid size-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
             >
               <X className="size-4" aria-hidden />
             </button>
@@ -517,7 +517,7 @@ export function AppFrame({
               ref={hamburgerRef}
               onClick={() => setNavOpen(true)}
               aria-label="Open navigation"
-              className="grid size-8 place-items-center rounded-[7px] border border-border bg-card text-secondary-foreground hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
+              className="tap-target grid size-8 place-items-center rounded-[7px] border border-border bg-card text-secondary-foreground hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
             >
               <Menu className="size-4" aria-hidden />
             </button>
@@ -776,7 +776,7 @@ function FacebookConnectionButton() {
         aria-expanded={connection.connected ? menuOpen : undefined}
         aria-haspopup={connection.connected ? "dialog" : undefined}
         title={title}
-        className="relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="tap-target-tight relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         <FacebookMark className="size-5" />
         <span

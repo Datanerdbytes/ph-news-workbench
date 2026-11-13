@@ -557,7 +557,7 @@ function StreamCard({
               stream.secureStreamUrl &&
               void copy(stream.secureStreamUrl, 'Server URL')
             }
-            className="text-muted-foreground hover:text-foreground"
+            className="tap-target rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
             aria-label="Copy server URL"
           >
             <Copy className="size-3.5" />
@@ -570,7 +570,7 @@ function StreamCard({
           <button
             type="button"
             onClick={() => stream.streamKey && void copy(stream.streamKey, 'Stream key')}
-            className="text-muted-foreground hover:text-foreground"
+            className="tap-target rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
             aria-label="Copy stream key"
           >
             <Copy className="size-3.5" />

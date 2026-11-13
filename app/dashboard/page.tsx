@@ -114,7 +114,7 @@ function RetryButton({
       onClick={handleRetry}
       disabled={pending}
       aria-busy={pending}
-      className="ml-2 h-7 rounded-[6px] px-2 text-[10.5px] border-muted-foreground/30 hover:bg-surface-2"
+      className="ml-2 h-8 rounded-[6px] px-2 text-[10.5px] border-muted-foreground/30 hover:bg-surface-2"
     >
       <RotateCcw className={`size-3.5 ${pending ? "animate-spin" : ""}`} aria-hidden />
       <span className="ml-1">{pending ? "Retrying…" : "Retry"}</span>

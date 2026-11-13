@@ -334,7 +334,7 @@ export function FilePicker({
           <button
             type="button"
             onClick={onClear}
-            className="rounded px-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+            className="tap-target rounded px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
           >
             Clear
           </button>
@@ -385,7 +385,7 @@ export function PageSelector({
                   aria-checked={active}
                   onClick={() => onSelect(page.id)}
                   className={cn(
-                    'flex cursor-pointer items-center gap-1.5 rounded-full border py-1 pl-1.5 pr-2.5 text-xs font-semibold transition-colors',
+                    'flex cursor-pointer items-center gap-1.5 rounded-full border py-1.5 pl-2 pr-3 text-xs font-semibold transition-colors',
                     active
                       ? 'border-ink bg-ink text-paper'
                       : 'border-border bg-background/60 text-muted-foreground hover:text-foreground'
@@ -435,12 +435,12 @@ export function ScheduleField({
   const bounds = scheduleBounds();
   return (
     <div>
-      <label className="flex items-center gap-2 text-xs font-medium">
+      <label className="flex items-center gap-2 py-1 text-xs font-medium">
         <input
           type="checkbox"
           checked={enabled}
           onChange={(event) => onEnabled(event.target.checked)}
-          className="size-3.5 accent-[var(--brand)]"
+          className="size-4 accent-[var(--brand)]"
         />
         Schedule with Facebook
       </label>
