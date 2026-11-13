@@ -619,7 +619,8 @@ export default function DownloadsPage() {
                 </p>
                 {activeDownload.status === "queued" && (
                   <p className="mt-1.5 text-[9.5px] leading-relaxed text-muted-foreground">
-                    Still queued? Install the auto-start worker on your Mac:{" "}
+                    Still queued? The local worker may not be running — start
+                    it once on this Mac with{" "}
                     <code className="rounded bg-white px-1 py-0.5 font-mono text-[9px]">
                       npm run worker:install
                     </code>

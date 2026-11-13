@@ -298,7 +298,7 @@ export default function DashboardPage() {
                 ? "Loading your workspace…"
                 : loadError
                   ? "Couldn't load the workspace just now — try refreshing."
-                  : `${ready} draft${ready === 1 ? "" : "s"} ready for review, ${pending} stor${
+                  : `${ready} draft${ready === 1 ? "" : "s"} waiting for review, ${pending} stor${
                     pending === 1 ? "y" : "ies"
                   } in the story queue. ${
                     connection.loading
@@ -341,7 +341,7 @@ export default function DashboardPage() {
           <StatCard
             label="Waiting for review"
             value={ready}
-            hint="Drafts ready to check"
+            hint="Drafts waiting for review"
             icon={FileText}
             loading={loading || loadError}
           />

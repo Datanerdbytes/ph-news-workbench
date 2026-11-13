@@ -100,7 +100,7 @@ export default function YouTubePage() {
         ]);
         return;
       }
-      toast.success('Uploaded to YouTube', {
+      toast.success('Published to YouTube', {
         description: 'Processing happens in YouTube Studio; check it there.',
       });
       setResults([
@@ -270,7 +270,7 @@ export default function YouTubePage() {
                 ) : (
                   <Clapperboard className="size-4" aria-hidden />
                 )}
-                Upload to YouTube
+                Publish to YouTube
               </Button>
               {busy && (
                 <span className="text-[11px] text-muted-foreground">

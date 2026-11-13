@@ -74,7 +74,7 @@ export default function StatusPage() {
       tone: 'text-foreground',
     },
     {
-      label: 'Ready to review',
+      label: 'Waiting for review',
       value: ready,
       hint: 'Generated successfully',
       icon: CheckCircle2,
@@ -97,7 +97,7 @@ export default function StatusPage() {
           className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" aria-hidden />
-          Back to story queue
+          Open story queue
         </Link>
 
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
@@ -229,7 +229,7 @@ export default function StatusPage() {
                 href="/"
                 className={buttonVariants({ variant: 'brand', size: 'sm', className: 'mt-4' })}
               >
-                Back to story queue
+                Open story queue
               </Link>
             </div>
           )}

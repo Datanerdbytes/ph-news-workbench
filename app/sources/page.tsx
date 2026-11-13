@@ -8,6 +8,7 @@ import {
   ExternalLink,
   AlertTriangle,
   CheckCircle,
+  X,
   XCircle,
   Clock,
   Globe,
@@ -84,7 +85,7 @@ function FeedCard({
               disabled={isToggling}
             >
               <StatusIcon className="size-3" aria-hidden />
-              {isToggling ? '...' : status.label}
+              {isToggling ? '…' : status.label}
             </Button>
           </div>
           <p className="mt-1 truncate text-[10.5px] text-muted-foreground">{feed.url}</p>
@@ -202,7 +203,7 @@ function AddFeedDialog({
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-[15px]">Add RSS Feed</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
-            <XCircle className="size-5" aria-hidden />
+            <X className="size-5" aria-hidden />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
@@ -280,7 +281,7 @@ function EditFeedDialog({
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-[15px]">Edit Feed</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
-            <XCircle className="size-5" aria-hidden />
+            <X className="size-5" aria-hidden />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
@@ -332,7 +333,7 @@ function DeleteConfirmDialog({
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-[15px]">Delete Feed</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
-            <XCircle className="size-5" aria-hidden />
+            <X className="size-5" aria-hidden />
           </button>
         </div>
         <p className="mt-3 text-[12px] text-muted-foreground">
@@ -362,6 +363,7 @@ export default function SourcesPage() {
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
   const [deletingFeedId, setDeletingFeedId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [fetchingIds, setFetchingIds] = useState<Set<number>>(new Set());
   const [togglingIds, setDisablingIds] = useState<Set<number>>(new Set());
 
@@ -385,6 +387,12 @@ export default function SourcesPage() {
   useEffect(() => {
     loadFeeds();
   }, [loadFeeds]);
+
+  async function refresh() {
+    setRefreshing(true);
+    await loadFeeds();
+    setRefreshing(false);
+  }
 
   const handleAddFeed = async (url: string) => {
     setSubmitting(true);
@@ -533,10 +541,25 @@ export default function SourcesPage() {
               Manage RSS feeds that populate your Story Queue.
             </p>
           </div>
-          <Button onClick={() => setAddDialogOpen(true)} className="h-9">
-            <Plus className="size-3.5" aria-hidden />
-            Add source
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-9"
+              onClick={() => void refresh()}
+              disabled={refreshing}
+              aria-busy={refreshing}
+            >
+              <RefreshCw
+                className={cn("size-3.5", refreshing && "animate-spin")}
+                aria-hidden
+              />
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </Button>
+            <Button onClick={() => setAddDialogOpen(true)} className="h-9">
+              <Plus className="size-3.5" aria-hidden />
+              Add source
+            </Button>
+          </div>
         </div>
 
         {loadError ? (

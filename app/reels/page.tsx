@@ -220,7 +220,7 @@ export default function ReelsPage() {
       if (!res.ok) throw new Error(data?.error ?? 'The reel could not be posted.');
       setResults(data.results ?? []);
       toast.success(
-        scheduleOn ? 'Reel scheduled' : 'Reel posted',
+        scheduleOn ? 'Reel scheduled' : 'Reel published',
         { description: data.warning }
       );
       setFile(null);
@@ -334,7 +334,7 @@ export default function ReelsPage() {
                     ? 'Publishing…'
                     : scheduleOn
                       ? 'Schedule reel'
-                      : 'Post reel'}
+                      : 'Publish reel'}
           </Button>
           <span className="text-[10px] text-muted-foreground">
             {uploadPct != null

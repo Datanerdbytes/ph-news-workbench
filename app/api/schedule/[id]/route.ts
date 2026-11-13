@@ -60,7 +60,7 @@ export async function DELETE(
         {
           error:
             cancelled.error ??
-            "This item is scheduled on Facebook itself and could not be cancelled automatically. Cancel it in Meta Business Suite, then this entry clears on its own.",
+            "This item is scheduled on Facebook itself and could not be canceled automatically. Cancel it in Meta Business Suite, then this entry clears on its own.",
         },
         { status: 409 }
       );
@@ -97,7 +97,7 @@ export async function DELETE(
 
 /**
  * Cancel a Facebook-held scheduled item. One scheduled action can cover
- * several Pages, so every Page that took it is cancelled in turn; the first
+ * several Pages, so every Page that took it is canceled in turn; the first
  * failure stops the loop and is reported back to the user.
  */
 async function cancelOnFacebook(
@@ -119,7 +119,7 @@ async function cancelOnFacebook(
     return {
       ok: false,
       error:
-        "This item is scheduled on Facebook but the app has no id for it, so it cannot be cancelled here. Cancel it in Meta Business Suite.",
+        "This item is scheduled on Facebook but the app has no id for it, so it cannot be canceled here. Cancel it in Meta Business Suite.",
     };
   }
 
@@ -129,7 +129,7 @@ async function cancelOnFacebook(
       return {
         ok: false,
         error:
-          "The stored Page token is unreadable, so this item cannot be cancelled. Reconnect the Page, or cancel it in Meta Business Suite.",
+          "The stored Page token is unreadable, so this item cannot be canceled. Reconnect the Page, or cancel it in Meta Business Suite.",
       };
     }
 

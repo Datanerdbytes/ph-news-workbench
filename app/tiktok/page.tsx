@@ -254,7 +254,7 @@ export default function TikTokPage() {
                 ) : (
                   <Music2 className="size-4" aria-hidden />
                 )}
-                Post to TikTok
+                Publish to TikTok
               </Button>
               {busy && (
                 <span className="text-[11px] text-muted-foreground">
