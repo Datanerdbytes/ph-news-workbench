@@ -9,8 +9,8 @@ import { authClient } from "@/lib/auth-client";
 import { validateNewPassword } from "@/lib/password";
 import { AuthAlert } from "@/components/auth-alert";
 import { AuthBrand } from "@/components/auth-brand";
+import { PasswordInput } from "@/components/auth-password-input";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "cn";
 
@@ -77,9 +77,9 @@ export function ResetPasswordForm({
         <AuthBrand />
 
         <p className="eyebrow text-brand">Password reset</p>
-        <h2 className="mt-2 text-balance font-heading text-3xl tracking-[-0.02em]">
+        <h1 className="mt-2 text-balance font-heading text-3xl tracking-[-0.02em]">
           Choose a new password
-        </h2>
+        </h1>
 
         {linkError ? (
           <div className="mt-7 space-y-4">
@@ -113,29 +113,27 @@ export function ResetPasswordForm({
           <form onSubmit={onSubmit} className="mt-7 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="password">New password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 autoComplete="new-password"
                 placeholder="At least 8 characters"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={setPassword}
                 required
                 minLength={8}
-                className="h-10 bg-card"
+                className="h-10 bg-card pr-10"
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="confirm">Confirm new password</Label>
-              <Input
+              <PasswordInput
                 id="confirm"
-                type="password"
                 autoComplete="new-password"
                 placeholder="Repeat the new password"
                 value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
+                onChange={setConfirm}
                 required
-                className="h-10 bg-card"
+                className="h-10 bg-card pr-10"
               />
             </div>
 

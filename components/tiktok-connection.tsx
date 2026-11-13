@@ -31,6 +31,7 @@ export type TikTokStatus = {
 
 type TikTokConnectionValue = {
   loading: boolean;
+  connecting: boolean;
   refreshing: boolean;
   configured: boolean;
   connected: boolean;
@@ -68,9 +69,15 @@ function notifyOutcome(outcome: string, status: TikTokStatus | null) {
     }
   } else if (outcome === 'denied') {
     toast.error('TikTok authorization was denied.');
-  } else if (outcome !== 'unconfigured') {
+  } else if (outcome === 'unconfigured') {
+    toast.warning("TikTok publishing isn't set up yet", {
+      description:
+        'The workspace owner still needs to finish the TikTok app setup.',
+    });
+  } else {
     toast.error('TikTok connection failed.', {
-      description: `Outcome: ${outcome}`,
+      description:
+        'Please try again. If it keeps failing, ask the workspace owner to check the setup.',
     });
   }
 }
@@ -85,6 +92,7 @@ export function TikTokConnectionProvider({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreachable, setUnreachable] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const pathname = usePathname();
   const lastPathname = useRef<string | null>(null);
   const flashHandled = useRef(false);
@@ -149,24 +157,26 @@ export function TikTokConnectionProvider({
   }, [pathname, refresh]);
 
   const connect = useCallback(() => {
-    if (loading) return;
+    if (loading || connecting) return;
 
     if (!status?.configured) {
-      toast.warning('TikTok is not configured', {
+      toast.warning("TikTok publishing isn't set up yet", {
         description:
-          'Add the TikTok client key and secret to this environment first.',
+          'The workspace owner still needs to finish the TikTok app setup.',
       });
       return;
     }
 
+    setConnecting(true);
     window.location.assign(
       `/api/tiktok/connect?next=${encodeURIComponent(window.location.pathname)}`
     );
-  }, [loading, status?.configured]);
+  }, [loading, connecting, status?.configured]);
 
   const value = useMemo<TikTokConnectionValue>(
     () => ({
       loading,
+      connecting,
       refreshing,
       configured: status?.configured ?? false,
       connected: Boolean(status?.connected),
@@ -176,7 +186,7 @@ export function TikTokConnectionProvider({
       connect,
       refresh,
     }),
-    [loading, refreshing, status, unreachable, connect, refresh]
+    [loading, connecting, refreshing, status, unreachable, connect, refresh]
   );
 
   return (

@@ -24,6 +24,7 @@ export type FacebookStatus = {
 
 type FacebookConnectionValue = {
   loading: boolean;
+  connecting: boolean;
   refreshing: boolean;
   unreachable: boolean;
   configured: boolean;
@@ -46,9 +47,9 @@ const FacebookConnectionContext =
   createContext<FacebookConnectionValue | null>(null);
 
 function notifyUnconfigured() {
-  toast.error('Facebook app not configured', {
+  toast.error('Facebook publishing isn\'t set up yet', {
     description:
-      'Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET to .env.local, then restart the dev server.',
+      'The workspace owner still needs to finish the Facebook app setup.',
   });
 }
 
@@ -78,7 +79,7 @@ function notifyOutcome(outcome: string, status: FacebookStatus | null) {
     case 'page_not_found':
       toast.error('Pinned Page not found', {
         description:
-          'Check FACEBOOK_PAGE_ID, or remove it to connect your first Page.',
+          'The workspace\'s pinned Facebook Page could not be found. Ask the workspace owner to review the Facebook settings.',
       });
       break;
     case 'state':
@@ -89,7 +90,8 @@ function notifyOutcome(outcome: string, status: FacebookStatus | null) {
       break;
     default:
       toast.error('Could not connect Facebook Page', {
-        description: 'Check the dev server logs for details, then try again.',
+        description:
+          'Please try again. If it keeps failing, ask the workspace owner to check the setup.',
       });
   }
 }
@@ -103,6 +105,7 @@ export function FacebookConnectionProvider({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreachable, setUnreachable] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const pathname = usePathname();
   const lastPathname = useRef<string | null>(null);
   const flashHandled = useRef(false);
@@ -167,17 +170,20 @@ export function FacebookConnectionProvider({
   }, [pathname, refresh]);
 
   const connect = useCallback(() => {
-    if (loading) return;
+    if (loading || connecting) return;
 
     if (!status?.configured) {
       notifyUnconfigured();
       return;
     }
 
+    // Full-page OAuth redirect; the flag keeps the button honest while it
+    // round-trips.
+    setConnecting(true);
     window.location.assign(
       `/api/facebook/connect?next=${encodeURIComponent(window.location.pathname)}`
     );
-  }, [loading, status?.configured]);
+  }, [loading, connecting, status?.configured]);
 
   const disconnect = useCallback(async () => {
     setRefreshing(true);
@@ -199,6 +205,7 @@ export function FacebookConnectionProvider({
   const value = useMemo<FacebookConnectionValue>(
     () => ({
       loading,
+      connecting,
       refreshing,
       unreachable,
       configured: status?.configured ?? false,
@@ -208,7 +215,7 @@ export function FacebookConnectionProvider({
       connect,
       disconnect,
     }),
-    [loading, refreshing, unreachable, status, connect, disconnect]
+    [loading, connecting, refreshing, unreachable, status, connect, disconnect]
   );
 
   return (

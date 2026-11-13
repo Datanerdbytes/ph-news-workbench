@@ -29,6 +29,7 @@ export type YouTubeStatus = {
 
 type YouTubeConnectionValue = {
   loading: boolean;
+  connecting: boolean;
   refreshing: boolean;
   configured: boolean;
   connected: boolean;
@@ -65,9 +66,15 @@ function notifyOutcome(outcome: string, status: YouTubeStatus | null) {
     }
   } else if (outcome === 'denied') {
     toast.error('YouTube authorization was denied.');
-  } else if (outcome !== 'unconfigured') {
+  } else if (outcome === 'unconfigured') {
+    toast.warning("YouTube publishing isn't set up yet", {
+      description:
+        'The workspace owner still needs to finish the YouTube app setup.',
+    });
+  } else {
     toast.error('YouTube connection failed.', {
-      description: `Outcome: ${outcome}`,
+      description:
+        'Please try again. If it keeps failing, ask the workspace owner to check the setup.',
     });
   }
 }
@@ -81,6 +88,7 @@ export function YouTubeConnectionProvider({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreachable, setUnreachable] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const pathname = usePathname();
   const lastPathname = useRef<string | null>(null);
   const flashHandled = useRef(false);
@@ -145,24 +153,26 @@ export function YouTubeConnectionProvider({
   }, [pathname, refresh]);
 
   const connect = useCallback(() => {
-    if (loading) return;
+    if (loading || connecting) return;
 
     if (!status?.configured) {
-      toast.warning('YouTube is not configured', {
+      toast.warning("YouTube publishing isn't set up yet", {
         description:
-          'Add the Google OAuth client credentials to this environment first.',
+          'The workspace owner still needs to finish the YouTube app setup.',
       });
       return;
     }
 
+    setConnecting(true);
     window.location.assign(
       `/api/youtube/connect?next=${encodeURIComponent(window.location.pathname)}`
     );
-  }, [loading, status?.configured]);
+  }, [loading, connecting, status?.configured]);
 
   const value = useMemo<YouTubeConnectionValue>(
     () => ({
       loading,
+      connecting,
       refreshing,
       configured: status?.configured ?? false,
       connected: Boolean(status?.connected),
@@ -171,7 +181,7 @@ export function YouTubeConnectionProvider({
       connect,
       refresh,
     }),
-    [loading, refreshing, status, unreachable, connect, refresh]
+    [loading, connecting, refreshing, status, unreachable, connect, refresh]
   );
 
   return (
