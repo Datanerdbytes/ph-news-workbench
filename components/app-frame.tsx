@@ -33,6 +33,7 @@ import { cn } from "cn";
 import { toast } from "sonner";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { FacebookMark } from "@/components/facebook-mark";
+import { PlatformMark } from "@/components/platform-mark";
 import { useFacebookConnection } from "@/components/facebook-connection";
 import { NotificationBell } from "@/components/notifications";
 import {
@@ -203,6 +204,15 @@ export function AppFrame({
   const activePublishingPage = managedPages.find(
     (page) => page.id === selectedPageIds[0]
   );
+  // Non-Facebook platforms publish to their own channel, not the shared
+  // Facebook Page — the sidebar card reflects the section you're in so it
+  // never claims "The Daily Buzz" while you're looking at YouTube.
+  const platformSection =
+    pathname === "/youtube" || pathname.startsWith("/youtube/")
+      ? ("youtube" as const)
+      : pathname === "/tiktok" || pathname.startsWith("/tiktok/")
+        ? ("tiktok" as const)
+        : null;
 
   const workspaceName =
     workspace?.name ?? connection.page?.name ?? "News Workbench";
@@ -321,28 +331,34 @@ export function AppFrame({
           aria-label="Workspace navigation"
         >
           <div className="flex items-center gap-2.5 rounded-[10px] border border-border bg-surface-2 px-2.5 py-2">
-            {activePublishingPage ? (
-              <PageAvatar
-                page={activePublishingPage}
-                className="size-8 rounded-lg text-[11px]"
-              />
+            {platformSection ? (
+              <PlatformStatusCard platform={platformSection} />
             ) : (
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink font-heading text-sm font-semibold text-paper">
-                {initials(workspaceName)}
-              </span>
+              <>
+                {activePublishingPage ? (
+                  <PageAvatar
+                    page={activePublishingPage}
+                    className="size-8 rounded-lg text-[11px]"
+                  />
+                ) : (
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink font-heading text-sm font-semibold text-paper">
+                    {initials(workspaceName)}
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[12.5px] font-semibold leading-tight">
+                    {activePublishingPage?.name ?? workspaceName}
+                  </p>
+                  <p className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">
+                    {activePublishingPage
+                      ? `Publishing · ${workspaceName}`
+                      : workspace?.role === "editor"
+                        ? "Editor workspace"
+                        : "Owner workspace"}
+                  </p>
+                </div>
+              </>
             )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[12.5px] font-semibold leading-tight">
-                {activePublishingPage?.name ?? workspaceName}
-              </p>
-              <p className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">
-                {activePublishingPage
-                  ? `Publishing · ${workspaceName}`
-                  : workspace?.role === "editor"
-                    ? "Editor workspace"
-                    : "Owner workspace"}
-              </p>
-            </div>
             <button
               type="button"
               onClick={() => setNavOpen(false)}
@@ -429,42 +445,48 @@ export function AppFrame({
                 Publishing
               </p>
               <div className="mt-1.5 flex items-center gap-2">
-                {activePublishingPage ? (
-                  <PageAvatar page={activePublishingPage} className="size-5 text-[8px]" />
+                {platformSection ? (
+                  <PlatformStatusCard platform={platformSection} compact />
                 ) : (
-                  <FacebookMark className="size-5" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-semibold leading-tight">
-                    {connection.loading
-                      ? "Checking…"
-                      : connection.connected
-                        ? (activePublishingPage?.name ?? connection.page?.name)
-                        : connection.configured
-                          ? "Connect a Page"
-                          : "Setup needed"}
-                  </p>
-                  <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full",
-                        connection.loading
-                          ? "animate-pulse bg-muted-foreground/50"
+                  <>
+                    {activePublishingPage ? (
+                      <PageAvatar page={activePublishingPage} className="size-5 text-[8px]" />
+                    ) : (
+                      <FacebookMark className="size-5" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[11px] font-semibold leading-tight">
+                        {connection.loading
+                          ? "Checking…"
                           : connection.connected
-                            ? "bg-success"
+                            ? (activePublishingPage?.name ?? connection.page?.name)
                             : connection.configured
-                              ? "bg-warning"
-                              : "bg-faint"
-                      )}
-                      aria-hidden
-                    />
-                    {connection.loading
-                      ? "Facebook Page"
-                      : connection.connected
-                        ? "Connected"
-                        : "Not connected"}
-                  </p>
-                </div>
+                              ? "Connect a Page"
+                              : "Setup needed"}
+                      </p>
+                      <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <span
+                          className={cn(
+                            "size-1.5 rounded-full",
+                            connection.loading
+                              ? "animate-pulse bg-muted-foreground/50"
+                              : connection.connected
+                                ? "bg-success"
+                                : connection.configured
+                                  ? "bg-warning"
+                                  : "bg-faint"
+                          )}
+                          aria-hidden
+                        />
+                        {connection.loading
+                          ? "Facebook Page"
+                          : connection.connected
+                            ? "Connected"
+                            : "Not connected"}
+                      </p>
+                    </div>
+                  </>
+                )}
                 <ChevronRight className="size-3.5 text-faint" aria-hidden />
               </div>
             </Link>
@@ -580,6 +602,74 @@ export function AppFrame({
             {children}
           </main>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// The sidebar card for sections that publish somewhere other than the shared
+// Facebook Page: YouTube uploads go to the connected channel, TikTok posts to
+// the connected account — so the card reports that platform's own state
+// instead of a Facebook Page that has nothing to do with it.
+function PlatformStatusCard({
+  platform,
+  compact = false,
+}: {
+  platform: "youtube" | "tiktok";
+  compact?: boolean;
+}) {
+  const [status, setStatus] = useState<{
+    configured: boolean;
+    connected: boolean;
+    account: { name: string } | null;
+  } | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/${platform}/status`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setStatus(data);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [platform]);
+
+  const label = platform === "youtube" ? "YouTube" : "TikTok";
+  const state = !status
+    ? "Checking…"
+    : !status.configured
+      ? "Setup needed"
+      : status.connected
+        ? (status.account?.name ?? "Connected")
+        : "Not connected";
+
+  if (compact) {
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <PlatformMark platform={platform} className="size-5" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-semibold leading-tight">
+            {label}
+          </p>
+          <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+            {state}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+      <PlatformMark platform={platform} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[12.5px] font-semibold leading-tight">
+          Publishing · {label}
+        </p>
+        <p className="mt-0.5 truncate text-[10px] leading-none text-muted-foreground">
+          {state}
+        </p>
       </div>
     </div>
   );

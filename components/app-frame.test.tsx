@@ -5,9 +5,12 @@ import type { ReactNode } from "react";
 
 const mockReplace = vi.fn();
 const mockRefresh = vi.fn();
+const { pathnameRef } = vi.hoisted(() => ({
+  pathnameRef: { current: "/" },
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mockReplace, refresh: mockRefresh, push: vi.fn() }),
-  usePathname: () => "/",
+  usePathname: () => pathnameRef.current,
 }));
 
 const { signOutMock } = vi.hoisted(() => ({ signOutMock: vi.fn() }));
@@ -133,5 +136,107 @@ describe("AppFrame sign out", () => {
     });
     expect(mockReplace).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeEnabled();
+  });
+});
+
+describe("AppFrame publishing card", () => {
+  function stubFetchWith(payloads: Record<string, unknown>) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        for (const [needle, payload] of Object.entries(payloads)) {
+          if (url.includes(needle)) {
+            return { ok: true, json: async () => payload };
+          }
+        }
+        return { ok: false, json: async () => ({}) };
+      })
+    );
+  }
+
+  it("reports the platform state instead of the Facebook Page on /youtube", async () => {
+    pathnameRef.current = "/youtube";
+    stubFetchWith({
+      "/api/youtube/status": {
+        configured: true,
+        connected: false,
+        account: null,
+        scopes: [],
+      },
+    });
+    render(
+      <AppFrame>
+        <p>Page body</p>
+      </AppFrame>
+    );
+    await flush();
+
+    expect(screen.getByText("Publishing · YouTube")).toBeInTheDocument();
+    expect(screen.getAllByText("Not connected").length).toBeGreaterThan(0);
+  });
+
+  it("names the connected channel when YouTube is live", async () => {
+    pathnameRef.current = "/youtube";
+    stubFetchWith({
+      "/api/youtube/status": {
+        configured: true,
+        connected: true,
+        account: { id: "uc-1", name: "Roel's Channel" },
+        scopes: [],
+      },
+    });
+    render(
+      <AppFrame>
+        <p>Page body</p>
+      </AppFrame>
+    );
+    await flush();
+
+    expect(screen.getByText("Publishing · YouTube")).toBeInTheDocument();
+    expect(screen.getAllByText("Roel's Channel").length).toBeGreaterThan(0);
+    expect(screen.queryByText("The Daily Buzz")).not.toBeInTheDocument();
+  });
+
+  it("does the same for TikTok on /tiktok", async () => {
+    pathnameRef.current = "/tiktok";
+    stubFetchWith({
+      "/api/tiktok/status": {
+        configured: true,
+        connected: false,
+        account: null,
+        scopes: [],
+      },
+    });
+    render(
+      <AppFrame>
+        <p>Page body</p>
+      </AppFrame>
+    );
+    await flush();
+
+    expect(screen.getByText("Publishing · TikTok")).toBeInTheDocument();
+    expect(screen.getAllByText("Not connected").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the Facebook Page card on Facebook-family routes", async () => {
+    pathnameRef.current = "/post";
+    stubFetchWith({});
+    render(
+      <AppFrame>
+        <p>Page body</p>
+      </AppFrame>
+    );
+    await flush();
+
+    expect(screen.queryByText("Publishing · YouTube")).not.toBeInTheDocument();
+    expect(screen.queryByText("Publishing · TikTok")).not.toBeInTheDocument();
+    // The workspace fallback name shows while no Page is selected.
+    expect(screen.getAllByText(/News Workbench/).length).toBeGreaterThan(0);
   });
 });
