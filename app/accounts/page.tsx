@@ -170,7 +170,7 @@ export default function AccountsPage() {
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-3 gap-2.5">
+        <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           <Summary
             label="Live channels"
             value={liveChannels ?? "—"}
@@ -457,9 +457,10 @@ export default function AccountsPage() {
                     variant="brand"
                     size="sm"
                     onClick={instagram.connect}
+                    disabled={instagram.connecting}
                     className="mt-3 h-8 rounded-[7px] px-3 text-[11.5px]"
                   >
-                    Connect Instagram
+                    {instagram.connecting ? "Redirecting…" : "Connect Instagram"}
                   </Button>
                 </div>
               )}
@@ -520,7 +521,7 @@ export default function AccountsPage() {
                 variant="outline"
                 size="sm"
                 disabled
-                title={`Blocked by ${channel.gate}`}
+                aria-describedby={`channel-${channel.platform}-gate`}
                 className="h-8 rounded-[7px] bg-card px-3 text-[11.5px]"
               >
                 Connect {channel.name}
@@ -533,7 +534,10 @@ export default function AccountsPage() {
                   Connection
                 </p>
                 <div className="mt-2">
-                  <p className="text-[12px] font-medium">
+                  <p
+                    id={`channel-${channel.platform}-gate`}
+                    className="text-[12px] font-medium"
+                  >
                     Blocked by {channel.gate}
                   </p>
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
@@ -590,6 +594,7 @@ export default function AccountsPage() {
                     (heading) => (
                       <th
                         key={heading}
+                        scope="col"
                         className="px-4 py-2 text-[9.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
                       >
                         {heading}
@@ -735,9 +740,17 @@ function Flag({ on }: { on: boolean }) {
   return (
     <td className="px-4 py-2.5">
       {on ? (
-        <Check className="size-3.5 text-success" aria-label="Supported" />
+        <Check
+          className="size-3.5 text-success"
+          role="img"
+          aria-label="Supported"
+        />
       ) : (
-        <Minus className="size-3.5 text-faint" aria-label="Not supported" />
+        <Minus
+          className="size-3.5 text-faint"
+          role="img"
+          aria-label="Not supported"
+        />
       )}
     </td>
   );

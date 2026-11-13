@@ -378,3 +378,20 @@ html[data-theme="forest-amber"] {
     transform: translateX(340%);
   }
 }
+
+/*
+ * Users who ask the OS for reduced motion get a still UI: every CSS
+ * animation (spinners, pulses, the download sweep) and transition is
+ * collapsed. GSAP-driven reel previews are output content, not UI motion,
+ * and gate themselves separately (presets.preview.ts).
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

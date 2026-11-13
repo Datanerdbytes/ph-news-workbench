@@ -211,11 +211,21 @@ export function AppFrame({
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/workspace", { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : null))
+      .then(async (res) => {
+        if (!res.ok) throw new Error("workspace request failed");
+        return res.json();
+      })
       .then((data) => {
         if (data) setWorkspace(data);
       })
-      .catch(() => {});
+      .catch((error) => {
+        // Navigations abort this fetch on purpose; anything else is a real
+        // failure and the fallback name should say why it showed up.
+        if ((error as Error)?.name === "AbortError") return;
+        toast.error("Workspace details unavailable", {
+          description: "Showing the default workspace name.",
+        });
+      });
     return () => controller.abort();
   }, []);
 

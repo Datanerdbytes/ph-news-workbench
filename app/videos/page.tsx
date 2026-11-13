@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Film, ImagePlus, Play, TriangleAlert, Upload, Video } from 'lucide-react';
+import { Film, Play, TriangleAlert, Upload, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from 'cn';
 import { AssistantChat } from '@/components/assistant-chat';
@@ -25,6 +25,12 @@ import {
 
 const MAX_BYTES = 1024 * 1024 * 1024;
 
+type VideosPublishResponse = {
+  results?: PublishResult[];
+  warning?: string;
+  error?: string;
+};
+
 export default function VideosPage() {
   const pages = useManagedPages();
   const [file, setFile] = useState<File | null>(null);
@@ -36,6 +42,7 @@ export default function VideosPage() {
   const [scheduledFor, setScheduledFor] = useState(defaultScheduleValue);
   const [scheduleError, setScheduleError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [results, setResults] = useState<PublishResult[] | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [previewFailed, setPreviewFailed] = useState(false);
@@ -168,6 +175,7 @@ export default function VideosPage() {
 
     setBusy(true);
     setResults(null);
+    setUploadPct(0);
     try {
       const form = new FormData();
       form.append('video', file);
@@ -178,9 +186,38 @@ export default function VideosPage() {
       if (scheduledForIso) form.append('scheduledFor', scheduledForIso);
       form.append('pageIds', JSON.stringify(pages.selected));
 
-      const res = await fetch('/api/videos', { method: 'POST', body: form });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? 'The video could not be published.');
+      // Real progress for the browser→workbench leg (GB-scale transfers sit
+      // on this path for minutes); the chunked server→Facebook leg that
+      // follows is the "Publishing…" phase.
+      const data = await new Promise<VideosPublishResponse>(
+        (resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/videos');
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              setUploadPct(Math.round((event.loaded / event.total) * 100));
+            }
+          };
+          xhr.onload = () => {
+            let body: VideosPublishResponse | null = null;
+            try {
+              body = JSON.parse(xhr.responseText) as VideosPublishResponse;
+            } catch {
+              body = null;
+            }
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(body ?? {});
+            } else {
+              reject(
+                new Error(body?.error ?? 'The video could not be published.')
+              );
+            }
+          };
+          xhr.onerror = () =>
+            reject(new Error('The video could not be published.'));
+          xhr.send(form);
+        }
+      );
       setResults(data.results ?? []);
       toast.success(scheduleOn ? 'Video scheduled' : 'Video published', {
         description: data.warning,
@@ -199,6 +236,7 @@ export default function VideosPage() {
       });
     } finally {
       setBusy(false);
+      setUploadPct(null);
     }
   }
 
@@ -333,8 +371,14 @@ export default function VideosPage() {
             onClick={publish}
             disabled={!file || busy || !pages.selected.length}
           >
-            <ImagePlus className="size-3.5" aria-hidden />
-            {busy ? 'Uploading…' : scheduleOn ? 'Schedule video' : 'Publish video'}
+            <Video className="size-3.5" aria-hidden />
+            {busy
+              ? uploadPct != null && uploadPct < 100
+                ? `Uploading ${uploadPct}%…`
+                : 'Publishing…'
+              : scheduleOn
+                ? 'Schedule video'
+                : 'Publish video'}
           </Button>
           <span className="text-[10px] text-muted-foreground">
             {file

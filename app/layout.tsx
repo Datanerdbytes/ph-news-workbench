@@ -34,7 +34,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  // No themeColor: themes are per-account, so a hardcoded color would
+  // mismatch every non-default theme.
   width: "device-width",
   initialScale: 1,
 };

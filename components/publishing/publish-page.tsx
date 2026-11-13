@@ -132,6 +132,7 @@ function PlatformConnectGate({
   platformName,
   gateHint,
   connectLabel,
+  heading,
 }: {
   configured: boolean;
   unreachable: boolean;
@@ -140,6 +141,7 @@ function PlatformConnectGate({
   platformName: string;
   gateHint: React.ReactNode;
   connectLabel: string;
+  heading?: string;
 }) {
   return (
     <div className="mt-6 rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center paper-shadow-sm">
@@ -150,7 +152,7 @@ function PlatformConnectGate({
         {unreachable
           ? 'Connection status unavailable'
           : configured
-            ? `Connect ${platformName}`
+            ? (heading ?? `Connect ${platformName}`)
             : `${platformName} is not configured`}
       </h2>
       <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-muted-foreground">
@@ -169,6 +171,8 @@ function PlatformConnectGate({
   );
 }
 
+// Facebook's gate is PlatformConnectGate with house defaults — the mark and
+// copy differ only, so the two never drift again.
 function ConnectGate({
   configured,
   unreachable,
@@ -179,30 +183,16 @@ function ConnectGate({
   onConnect: () => void;
 }) {
   return (
-    <div className="mt-6 rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center paper-shadow-sm">
-      <span className="mx-auto grid size-10 place-items-center">
-        <FacebookMark className="size-7" />
-      </span>
-      <h2 className="mt-3 text-sm font-semibold">
-        {unreachable
-          ? 'Connection status unavailable'
-          : configured
-            ? 'Connect a Facebook Page'
-            : 'Facebook is not configured'}
-      </h2>
-      <p className="mx-auto mt-1.5 max-w-md text-[12.5px] leading-relaxed text-muted-foreground">
-        {unreachable
-          ? 'Reload the page to check the Page connection again.'
-          : configured
-            ? 'Publishing tools post with the Page access token, so a Page must be connected first.'
-            : 'Add the Facebook app credentials to this environment before publishing.'}
-      </p>
-      {configured && !unreachable && (
-        <Button variant="brand" size="sm" className="mt-4" onClick={onConnect}>
-          Connect Facebook
-        </Button>
-      )}
-    </div>
+    <PlatformConnectGate
+      configured={configured}
+      unreachable={unreachable}
+      onConnect={onConnect}
+      mark={<FacebookMark className="size-7" />}
+      platformName="Facebook"
+      heading="Connect a Facebook Page"
+      gateHint="Publishing tools post with the Page access token, so a Page must be connected first."
+      connectLabel="Connect Facebook"
+    />
   );
 }
 
@@ -214,7 +204,6 @@ export type { ManagedPage } from '@/components/publishing/page-selection';
 
 import {
   PageAvatar,
-  useManagedPages,
   type ManagedPage,
 } from '@/components/publishing/page-selection';
 
@@ -283,11 +272,15 @@ export function FieldLabel({
   );
 }
 
+// Mirrors the ui/input + ui/textarea recipes (same ring and aria-invalid
+// styles, plus the text-base md:text-sm pattern that keeps mobile at 16px so
+// iOS Safari doesn't auto-zoom on focus); composers keep h-9 for the larger
+// touch target.
 export const textareaClass =
-  'mt-1.5 w-full resize-y rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
+  'mt-1.5 w-full resize-y rounded-lg border border-input bg-background px-2.5 py-2 text-base outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm';
 
 export const inputClass =
-  'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
+  'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-base outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm';
 
 /**
  * Pick-time media validation, mirrored from the server-side limits: returns
@@ -537,7 +530,7 @@ export function ScheduleField({
   const bounds = scheduleBounds();
   return (
     <div>
-      <label className="flex items-center gap-2 py-1 text-xs font-medium">
+      <label className="tap-target flex items-center gap-2 py-1 text-xs font-medium">
         <input
           type="checkbox"
           checked={enabled}

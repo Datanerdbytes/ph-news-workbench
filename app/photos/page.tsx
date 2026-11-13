@@ -57,11 +57,13 @@ export default function PhotosPage() {
 
   const [albums, setAlbums] = useState<Album[]>([]);
   const [albumsLoaded, setAlbumsLoaded] = useState(false);
+  const [albumsLoading, setAlbumsLoading] = useState(false);
   const [albumsError, setAlbumsError] = useState(false);
   const [albumId, setAlbumId] = useState('');
   const connection = useFacebookConnection();
 
   async function loadAlbums() {
+    setAlbumsLoading(true);
     try {
       const res = await fetch('/api/photos/albums');
       const data = await res.json().catch(() => null);
@@ -74,6 +76,8 @@ export default function PhotosPage() {
       toast.error('Albums unavailable', {
         description: error instanceof Error ? error.message : undefined,
       });
+    } finally {
+      setAlbumsLoading(false);
     }
   }
 
@@ -108,7 +112,6 @@ export default function PhotosPage() {
     // the images that are still uploading.
     setStaging(true);
     try {
-      const staged: string[] = [];
       for (const file of accepted) {
         const blob = await upload(
           `photos/${Date.now()}-${file.name.replace(/[^\w.-]+/g, '_')}`,
@@ -119,9 +122,11 @@ export default function PhotosPage() {
             contentType: file.type,
           }
         );
-        staged.push(blob.url);
+        // Append each image as soon as its own upload finishes so the
+        // composer reflects progress mid-batch (publishing stays gated on
+        // `staging` until the whole batch lands).
+        setImages((current) => [...current, blob.url].slice(0, MAX_IMAGES));
       }
-      setImages((current) => [...current, ...staged].slice(0, MAX_IMAGES));
     } catch (error) {
       toast.error('Upload failed', {
         description:
@@ -427,6 +432,11 @@ export default function PhotosPage() {
                       </option>
                     ))}
                   </select>
+                  {albumsLoading && !albumsError && (
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      Loading albums…
+                    </p>
+                  )}
                   {albumsError && (
                     <p className="mt-1.5 text-[11px] text-destructive">
                       Couldn&apos;t load albums.{' '}

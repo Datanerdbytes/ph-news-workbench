@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -37,8 +37,15 @@ export function ResetPasswordForm({
   const [confirm, setConfirm] = useState("");
   const [fieldError, setFieldError] = useState("");
   const [loading, setLoading] = useState(false);
+  const errorRef = useRef<HTMLDivElement>(null);
 
   const linkError = error ? labelForCode(error) : "";
+
+  // Move focus to the error so sighted keyboard users don't have to hunt
+  // for it (screen readers already announce the alert).
+  useEffect(() => {
+    if (fieldError) errorRef.current?.focus();
+  }, [fieldError]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -137,7 +144,15 @@ export function ResetPasswordForm({
               />
             </div>
 
-            {fieldError && <AuthAlert>{fieldError}</AuthAlert>}
+            {fieldError && (
+              <div
+                ref={errorRef}
+                tabIndex={-1}
+                className="rounded-lg focus-visible:outline-none"
+              >
+                <AuthAlert>{fieldError}</AuthAlert>
+              </div>
+            )}
 
             <Button
               type="submit"

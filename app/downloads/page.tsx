@@ -186,6 +186,7 @@ export default function DownloadsPage() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [downloads, setDownloads] = useState<DownloadRecord[]>([]);
   const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewErrorId, setPreviewErrorId] = useState<string | null>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
@@ -235,7 +236,7 @@ export default function DownloadsPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   useEffect(() => {
     if (!activeJobId) return;
@@ -896,12 +897,14 @@ export default function DownloadsPage() {
             <ErrorState
               compact
               title="Couldn't load recent downloads"
+              onRetry={() => setReloadKey((key) => key + 1)}
             />
           ) : downloads.length ? (
             <ul className="divide-y divide-border">
             {downloads.map((job) => (
               <li
                 key={job.id}
+                aria-current={previewJob?.id === job.id ? "true" : undefined}
                 className={cn(
                   "flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5",
                   previewJob?.id === job.id && "bg-brand-soft/40"

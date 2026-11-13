@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { AuthAlert } from "@/components/auth-alert";
@@ -16,6 +16,13 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  // Move focus to the error so sighted keyboard users don't have to hunt
+  // for it (screen readers already announce the alert).
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,7 +84,15 @@ export default function ForgotPasswordPage() {
               />
             </div>
 
-            {error && <AuthAlert>{error}</AuthAlert>}
+            {error && (
+              <div
+                ref={errorRef}
+                tabIndex={-1}
+                className="rounded-lg focus-visible:outline-none"
+              >
+                <AuthAlert>{error}</AuthAlert>
+              </div>
+            )}
 
             <Button
               type="submit"

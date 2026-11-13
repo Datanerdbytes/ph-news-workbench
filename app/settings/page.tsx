@@ -357,7 +357,11 @@ export default function SettingsPage() {
             Changing the password signs out your other devices.
           </p>
           <form onSubmit={changePassword} className="mt-3 grid gap-2 sm:max-w-md">
+            <label className="sr-only" htmlFor="current-password">
+              Current password
+            </label>
             <input
+              id="current-password"
               type="password"
               name="current-password"
               autoComplete="current-password"
@@ -368,7 +372,11 @@ export default function SettingsPage() {
               placeholder="Current password"
               className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
             />
+            <label className="sr-only" htmlFor="new-password">
+              New password (at least 8 characters)
+            </label>
             <input
+              id="new-password"
               type="password"
               name="new-password"
               autoComplete="new-password"
@@ -380,7 +388,11 @@ export default function SettingsPage() {
               placeholder="New password (at least 8 characters)"
               className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
             />
+            <label className="sr-only" htmlFor="confirm-password">
+              Confirm new password
+            </label>
             <input
+              id="confirm-password"
               type="password"
               name="confirm-password"
               autoComplete="new-password"

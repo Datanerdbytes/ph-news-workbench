@@ -159,7 +159,7 @@ export default function TeamPage() {
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-3 gap-2.5">
+        <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           <SummaryCard
             label="Members"
             value={loading || loadError ? "—" : String(members.length)}

@@ -307,7 +307,7 @@ export default function PlatformsPage() {
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-3 gap-2.5">
+        <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           <Summary
             label="Connected"
             value={checking ? "—" : liveEntries.length}
@@ -425,7 +425,10 @@ function PlatformCard({ entry }: { entry: PlatformEntry }) {
           ))}
         </div>
 
-        <div className="mt-3 rounded-[8px] border border-border bg-surface-2 px-2.5 py-2">
+        <div
+          id={`platform-${entry.name}-note`}
+          className="mt-3 rounded-[8px] border border-border bg-surface-2 px-2.5 py-2"
+        >
           <div className="flex items-start justify-between gap-3">
             <span className="shrink-0 text-[9.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
               {entry.account ? "Account" : "Access"}
@@ -467,6 +470,7 @@ function PlatformCard({ entry }: { entry: PlatformEntry }) {
                   ? "Checking this platform's status"
                   : undefined)
               }
+              aria-describedby={`platform-${entry.name}-note`}
               className="h-8 w-full rounded-[7px] text-[11.5px]"
             >
               {entry.connecting
