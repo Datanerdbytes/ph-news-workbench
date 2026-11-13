@@ -120,6 +120,24 @@ rotate the secret there, update `.env.local` to match. Check on the agent with
 `~/Library/Logs/ph-news-workbench-scheduler.log`. Run a one-off sweep any time
 with `npm run scheduler:sweep`.
 
+## Repository automation — do not delete
+
+Three tracked files under `.github/` keep this workspace running. Never delete
+or edit them for any reason:
+
+- **`.github/workflows/ci.yml`** — the `verify` check (typecheck, lint, unit
+  tests) that GitHub requires before any PR can merge to `main`. Deleting it
+  removes the merge gate.
+- **`.github/workflows/cron.yml`** — the two GitHub Actions crons. The hourly
+  job is the *only* executor of feed ingest (`POST /api/ingest`) — nothing
+  local replaces it — and the 5-minute job publishes due posts while this Mac
+  is asleep (the LaunchAgent above is the primary; GitHub is its backup).
+- **`.github/pull_request_template.md`** — the PR description checklist.
+
+If a workflow seems broken or noisy, investigate first — deleting any of
+these stops feed ingest, scheduled publishing during sleep, or the merge
+gate itself.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
