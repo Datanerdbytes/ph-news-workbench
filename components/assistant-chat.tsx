@@ -227,7 +227,7 @@ export function AssistantChat({
                         type="button"
                         onClick={() => send(suggestion)}
                         disabled={busy}
-                        className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-brand/30 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                        className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-brand/30 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
                       >
                         {suggestion}
                       </button>
@@ -259,7 +259,10 @@ export function AssistantChat({
 
               {busy && (
                 <div className="flex justify-start">
-                  <span className="inline-flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground">
+                  <span
+                    role="status"
+                    className="inline-flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground"
+                  >
                     <Loader2 className="size-3.5 animate-spin" aria-hidden />
                     {chatMode
                       ? 'Thinking…'
@@ -299,7 +302,7 @@ export function AssistantChat({
                   size="sm"
                   className="h-9 px-3"
                   disabled={!input.trim() || busy}
-                  aria-label="Send revision request"
+                  aria-label={chatMode ? 'Send message' : 'Send revision request'}
                 >
                   {busy ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden />

@@ -147,14 +147,14 @@ export default function DashboardPage() {
         throw new Error("Could not load the workspace.");
       }
 
-      const draftData = (await draftsRes.json()) as Draft[];
+      const draftData = (await draftsRes.json()) as { drafts?: Draft[] };
       const storyData = (await itemsRes.json()) as
         | Story[]
         | { rows?: Story[] };
       const activityData = (await activitiesRes.json()) as
         | Activity[]
         | { rows?: Activity[]; nextCursor?: number | null; hasMore?: boolean };
-      setDrafts(Array.isArray(draftData) ? draftData : []);
+      setDrafts(Array.isArray(draftData?.drafts) ? draftData.drafts : []);
       setStories(
         Array.isArray(storyData) ? storyData : (storyData.rows ?? [])
       );
@@ -298,7 +298,7 @@ export default function DashboardPage() {
                 ? "Loading your workspace…"
                 : loadError
                   ? "Couldn't load the workspace just now — try refreshing."
-                  : `${ready} draft${ready === 1 ? "" : "s"} ready for review, ${pending} stor${
+                  : `${ready} draft${ready === 1 ? "" : "s"} waiting for review, ${pending} stor${
                     pending === 1 ? "y" : "ies"
                   } in the story queue. ${
                     connection.loading
@@ -341,7 +341,7 @@ export default function DashboardPage() {
           <StatCard
             label="Waiting for review"
             value={ready}
-            hint="Drafts ready to check"
+            hint="Drafts waiting for review"
             icon={FileText}
             loading={loading || loadError}
           />
@@ -450,7 +450,7 @@ export default function DashboardPage() {
                         href={isSchedule
                           ? `/calendar?post=${activity.scheduledPostId}`
                           : `/drafts/${activity.id}`}
-                        className="group flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40"
+                        className="group flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">

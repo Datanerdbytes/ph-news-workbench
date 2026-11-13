@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Plus,
   Trash2,
@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/error-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Modal } from '@/components/ui/modal';
 import { timeAgo } from '@/lib/format';
 
 type Feed = {
@@ -84,7 +85,7 @@ function FeedCard({
               disabled={isToggling}
             >
               <StatusIcon className="size-3" aria-hidden />
-              {isToggling ? '...' : status.label}
+              {isToggling ? '…' : status.label}
             </Button>
           </div>
           <p className="mt-1 truncate text-[10.5px] text-muted-foreground">{feed.url}</p>
@@ -181,6 +182,7 @@ function AddFeedDialog({
 }) {
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,51 +196,41 @@ function AddFeedDialog({
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-[15px]">Add RSS Feed</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
-            <XCircle className="size-5" aria-hidden />
-          </button>
+    <Modal open={open} onClose={onClose} title="Add RSS Feed" initialFocusRef={inputRef}>
+      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="feed-url" className="text-[12px]">Feed URL</Label>
+          <Input
+            id="feed-url"
+            ref={inputRef}
+            type="url"
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            placeholder="https://example.com/feed.xml"
+            className="h-9 text-[12px]"
+            disabled={submitting}
+          />
         </div>
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="feed-url" className="text-[12px]">Feed URL</Label>
-            <Input
-              id="feed-url"
-              type="url"
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              placeholder="https://example.com/feed.xml"
-              className="h-9 text-[12px]"
-              disabled={submitting}
-              autoFocus
-            />
-          </div>
-          {error && (
-            <p className="text-[10.5px] text-destructive flex items-center gap-1">
-              <AlertTriangle className="size-3" aria-hidden />
-              {error}
-            </p>
-          )}
-          <p className="text-[10.5px] text-muted-foreground">
-            Enter the URL of an RSS or Atom feed. We&apos;ll fetch the title and preview the latest stories.
+        {error && (
+          <p className="text-[10.5px] text-destructive flex items-center gap-1">
+            <AlertTriangle className="size-3" aria-hidden />
+            {error}
           </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting || !url.trim()}>
-              {submitting ? 'Adding…' : 'Add feed'}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+        )}
+        <p className="text-[10.5px] text-muted-foreground">
+          Enter the URL of an RSS or Atom feed. We&apos;ll fetch the title and preview the latest stories.
+        </p>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={submitting || !url.trim()}>
+            {submitting ? 'Adding…' : 'Add feed'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -256,6 +248,7 @@ function EditFeedDialog({
   submitting: boolean;
 }) {
   const [title, setTitle] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (feed) setTitle(feed.title ?? '');
@@ -272,42 +265,37 @@ function EditFeedDialog({
     }
   };
 
-  if (!open || !feed) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-[15px]">Edit Feed</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
-            <XCircle className="size-5" aria-hidden />
-          </button>
+    <Modal
+      open={open && Boolean(feed)}
+      onClose={onClose}
+      title="Edit Feed"
+      initialFocusRef={inputRef}
+    >
+      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="feed-title" className="text-[12px]">Feed Title</Label>
+          <Input
+            id="feed-title"
+            ref={inputRef}
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Feed title"
+            className="h-9 text-[12px]"
+            disabled={submitting}
+          />
         </div>
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="feed-title" className="text-[12px]">Feed Title</Label>
-            <Input
-              id="feed-title"
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Feed title"
-              className="h-9 text-[12px]"
-              disabled={submitting}
-              autoFocus
-            />
-          </div>
-          <p className="text-[10.5px] text-muted-foreground truncate">{feed.url}</p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting || !title.trim()}>
-              {submitting ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <p className="text-[10.5px] text-muted-foreground truncate">{feed?.url}</p>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={submitting || !title.trim()}>
+            {submitting ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -324,31 +312,21 @@ function DeleteConfirmDialog({
   confirming: boolean;
   feedTitle: string;
 }) {
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-[15px]">Delete Feed</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
-            <XCircle className="size-5" aria-hidden />
-          </button>
-        </div>
-        <p className="mt-3 text-[12px] text-muted-foreground">
-          Are you sure you want to delete <strong className="text-foreground">{feedTitle}</strong>?
-          This will remove the feed from your sources. Previously fetched stories will remain in your queue.
-        </p>
-        <div className="flex justify-end gap-2 mt-5">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={confirming}>
-            Cancel
-          </Button>
-          <Button type="button" variant="destructive" onClick={onConfirm} disabled={confirming}>
-            {confirming ? 'Deleting…' : 'Delete'}
-          </Button>
-        </div>
+    <Modal open={open} onClose={onClose} title="Delete Feed">
+      <p className="mt-3 text-[12px] text-muted-foreground">
+        Are you sure you want to delete <strong className="text-foreground">{feedTitle}</strong>?
+        This will remove the feed from your sources. Previously fetched stories will remain in your queue.
+      </p>
+      <div className="flex justify-end gap-2 mt-5">
+        <Button type="button" variant="ghost" onClick={onClose} disabled={confirming}>
+          Cancel
+        </Button>
+        <Button type="button" variant="destructive" onClick={onConfirm} disabled={confirming}>
+          {confirming ? 'Deleting…' : 'Delete'}
+        </Button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -362,6 +340,7 @@ export default function SourcesPage() {
   const [editingFeed, setEditingFeed] = useState<Feed | null>(null);
   const [deletingFeedId, setDeletingFeedId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [fetchingIds, setFetchingIds] = useState<Set<number>>(new Set());
   const [togglingIds, setDisablingIds] = useState<Set<number>>(new Set());
 
@@ -385,6 +364,12 @@ export default function SourcesPage() {
   useEffect(() => {
     loadFeeds();
   }, [loadFeeds]);
+
+  async function refresh() {
+    setRefreshing(true);
+    await loadFeeds();
+    setRefreshing(false);
+  }
 
   const handleAddFeed = async (url: string) => {
     setSubmitting(true);
@@ -533,10 +518,25 @@ export default function SourcesPage() {
               Manage RSS feeds that populate your Story Queue.
             </p>
           </div>
-          <Button onClick={() => setAddDialogOpen(true)} className="h-9">
-            <Plus className="size-3.5" aria-hidden />
-            Add source
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-9"
+              onClick={() => void refresh()}
+              disabled={refreshing}
+              aria-busy={refreshing}
+            >
+              <RefreshCw
+                className={cn("size-3.5", refreshing && "animate-spin")}
+                aria-hidden
+              />
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </Button>
+            <Button onClick={() => setAddDialogOpen(true)} className="h-9">
+              <Plus className="size-3.5" aria-hidden />
+              Add source
+            </Button>
+          </div>
         </div>
 
         {loadError ? (

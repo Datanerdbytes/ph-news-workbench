@@ -63,7 +63,7 @@ function notifyOutcome(outcome: string, status: FacebookStatus | null) {
       });
       break;
     case 'denied':
-      toast.info('Connection cancelled', {
+      toast.info('Connection canceled', {
         description: 'You can connect your Page anytime from the masthead.',
       });
       break;

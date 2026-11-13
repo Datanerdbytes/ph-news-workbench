@@ -38,4 +38,18 @@ describe("YouTubePreview", () => {
     expect(screen.getByText("NeuralVerse")).toBeInTheDocument();
     expect(screen.getByText("Public")).toBeInTheDocument();
   });
+
+  it("pins the channel badge to the youtube token, not a raw hex", () => {
+    render(
+      <YouTubePreview
+        videoUrl="https://blob/public/youtube/newsroom.mp4"
+        title="t"
+        channelName="NeuralVerse"
+        privacy="public"
+      />
+    );
+    const badge = screen.getByText("Y").closest("span")!;
+    expect(badge.className).toContain("bg-youtube");
+    expect(badge.className).not.toContain("#cc0000");
+  });
 });

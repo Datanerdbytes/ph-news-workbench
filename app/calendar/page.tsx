@@ -99,7 +99,7 @@ function CalendarPostRow({
           idleLabel="Cancel scheduled post"
           armedLabel="Click again to cancel this scheduled post"
           busyIcon={<Loader2 className="size-3.5 animate-spin" aria-hidden />}
-          className="tap-target rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+          className="tap-target rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40"
           icon={<X className="size-3.5" aria-hidden />}
         />
       )}
@@ -429,7 +429,7 @@ export default function CalendarPage() {
                           } — ${post.news_title ?? post.text}`}
                           title={post.text}
                           className={cn(
-                            "block w-full truncate rounded px-1.5 py-1 text-left text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                            "block w-full truncate rounded px-1.5 py-1 text-left text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                             post.status === "published"
                               ? "bg-success-soft text-success hover:bg-success/20"
                               : post.status === "failed"
@@ -450,7 +450,7 @@ export default function CalendarPage() {
                           type="button"
                           onClick={() => setSelectedDay(key)}
                           aria-label={`Show all ${items.length} posts on ${labelForKey(key)}`}
-                          className="block w-full rounded px-1.5 py-0.5 text-left text-[9.5px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                          className="block w-full rounded px-1.5 py-0.5 text-left text-[9.5px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                         >
                           +{items.length - 2} more
                         </button>
@@ -557,7 +557,7 @@ export default function CalendarPage() {
                             busyIcon={
                               <Loader2 className="size-3.5 animate-spin" aria-hidden />
                             }
-                            className="tap-target rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                            className="tap-target rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40"
                             icon={<X className="size-3.5" aria-hidden />}
                           />
                         </div>

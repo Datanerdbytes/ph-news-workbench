@@ -17,6 +17,7 @@ import {
   defaultScheduleValue,
   resolveScheduledFor,
   inputClass,
+  mediaFileError,
   textareaClass,
   useManagedPages,
   type PublishResult,
@@ -47,7 +48,7 @@ export default function VideosPage() {
   }
 
   const videoAside = (
-    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-[#171923] p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
+    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-ink p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-16 -top-20 -z-10 size-[220px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
@@ -57,7 +58,7 @@ export default function VideosPage() {
           <span
             className={cn(
               "size-1.5 rounded-full",
-              file ? "bg-[#79d2ae]" : "bg-white/70"
+              file ? "bg-success-bright" : "bg-white/70"
             )}
           />
           {file ? "Ready to publish" : "Upload preview"}
@@ -219,6 +220,15 @@ export default function VideosPage() {
           onPick={applyVideoFile}
           onClear={() => applyVideoFile(null)}
           icon={<Video className="size-3.5" />}
+          validate={(picked) =>
+            mediaFileError(picked, {
+              types: ['video/mp4', 'video/quicktime'],
+              extensions: ['.mp4', '.mov'],
+              typeLabel: 'an MP4 or MOV file',
+              maxBytes: MAX_BYTES,
+              maxLabel: '1 GB',
+            })
+          }
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -243,7 +253,23 @@ export default function VideosPage() {
               id="video-thumbnail"
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={(event) => setThumbnail(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                const picked = event.target.files?.[0] ?? null;
+                event.target.value = '';
+                if (picked) {
+                  const reason = mediaFileError(picked, {
+                    types: ['image/jpeg', 'image/png', 'image/webp'],
+                    typeLabel: 'a JPEG, PNG, or WebP image',
+                    maxBytes: 20 * 1024 * 1024,
+                    maxLabel: '20 MB',
+                  });
+                  if (reason) {
+                    toast.error(reason);
+                    return;
+                  }
+                }
+                setThumbnail(picked);
+              }}
               className="mt-1.5 block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-surface-2 file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-foreground"
             />
           </div>
@@ -317,7 +343,7 @@ export default function VideosPage() {
           </span>
         </div>
 
-        {results && <ResultList results={results} />}
+        <ResultList results={results ?? []} />
       </ComposerCard>
       <AssistantChat
         draft={description}

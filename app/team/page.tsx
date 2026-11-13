@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, Mail, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { Check, Copy, Mail, RefreshCw, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -69,6 +70,12 @@ export default function TeamPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function refresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
 
   async function createInvite() {
     setCreating(true);
@@ -124,17 +131,32 @@ export default function TeamPage() {
               Drafts and the connected Page are shared; accounts stay separate.
             </p>
           </div>
-          {role === "owner" && (
+          <div className="flex items-center gap-2">
             <Button
-              variant="brand"
-              className="h-9 rounded-[7px] px-3 text-[12px]"
-              onClick={() => void createInvite()}
-              disabled={creating}
+              variant="outline"
+              onClick={() => void refresh()}
+              disabled={refreshing}
+              aria-busy={refreshing}
+              className="h-9 rounded-[7px] border-line-strong bg-card px-3 text-[12px]"
             >
-              <UserPlus className="size-3.5" aria-hidden />
-              {creating ? "Creating…" : "Invite editor"}
+              <RefreshCw
+                className={cn("size-3.5", refreshing && "animate-spin")}
+                aria-hidden
+              />
+              {refreshing ? "Refreshing…" : "Refresh"}
             </Button>
-          )}
+            {role === "owner" && (
+              <Button
+                variant="brand"
+                className="h-9 rounded-[7px] px-3 text-[12px]"
+                onClick={() => void createInvite()}
+                disabled={creating}
+              >
+                <UserPlus className="size-3.5" aria-hidden />
+                {creating ? "Creating…" : "Invite editor"}
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-2.5">

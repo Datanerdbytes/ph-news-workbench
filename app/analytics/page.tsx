@@ -9,12 +9,14 @@ import {
   Heart,
   MessageCircle,
   Newspaper,
+  RefreshCw,
   Share2,
   Sparkles,
 } from "lucide-react";
 import { AppFrame } from "@/components/app-frame";
 import { useFacebookConnection } from "@/components/facebook-connection";
 import { PlatformMark } from "@/components/platform-mark";
+import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { cn } from "cn";
 
@@ -221,12 +223,27 @@ export default function AnalyticsPage() {
               workspace.
             </p>
           </div>
-          {connection.connected && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[10.5px] font-semibold text-secondary-foreground">
-              <span className="size-1.5 rounded-full bg-success" aria-hidden />
-              {connection.page?.name ?? "Facebook Page"}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={retryAnalytics}
+              disabled={loading}
+              aria-busy={loading}
+              className="h-9 rounded-[7px] border-line-strong bg-card px-3 text-[12px]"
+            >
+              <RefreshCw
+                className={cn("size-3.5", loading && "animate-spin")}
+                aria-hidden
+              />
+              {loading ? "Refreshing…" : "Refresh"}
+            </Button>
+            {connection.connected && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[10.5px] font-semibold text-secondary-foreground">
+                <span className="size-1.5 rounded-full bg-success" aria-hidden />
+                {connection.page?.name ?? "Facebook Page"}
+              </span>
+            )}
+          </div>
         </div>
 
         {totals?.failed ? (
@@ -534,7 +551,7 @@ export default function AnalyticsPage() {
             </p>
             <ul className="mt-3 flex flex-col gap-2">
               <li className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-2.5 py-2">
-                <span className="grid size-7 place-items-center rounded-md bg-[#1877f2] text-[10px] font-bold text-white">
+                <span className="grid size-7 place-items-center rounded-md bg-facebook text-[10px] font-bold text-white">
                   f
                 </span>
                 <div className="min-w-0 flex-1">

@@ -37,8 +37,10 @@ export function statusMeta(status: string) {
     case "retrying":
       return {
         label: "Retrying",
-        dot: "bg-warning",
-        pill: "border-warning/20 bg-warning/10 text-warning",
+        // Info blue keeps an in-progress retry visually distinct from the
+        // terminal amber "Canceled" — the two used to share one recipe.
+        dot: "bg-info",
+        pill: "border-info/20 bg-info/10 text-info",
       };
     default:
       return {

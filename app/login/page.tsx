@@ -365,7 +365,7 @@ export default function LoginPage() {
               <p className="text-center text-[11.5px] text-muted-foreground">
                 <Link
                   href="/forgot-password"
-                  className="font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 >
                   Forgot your password?
                 </Link>
@@ -379,7 +379,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => switchMode(mode === "signup" ? "signin" : "signup")}
-              className="font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               {mode === "signup" ? "Sign in" : "Join with an invite code"}
             </button>

@@ -94,7 +94,7 @@ export default function ForgotPasswordPage() {
           Remembered it after all?{" "}
           <Link
             href="/login"
-            className="font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             Sign in
           </Link>

@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { upload } from '@vercel/blob/client';
+import { deleteStagedBlob } from '@/lib/blob-cleanup';
 import { Film, Loader2, Music2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PlatformMark } from '@/components/platform-mark';
@@ -12,6 +13,7 @@ import {
   ResultList,
   textareaClass,
   inputClass,
+  mediaFileError,
   type PublishResult,
 } from '@/components/publishing/publish-page';
 import { TikTokPreview } from '@/components/tiktok-preview';
@@ -39,8 +41,15 @@ export default function TikTokPage() {
 
   const pickVideo = useCallback(async (file: File | null) => {
     if (!file) return;
-    if (!['video/mp4', 'video/quicktime'].includes(file.type)) {
-      toast.error('Choose an MP4 or MOV file.');
+    const reason = mediaFileError(file, {
+      types: ['video/mp4', 'video/quicktime'],
+      extensions: ['.mp4', '.mov'],
+      typeLabel: 'an MP4 or MOV file',
+      maxBytes: 1024 * 1024 * 1024,
+      maxLabel: '1 GB',
+    });
+    if (reason) {
+      toast.error(reason);
       return;
     }
     setStaging(true);
@@ -190,7 +199,10 @@ export default function TikTokPage() {
                 {videoUrl && (
                   <button
                     type="button"
-                    onClick={() => setVideoUrl(null)}
+                    onClick={() => {
+                      deleteStagedBlob(videoUrl);
+                      setVideoUrl(null);
+                    }}
                     className="rounded px-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
                     aria-label="Remove selected video"
                   >
@@ -254,7 +266,7 @@ export default function TikTokPage() {
                 ) : (
                   <Music2 className="size-4" aria-hidden />
                 )}
-                Post to TikTok
+                Publish to TikTok
               </Button>
               {busy && (
                 <span className="text-[11px] text-muted-foreground">

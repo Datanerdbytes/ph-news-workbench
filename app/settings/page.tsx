@@ -303,7 +303,7 @@ export default function SettingsPage() {
               onChange={(event) => setName(event.target.value)}
               disabled={!isOwner || saving}
               maxLength={60}
-              className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
             />
             <Button
               type="submit"
@@ -366,7 +366,7 @@ export default function SettingsPage() {
               disabled={savingPassword}
               required
               placeholder="Current password"
-              className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+              className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
             />
             <input
               type="password"
@@ -378,7 +378,7 @@ export default function SettingsPage() {
               required
               minLength={8}
               placeholder="New password (at least 8 characters)"
-              className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+              className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
             />
             <input
               type="password"
@@ -389,7 +389,7 @@ export default function SettingsPage() {
               disabled={savingPassword}
               required
               placeholder="Confirm new password"
-              className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+              className="h-9 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
             />
             <div>
               <Button
@@ -434,7 +434,7 @@ export default function SettingsPage() {
                   aria-checked={selected}
                   disabled={savingTheme}
                   onClick={() => void changeTheme(option.id)}
-                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60 ${
+                  className={`flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60 ${
                     selected
                       ? "border-ring bg-brand-soft/60 ring-2 ring-ring/30"
                       : "border-border hover:bg-surface-2"
@@ -482,7 +482,7 @@ export default function SettingsPage() {
               value={model}
               onChange={(event) => void changeModel(event.target.value)}
               disabled={!isOwner || savingModel || !model}
-              className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
             >
               {TEXT_MODELS.map((option) => (
                 <option key={option.id} value={option.id}>
@@ -508,7 +508,7 @@ export default function SettingsPage() {
             The Facebook Page this workspace publishes to.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface-2 px-3 py-2.5">
-            <span className="grid size-8 place-items-center rounded-md bg-[#1877f2] text-[11px] font-bold text-white">
+            <span className="grid size-8 place-items-center rounded-md bg-facebook text-[11px] font-bold text-white">
               f
             </span>
             <div className="min-w-0 flex-1">
@@ -552,7 +552,7 @@ export default function SettingsPage() {
 
         <Link
           href="/team"
-          className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <span className="grid size-8 place-items-center rounded-lg bg-surface-3 text-secondary-foreground">
             <UserPlus className="size-4" aria-hidden />

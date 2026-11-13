@@ -743,7 +743,7 @@ export default function Home() {
                           type="button"
                           onClick={() => selectItem(item)}
                           className={cn(
-                            'relative w-full px-4 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40',
+                            'relative w-full px-4 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50',
                             item.draft_id && 'pr-9'
                           )}
                         >
@@ -785,7 +785,7 @@ export default function Home() {
                             armedLabel="Click again to delete this draft"
                             title="Delete draft"
                             disabled={rowDeleting === item.id}
-                            className="tap-target absolute right-1.5 top-2.5 rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                            className="tap-target absolute right-1.5 top-2.5 rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40"
                             icon={<Trash2 className="size-3.5" aria-hidden />}
                           />
                         ) : null}
@@ -852,7 +852,7 @@ export default function Home() {
                   type="button"
                   onClick={() => setPane('queue')}
                   aria-label="Back to story queue"
-                  className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-card text-faint transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 md:hidden"
+                  className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-card text-faint transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 md:hidden"
                 >
                   <ArrowLeft className="size-3.5" aria-hidden />
                 </button>
@@ -1051,8 +1051,8 @@ export default function Home() {
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] tabular-nums text-muted-foreground">
                           {stats ? (
                             <>
-                              <span>Input {stats.inputTokens} tok</span>
-                              <span>Output {stats.outputTokens} tok</span>
+                              <span>Input {stats.inputTokens} tokens</span>
+                              <span>Output {stats.outputTokens} tokens</span>
                               <span className="font-medium text-foreground/70">
                                 ~{formatCost(stats.estimatedCost)}
                               </span>
@@ -1184,7 +1184,7 @@ export default function Home() {
                                   setScheduledFor(event.target.value);
                                   setScheduleError('');
                                 }}
-                                className="h-8 rounded-md border border-input bg-background px-2 text-[11.5px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                className="h-8 rounded-md border border-input bg-background px-2 text-[11.5px] text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                               />
                               {scheduleError && (
                                 <p

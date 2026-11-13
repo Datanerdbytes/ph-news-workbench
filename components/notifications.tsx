@@ -114,6 +114,7 @@ export function NotificationBell() {
   const [rows, setRows] = useState<NotificationRow[]>([]);
   const [unread, setUnread] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -199,19 +200,25 @@ export function NotificationBell() {
   }
 
   async function loadMore() {
-    if (!hasMore || !rows.length) return;
+    if (loadingMore || !hasMore || !rows.length) return;
+    setLoadingMore(true);
     try {
       const res = await fetch(
         `/api/notifications?limit=${PAGE_SIZE}&before=${rows[rows.length - 1].id}`,
         { cache: "no-store" }
       );
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const data = (await res.json()) as NotificationsResponse;
       setRows((current) => mergeRows(current, data.rows));
       setHasMore(data.hasMore);
       setUnread(data.unread);
-    } catch {
-      // Ignore — the panel keeps what it already has.
+    } catch (error) {
+      // The panel keeps what it already has; say so instead of failing silently.
+      toast.error("Could not load more notifications", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -255,7 +262,7 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-haspopup="dialog"
         title="Notifications"
-        className="tap-target-tight relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="tap-target-tight relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         <Bell className="size-4 text-faint" aria-hidden />
         {unread > 0 && (
@@ -278,7 +285,7 @@ export function NotificationBell() {
               <button
                 type="button"
                 onClick={() => void onMarkAll()}
-                className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[10.5px] font-medium text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[10.5px] font-medium text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <CheckCheck className="size-3.5" aria-hidden />
                 Mark all read
@@ -301,7 +308,7 @@ export function NotificationBell() {
                     type="button"
                     onClick={() => void onRowClick(row)}
                     className={cn(
-                      "flex w-full items-start gap-2.5 rounded-md px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                      "flex w-full items-start gap-2.5 rounded-md px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                       row.readAt
                         ? "hover:bg-surface-3"
                         : "bg-surface-2 hover:bg-surface-3"
@@ -347,9 +354,10 @@ export function NotificationBell() {
               <button
                 type="button"
                 onClick={() => void loadMore()}
-                className="w-full rounded-md px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                disabled={loadingMore}
+                className="w-full rounded-md px-2 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
               >
-                Load more
+                {loadingMore ? "Loading…" : "Load more"}
               </button>
             </div>
           )}

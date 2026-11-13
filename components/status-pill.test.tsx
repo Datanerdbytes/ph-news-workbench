@@ -37,6 +37,13 @@ describe("StatusPill", () => {
     expect(container.firstElementChild!.className).toContain("text-destructive");
   });
 
+  it("keeps retrying visually distinct from canceled", () => {
+    const { container: retrying } = render(<StatusPill status="retrying" />);
+    expect(retrying.firstElementChild!.className).toContain("text-info");
+    const { container: canceled } = render(<StatusPill status="canceled" />);
+    expect(canceled.firstElementChild!.className).toContain("text-warning");
+  });
+
   it("uses the brand palette for scheduled posts", () => {
     const { container } = render(<StatusPill status="scheduled" />);
     expect(container.firstElementChild!.className).toContain("text-brand");

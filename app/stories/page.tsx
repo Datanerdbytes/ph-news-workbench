@@ -13,6 +13,7 @@ import {
   PublishPage,
   ResultList,
   inputClass,
+  mediaFileError,
   useManagedPages,
   type PublishResult,
 } from '@/components/publishing/publish-page';
@@ -86,7 +87,7 @@ export default function StoriesPage() {
       : videoBlobUrl;
 
   const storyAside = (
-    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-[#171923] p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
+    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-ink p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-16 -top-20 -z-10 size-[220px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
@@ -96,7 +97,7 @@ export default function StoriesPage() {
           <span
             className={
               storySource
-                ? 'size-1.5 rounded-full bg-[#79d2ae]'
+                ? 'size-1.5 rounded-full bg-success-bright'
                 : 'size-1.5 rounded-full bg-white/70'
             }
           />
@@ -245,6 +246,14 @@ export default function StoriesPage() {
               onPick={applyStoryPhoto}
               onClear={() => applyStoryPhoto(null)}
               icon={<ImagePlus className="size-3.5" />}
+              validate={(file) =>
+                mediaFileError(file, {
+                  types: ['image/jpeg', 'image/png', 'image/webp'],
+                  typeLabel: 'a JPEG, PNG, or WebP image',
+                  maxBytes: 20 * 1024 * 1024,
+                  maxLabel: '20 MB',
+                })
+              }
             />
             <div>
               <FieldLabel htmlFor="story-photo-url" hint="Or paste a URL">
@@ -270,6 +279,15 @@ export default function StoriesPage() {
             onPick={applyStoryVideo}
             onClear={() => applyStoryVideo(null)}
             icon={<Video className="size-3.5" />}
+            validate={(file) =>
+              mediaFileError(file, {
+                types: ['video/mp4', 'video/quicktime'],
+                extensions: ['.mp4', '.mov'],
+                typeLabel: 'an MP4 or MOV file',
+                maxBytes: 100 * 1024 * 1024,
+                maxLabel: '100 MB',
+              })
+            }
           />
         )}
 
@@ -295,7 +313,7 @@ export default function StoriesPage() {
           </span>
         </div>
 
-        {results && <ResultList results={results} />}
+        <ResultList results={results ?? []} />
       </ComposerCard>
       <AssistantChat />
     </PublishPage>

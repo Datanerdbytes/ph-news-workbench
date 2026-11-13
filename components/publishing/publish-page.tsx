@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { FacebookMark } from '@/components/facebook-mark';
 import { AppFrame } from '@/components/app-frame';
@@ -283,10 +284,40 @@ export function FieldLabel({
 }
 
 export const textareaClass =
-  'mt-1.5 w-full resize-y rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40';
+  'mt-1.5 w-full resize-y rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
 
 export const inputClass =
-  'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40';
+  'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
+
+/**
+ * Pick-time media validation, mirrored from the server-side limits: returns
+ * a human reason the file can't be published, or null when it's acceptable —
+ * so wrong-type or oversized files never start a long upload.
+ */
+export function mediaFileError(
+  file: File,
+  opts: {
+    types: readonly string[];
+    /** Fallback extensions checked when the browser reports no MIME type. */
+    extensions?: readonly string[];
+    /** Noun phrase with article, e.g. "an MP4 or MOV file". */
+    typeLabel: string;
+    maxBytes: number;
+    maxLabel: string;
+  }
+): string | null {
+  const extensionOk =
+    !file.type &&
+    (opts.extensions?.some((ext) => file.name.toLowerCase().endsWith(ext)) ??
+      false);
+  if (!opts.types.includes(file.type) && !extensionOk) {
+    return `Choose ${opts.typeLabel}.`;
+  }
+  if (file.size > opts.maxBytes) {
+    return `The file must be ${opts.maxLabel} or smaller.`;
+  }
+  return null;
+}
 
 export function FilePicker({
   id,
@@ -297,6 +328,7 @@ export function FilePicker({
   onPick,
   onClear,
   icon,
+  validate,
 }: {
   id: string;
   accept: string;
@@ -306,7 +338,10 @@ export function FilePicker({
   onPick: (file: File | null) => void;
   onClear?: () => void;
   icon: React.ReactNode;
+  /** Pick-time validation: return a human reason to reject, or null to accept. */
+  validate?: (file: File) => string | null;
 }) {
+  const [pickError, setPickError] = useState<string | null>(null);
   return (
     <div>
       <FieldLabel htmlFor={id} hint={hint}>
@@ -325,21 +360,44 @@ export function FilePicker({
           type="file"
           accept={accept}
           className="sr-only"
+          aria-invalid={Boolean(pickError)}
+          aria-describedby={pickError ? `${id}-error` : undefined}
           onChange={(event) => {
-            onPick(event.target.files?.[0] ?? null);
+            const picked = event.target.files?.[0] ?? null;
             event.target.value = '';
+            if (picked && validate) {
+              const reason = validate(picked);
+              if (reason) {
+                setPickError(reason);
+                return;
+              }
+            }
+            setPickError(null);
+            onPick(picked);
           }}
         />
         {file && onClear && (
           <button
             type="button"
-            onClick={onClear}
+            onClick={() => {
+              setPickError(null);
+              onClear();
+            }}
             className="tap-target rounded px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
           >
             Clear
           </button>
         )}
       </div>
+      {pickError && (
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="mt-1.5 text-[11px] text-destructive"
+        >
+          {pickError}
+        </p>
+      )}
     </div>
   );
 }
@@ -357,6 +415,45 @@ export function PageSelector({
 }) {
   const selectedId = selected[0] ?? null;
   const activePage = pages.find((page) => page.id === selectedId);
+  const radioRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // Roving tabindex: the selected radio (or the first one) is tabbable.
+  const tabIndexId = selectedId ?? pages[0]?.id ?? null;
+
+  function moveSelection(fromIndex: number, step: number) {
+    if (!pages.length) return;
+    const next =
+      (((fromIndex + step) % pages.length) + pages.length) % pages.length;
+    onSelect(pages[next].id);
+    radioRefs.current[next]?.focus();
+  }
+
+  // Radio semantics: arrows move from the focused radio (selection follows
+  // focus), not from the controlled selection, so repeated presses keep
+  // walking even before the parent state round-trips.
+  function onKeyDown(event: React.KeyboardEvent) {
+    if (!pages.length) return;
+    const target =
+      event.target instanceof HTMLButtonElement ? event.target : null;
+    const focused = target ? radioRefs.current.indexOf(target) : -1;
+    const selected = pages.findIndex((page) => page.id === selectedId);
+    const origin = focused !== -1 ? focused : selected !== -1 ? selected : 0;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveSelection(origin, 1);
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveSelection(origin, -1);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      moveSelection(origin, (pages.length - origin) % pages.length);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      moveSelection(
+        origin,
+        (pages.length - 1 - origin + pages.length) % pages.length
+      );
+    }
+  }
   return (
     <div>
       <FieldLabel hint="One page per post">Pages</FieldLabel>
@@ -373,16 +470,21 @@ export function PageSelector({
           <div
             role="radiogroup"
             aria-label="Publishing page"
+            onKeyDown={onKeyDown}
             className="mt-1.5 flex flex-wrap gap-1.5"
           >
-            {pages.map((page) => {
+            {pages.map((page, index) => {
               const active = page.id === selectedId;
               return (
                 <button
                   key={page.id}
+                  ref={(el) => {
+                    radioRefs.current[index] = el;
+                  }}
                   type="button"
                   role="radio"
                   aria-checked={active}
+                  tabIndex={page.id === tabIndexId ? 0 : -1}
                   onClick={() => onSelect(page.id)}
                   className={cn(
                     'flex cursor-pointer items-center gap-1.5 rounded-full border py-1.5 pl-2 pr-3 text-xs font-semibold transition-colors',
@@ -449,6 +551,8 @@ export function ScheduleField({
           <input
             type="datetime-local"
             aria-label="Publish date and time"
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? 'schedule-error' : undefined}
             min={bounds.min}
             max={bounds.max}
             value={value}
@@ -456,7 +560,11 @@ export function ScheduleField({
             className={cn(inputClass, 'mt-1.5')}
           />
           {error && (
-            <p role="alert" className="mt-1 text-[11px] text-destructive">
+            <p
+              id="schedule-error"
+              role="alert"
+              className="mt-1 text-[11px] text-destructive"
+            >
               {error}
             </p>
           )}
@@ -521,9 +629,10 @@ export type PublishResult = {
 };
 
 export function ResultList({ results }: { results: PublishResult[] }) {
-  if (!results.length) return null;
+  // The live region must exist before results arrive for screen readers to
+  // announce them, so the list renders even when empty (zero height).
   return (
-    <ul className="space-y-1.5">
+    <ul aria-live="polite" className="space-y-1.5">
       {results.map((result) => (
         <li
           key={result.page.id}

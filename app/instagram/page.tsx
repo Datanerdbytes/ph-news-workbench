@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { upload } from '@vercel/blob/client';
+import { deleteStagedBlob } from '@/lib/blob-cleanup';
 import { ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PlatformMark } from '@/components/platform-mark';
@@ -213,7 +214,10 @@ export default function InstagramPage() {
                 {imageUrl && (
                   <button
                     type="button"
-                    onClick={() => setImageUrl(null)}
+                    onClick={() => {
+                      deleteStagedBlob(imageUrl);
+                      setImageUrl(null);
+                    }}
                     className="rounded px-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
                     aria-label="Remove selected image"
                   >

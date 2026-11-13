@@ -123,7 +123,7 @@ export default function LivePage() {
   const hasTitle = Boolean(title.trim());
 
   const liveAside = (
-    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-[#171923] p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
+    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-ink p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-16 -top-20 -z-10 size-[220px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
@@ -133,7 +133,7 @@ export default function LivePage() {
           <span
             className={
               hasTitle
-                ? 'size-1.5 rounded-full bg-[#79d2ae]'
+                ? 'size-1.5 rounded-full bg-success-bright'
                 : 'size-1.5 rounded-full bg-white/70'
             }
           />
@@ -373,12 +373,53 @@ function StreamCard({
   const [busy, setBusy] = useState(false);
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [commentsBusy, setCommentsBusy] = useState(false);
+  const [commentsStopped, setCommentsStopped] = useState(false);
+
+  const ended = stream.status === 'ENDED' || stream.status === 'VOD';
+  const commentsOpen = comments !== null;
 
   useEffect(() => {
     setTitle(stream.title);
     setDescription(stream.description);
     setPlanned(toLocalInput(stream.plannedStartTime));
   }, [stream.title, stream.description, stream.plannedStartTime]);
+
+  // While the stream is live and the panel is open, refresh comments every
+  // 10s. Stop after 3 consecutive failures (one toast) instead of silently
+  // erroring forever.
+  useEffect(() => {
+    if (ended || !commentsOpen || commentsStopped) return;
+    let stopped = false;
+    let failures = 0;
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/live/${stream.id}/comments`, {
+          cache: 'no-store',
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(data?.error ?? 'Could not refresh comments.');
+        }
+        if (stopped) return;
+        failures = 0;
+        setComments(data.comments ?? []);
+      } catch (error) {
+        if (stopped) return;
+        failures += 1;
+        if (failures >= 3) {
+          setCommentsStopped(true);
+          toast.error('Live comments stopped refreshing', {
+            description:
+              error instanceof Error ? error.message : 'Please try again.',
+          });
+        }
+      }
+    }, 10_000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [ended, commentsOpen, commentsStopped, stream.id]);
 
   async function save() {
     setBusy(true);
@@ -424,6 +465,7 @@ function StreamCard({
 
   async function loadComments() {
     setCommentsBusy(true);
+    setCommentsStopped(false);
     try {
       const res = await fetch(`/api/live/${stream.id}/comments`);
       const data = await res.json().catch(() => null);
@@ -437,8 +479,6 @@ function StreamCard({
       setCommentsBusy(false);
     }
   }
-
-  const ended = stream.status === 'ENDED' || stream.status === 'VOD';
 
   return (
     <div className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_240px]">
@@ -530,7 +570,10 @@ function StreamCard({
           </ConfirmButton>
         </div>
         {comments && (
-          <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-2">
+          <div
+            aria-live="polite"
+            className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-2"
+          >
             {comments.length === 0 ? (
               <p className="text-[11px] text-muted-foreground">No comments yet.</p>
             ) : (

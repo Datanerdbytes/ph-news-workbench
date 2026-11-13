@@ -242,6 +242,11 @@ export default function DownloadsPage() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let notified = false;
+    let failures = 0;
+    // A still-running job must survive blips: retry with backoff instead of
+    // ending polling on the first transient error. A gone job is terminal.
+    const POLL_MS = 2000;
+    const GIVE_UP_AFTER = 4;
 
     async function poll() {
       try {
@@ -250,11 +255,21 @@ export default function DownloadsPage() {
         });
         const data = await response.json().catch(() => null);
         if (!response.ok) {
+          if (response.status === 404) {
+            if (!cancelled) {
+              toast.error("This download is no longer available.", {
+                description: data?.error ?? undefined,
+              });
+              setActiveJobId(null);
+            }
+            return;
+          }
           throw new Error(data?.error ?? "Could not check the download status.");
         }
         if (cancelled) return;
 
         const job = data.job as DownloadRecord;
+        failures = 0;
         setDownloads((current) => [
           job,
           ...current.filter((item) => item.id !== job.id),
@@ -277,14 +292,21 @@ export default function DownloadsPage() {
           setActiveJobId(null);
           return;
         }
-        timer = setTimeout(poll, 2000);
+        timer = setTimeout(poll, POLL_MS);
       } catch (error) {
-        if (!cancelled) {
-          toast.error("Could not check download progress", {
-            description: error instanceof Error ? error.message : undefined,
-          });
-          setActiveJobId(null);
+        if (cancelled) return;
+        failures += 1;
+        if (failures < GIVE_UP_AFTER) {
+          timer = setTimeout(
+            poll,
+            Math.min(POLL_MS * 2 ** (failures - 1), 16000)
+          );
+          return;
         }
+        toast.error("Could not check download progress", {
+          description: error instanceof Error ? error.message : undefined,
+        });
+        setActiveJobId(null);
       }
     }
 
@@ -404,7 +426,7 @@ export default function DownloadsPage() {
           </div>
           <a
             href="#how-it-works"
-            className="mb-0.5 inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-[11.5px] font-semibold text-secondary-foreground shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="mb-0.5 inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-[11.5px] font-semibold text-secondary-foreground shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <CircleHelp className="size-3.5 text-faint" aria-hidden="true" />
             How it works
@@ -485,7 +507,7 @@ export default function DownloadsPage() {
                   <button
                     type="button"
                     onClick={() => void pasteLink()}
-                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 text-[10.5px] font-semibold text-secondary-foreground transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 text-[10.5px] font-semibold text-secondary-foreground transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                   >
                     {copied ? (
                       <Check className="size-3.5 text-success" aria-hidden="true" />
@@ -619,10 +641,9 @@ export default function DownloadsPage() {
                 </p>
                 {activeDownload.status === "queued" && (
                   <p className="mt-1.5 text-[9.5px] leading-relaxed text-muted-foreground">
-                    Still queued? Install the auto-start worker on your Mac:{" "}
-                    <code className="rounded bg-white px-1 py-0.5 font-mono text-[9px]">
-                      npm run worker:install
-                    </code>
+                    Still queued? The local worker on this Mac may not be
+                    running yet — run its one-time setup from the project
+                    folder to start it.
                   </p>
                 )}
               </div>
@@ -631,7 +652,7 @@ export default function DownloadsPage() {
 
           <aside
             id="how-it-works"
-            className="relative isolate flex min-h-[380px] flex-col overflow-hidden rounded-xl bg-[#171923] p-5 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)] sm:p-6"
+            className="relative isolate flex min-h-[380px] flex-col overflow-hidden rounded-xl bg-ink p-5 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)] sm:p-6"
           >
             <div
               aria-hidden="true"
@@ -641,7 +662,7 @@ export default function DownloadsPage() {
               <>
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
-                    <span className="size-1.5 rounded-full bg-[#79d2ae]" />
+                    <span className="size-1.5 rounded-full bg-success-bright" />
                     Download complete
                   </span>
                   <span className="font-mono text-[9px] uppercase text-white/60">
@@ -688,7 +709,7 @@ export default function DownloadsPage() {
                 <div className="mt-auto pt-4">
                   <div className="rounded-xl border border-white/10 bg-white/[0.045] p-3.5">
                     <div className="flex items-center gap-2.5">
-                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-success/10 text-[#79d2ae]">
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-success/10 text-success-bright">
                         <Check className="size-3.5" aria-hidden="true" />
                       </span>
                       <div className="min-w-0">
@@ -708,7 +729,7 @@ export default function DownloadsPage() {
                         href={`/reels?video=${previewJob.id}`}
                         aria-label={`Use ${previewJob.fileName} as a reel`}
                         title="Use as reel"
-                        className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                        className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                       >
                         <Clapperboard className="size-3.5" aria-hidden="true" />
                       </a>
@@ -716,7 +737,7 @@ export default function DownloadsPage() {
                         href={`/api/downloads/${previewJob.id}/file?download=1`}
                         aria-label={`Download ${previewJob.fileName}`}
                         title="Download the video file"
-                        className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                        className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                       >
                         <Download className="size-3.5" aria-hidden="true" />
                       </a>
@@ -771,7 +792,7 @@ export default function DownloadsPage() {
                 <p className="text-[10px] font-semibold text-white/80">
                   Your download flow
                 </p>
-                <span className="rounded-full bg-success/10 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.1em] text-[#79d2ae]">
+                <span className="rounded-full bg-success/10 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.1em] text-success-bright">
                   yt-dlp ready
                 </span>
               </div>
@@ -897,7 +918,7 @@ export default function DownloadsPage() {
                     type="button"
                     onClick={() => setPreviewId(job.id)}
                     aria-label={`Preview ${job.fileName} in the side panel`}
-                    className="min-w-0 flex-1 cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="min-w-0 flex-1 cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                   >
                     <p className="truncate text-[11px] font-semibold text-foreground">
                       {job.fileName}
@@ -958,7 +979,7 @@ export default function DownloadsPage() {
                     href={`/reels?video=${job.id}`}
                     aria-label={`Use ${job.fileName ?? job.platform} as a reel`}
                     title="Use as reel"
-                    className="tap-target grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="tap-target grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                   >
                     <Clapperboard className="size-3.5" aria-hidden="true" />
                   </a>
@@ -973,7 +994,7 @@ export default function DownloadsPage() {
                     busyIcon={
                       <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                     }
-                    className="tap-target grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                    className="tap-target grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40"
                     icon={<Trash2 className="size-3.5" aria-hidden="true" />}
                   />
                 )}

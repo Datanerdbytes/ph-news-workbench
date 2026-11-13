@@ -133,7 +133,7 @@ export default function PlatformsPage() {
           ? `${facebook.page.name} · ${facebook.page.id}`
           : null,
       note: facebook.unreachable
-        ? "Status unavailable — the dev server or database may be down."
+        ? "Status unavailable — the server or database may be down."
         : facebook.connected
           ? "Connected through the Facebook Login for Business OAuth flow."
           : facebook.configured
@@ -174,7 +174,7 @@ export default function PlatformsPage() {
           }`
         : null,
       note: instagram.unreachable
-        ? "Status unavailable — the dev server or database may be down."
+        ? "Status unavailable — the server or database may be down."
         : instagram.connected
           ? "Rides the same Meta login as the Facebook Page."
           : instagram.configured
@@ -214,7 +214,7 @@ export default function PlatformsPage() {
         ? `${youtube.account?.name ?? "YouTube"} · ${youtube.account?.id ?? ""}`
         : null,
       note: youtube.unreachable
-        ? "Status unavailable — the dev server or database may be down."
+        ? "Status unavailable — the server or database may be down."
         : youtube.connected
           ? "Uploads land on this channel with the granted youtube.upload scope."
           : youtube.configured
@@ -253,7 +253,7 @@ export default function PlatformsPage() {
         ? `@${tiktok.account?.name ?? "tiktok"} · ${tiktok.account?.id ?? ""}`
         : null,
       note: tiktok.unreachable
-        ? "Status unavailable — the dev server or database may be down."
+        ? "Status unavailable — the server or database may be down."
         : tiktok.connected
           ? tiktok.publicPostingApproved
             ? "Connected with public posting approved."
