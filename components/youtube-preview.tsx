@@ -30,7 +30,7 @@ export function YouTubePreview({
             className="h-full w-full bg-black object-contain"
           />
         ) : (
-          <div className="grid h-full place-items-center text-faint">
+          <div className="grid h-full place-items-center text-muted-foreground">
             <Film className="size-8" aria-hidden />
             <span className="sr-only">No video selected yet</span>
           </div>
@@ -47,7 +47,7 @@ export function YouTubePreview({
       <div className="px-3 pb-3 pt-2">
         <p className="line-clamp-2 text-[12.5px] font-semibold leading-snug">
           {title.trim() || (
-            <span className="text-faint">Your title appears here…</span>
+            <span className="text-muted-foreground">Your title appears here…</span>
           )}
         </p>
         <div className="mt-1.5 flex items-center gap-2">

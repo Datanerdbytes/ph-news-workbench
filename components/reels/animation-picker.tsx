@@ -125,7 +125,7 @@ export function AnimationPicker({
               <span className="mt-1.5 block truncate text-[11px] font-semibold leading-tight">
                 {preset.name}
               </span>
-              <span className="block truncate text-[9px] font-bold uppercase tracking-wider text-faint">
+              <span className="block truncate text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                 {preset.id === 'none' ? 'Start here' : preset.category}
               </span>
             </button>

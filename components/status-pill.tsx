@@ -6,13 +6,15 @@ export function statusMeta(status: string) {
       return {
         label: "Drafted",
         dot: "bg-facebook",
-        pill: "border-facebook/20 bg-facebook/10 text-facebook",
+        // --facebook (#1877f2) is ~4.2:1 at 10px — below AA. The strong
+        // variant clears 4.5:1 on its tinted pill.
+        pill: "border-facebook/20 bg-facebook/10 text-facebook-strong",
       };
     case "published":
       return {
         label: "Published",
-        dot: "bg-emerald-600",
-        pill: "border-emerald-600/20 bg-emerald-600/10 text-emerald-700",
+        dot: "bg-success",
+        pill: "border-success/20 bg-success/10 text-success",
       };
     case "failed":
       return {
@@ -23,8 +25,8 @@ export function statusMeta(status: string) {
     case "canceled":
       return {
         label: "Canceled",
-        dot: "bg-amber-600",
-        pill: "border-amber-600/20 bg-amber-600/10 text-amber-700",
+        dot: "bg-warning",
+        pill: "border-warning/20 bg-warning/10 text-warning",
       };
     case "scheduled":
       return {
@@ -35,8 +37,8 @@ export function statusMeta(status: string) {
     case "retrying":
       return {
         label: "Retrying",
-        dot: "bg-amber-500",
-        pill: "border-amber-500/20 bg-amber-500/10 text-amber-700",
+        dot: "bg-warning",
+        pill: "border-warning/20 bg-warning/10 text-warning",
       };
     default:
       return {

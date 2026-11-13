@@ -139,7 +139,7 @@ export default function LivePage() {
           />
           {hasTitle ? 'Ready to create' : 'Live preview'}
         </span>
-        <span className="font-mono text-[9px] uppercase text-white/35">Live</span>
+        <span className="font-mono text-[9px] uppercase text-white/60">Live</span>
       </div>
 
       <div className="relative mt-4 flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
@@ -160,19 +160,19 @@ export default function LivePage() {
                 {title}
               </p>
               {description.trim() && (
-                <p className="mt-1.5 line-clamp-2 text-[10px] leading-relaxed text-white/45">
+                <p className="mt-1.5 line-clamp-2 text-[10px] leading-relaxed text-white/60">
                   {description}
                 </p>
               )}
             </div>
-            <span className="absolute bottom-2 right-2.5 font-mono text-[8px] text-white/35">
+            <span className="absolute bottom-2 right-2.5 font-mono text-[8px] text-white/60">
               {scheduleOn && !Number.isNaN(new Date(scheduledFor).getTime())
                 ? `Planned ${new Date(scheduledFor).toLocaleString()}`
                 : 'Goes live when the encoder connects'}
             </span>
           </>
         ) : (
-          <div className="flex flex-col items-center gap-2 px-4 text-center text-white/35">
+          <div className="flex flex-col items-center gap-2 px-4 text-center text-white/60">
             <span className="grid size-9 place-items-center rounded-full border border-white/25 bg-white/10">
               <Radio className="size-3.5" aria-hidden />
             </span>
@@ -186,7 +186,7 @@ export default function LivePage() {
       </div>
 
       <div className="mt-3 min-w-0">
-        <p className="truncate font-mono text-[9px] text-white/40">
+        <p className="truncate font-mono text-[9px] text-white/60">
           Title {title.length}/200 · Description {description.length}/5,000
         </p>
       </div>
@@ -201,7 +201,7 @@ export default function LivePage() {
               <p className="text-[10px] font-semibold text-white/85">
                 Streaming endpoint
               </p>
-              <p className="mt-0.5 text-[9px] leading-relaxed text-white/45">
+              <p className="mt-0.5 text-[9px] leading-relaxed text-white/60">
                 Facebook returns an RTMPS server URL and stream key — paste both
                 into OBS or any RTMP encoder.
               </p>

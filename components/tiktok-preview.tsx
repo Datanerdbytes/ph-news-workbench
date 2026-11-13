@@ -61,7 +61,7 @@ export function TikTokPreview({
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-3 pt-8">
           <p className="line-clamp-2 text-[12.5px] font-medium leading-snug text-white">
             {caption.trim() || (
-              <span className="text-white/50">
+              <span className="text-white/60">
                 Your caption appears here…
               </span>
             )}

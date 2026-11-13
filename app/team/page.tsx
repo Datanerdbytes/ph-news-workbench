@@ -285,7 +285,7 @@ export default function TeamPage() {
           </section>
         </div>
 
-        <p className="mt-4 text-[11px] leading-relaxed text-faint">
+        <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
           Editors sign in with their own account. Publishing uses the
           workspace&rsquo;s connected Facebook Page, so everyone posts as the
           same brand.
@@ -306,7 +306,7 @@ function SummaryCard({
 }) {
   return (
     <article className="panel flex items-center gap-3 p-3.5">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-muted-foreground">
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-faint">
         <Icon className="size-4" aria-hidden />
       </span>
       <div className="min-w-0">

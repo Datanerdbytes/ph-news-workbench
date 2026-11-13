@@ -277,16 +277,16 @@ export function FieldLabel({
       <label htmlFor={htmlFor} className="eyebrow text-muted-foreground">
         {children}
       </label>
-      {hint && <span className="text-[10px] text-faint">{hint}</span>}
+      {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
     </div>
   );
 }
 
 export const textareaClass =
-  'mt-1.5 w-full resize-y rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40';
+  'mt-1.5 w-full resize-y rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40';
 
 export const inputClass =
-  'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40';
+  'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40';
 
 export function FilePicker({
   id,
@@ -397,7 +397,7 @@ export function PageSelector({
                     <span
                       className={cn(
                         'rounded-full px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wider',
-                        active ? 'bg-white/15' : 'bg-secondary text-faint'
+                        active ? 'bg-white/15' : 'bg-secondary text-muted-foreground'
                       )}
                     >
                       Default

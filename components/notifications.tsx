@@ -257,7 +257,7 @@ export function NotificationBell() {
         title="Notifications"
         className="relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
-        <Bell className="size-4 text-muted-foreground" aria-hidden />
+        <Bell className="size-4 text-faint" aria-hidden />
         {unread > 0 && (
           <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[9px] font-bold leading-none text-white ring-2 ring-card">
             {unread > 9 ? "9+" : unread}
@@ -333,7 +333,7 @@ export function NotificationBell() {
                       )}
                       <TimeAgo
                         date={row.createdAt}
-                        className="mt-1 block text-[10px] text-faint"
+                        className="mt-1 block text-[10px] text-muted-foreground"
                       />
                     </span>
                   </button>
