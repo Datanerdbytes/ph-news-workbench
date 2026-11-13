@@ -101,6 +101,25 @@ The worker runs up to two downloads at once. Ctrl+C requeues anything active;
 jobs whose worker stops heartbeating for three minutes are requeued
 automatically, up to three attempts.
 
+## Scheduled publishing
+
+Posts scheduled in the composer go out on time only if the scheduling sweep
+runs. Facebook publishes reels and videos on its own schedule, but the
+workspace still has to check Facebook for the outcome before your publish
+notification appears. GitHub's Actions cron is scheduled every 5 minutes but
+often fires hours late, so this Mac runs the sweep every minute as a
+LaunchAgent (GitHub stays as the backup while your Mac sleeps):
+
+```bash
+npm run scheduler:install
+```
+
+It needs `CRON_SECRET` in `.env.local` matching the value on Vercel — if you
+rotate the secret there, update `.env.local` to match. Check on the agent with
+`scripts/install-scheduler.sh --status`; logs land in
+`~/Library/Logs/ph-news-workbench-scheduler.log`. Run a one-off sweep any time
+with `npm run scheduler:sweep`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
