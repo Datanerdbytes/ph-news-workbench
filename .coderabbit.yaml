@@ -2,6 +2,11 @@
 # Docs: https://docs.coderabbit.ai/getting-started/configure-coderabbit
 language: en-US
 reviews:
+  auto_review:
+    # Reviews keep firing on every push — the default pauses them after 5
+    # reviewed commits, which would silently stop later PRs from being
+    # reviewed.
+    auto_pause_after_reviewed_commits: 0
   # "chill" keeps the review focused on meaningful issues instead of nitpicks.
   profile: chill
   request_changes_workflow: false
