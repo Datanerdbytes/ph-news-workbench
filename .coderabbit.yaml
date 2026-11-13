@@ -7,6 +7,8 @@ reviews:
     # reviewed commits, which would silently stop later PRs from being
     # reviewed.
     auto_pause_after_reviewed_commits: 0
+    # Draft PRs get reviewed too (default excludes them).
+    drafts: true
   # "chill" keeps the review focused on meaningful issues instead of nitpicks.
   profile: chill
   request_changes_workflow: false
