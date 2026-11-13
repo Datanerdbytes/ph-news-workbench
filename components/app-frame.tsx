@@ -206,13 +206,17 @@ export function AppFrame({
   );
   // Non-Facebook platforms publish to their own channel, not the shared
   // Facebook Page — the sidebar card reflects the section you're in so it
-  // never claims "The Daily Buzz" while you're looking at YouTube.
+  // never claims "The Daily Buzz" while you're looking at YouTube. Instagram
+  // publishes through the Page's linked professional account, so its card
+  // reports the IG link state instead of the Page name.
   const platformSection =
     pathname === "/youtube" || pathname.startsWith("/youtube/")
       ? ("youtube" as const)
       : pathname === "/tiktok" || pathname.startsWith("/tiktok/")
         ? ("tiktok" as const)
-        : null;
+        : pathname === "/instagram" || pathname.startsWith("/instagram/")
+          ? ("instagram" as const)
+          : null;
 
   const workspaceName =
     workspace?.name ?? connection.page?.name ?? "News Workbench";
@@ -609,19 +613,22 @@ export function AppFrame({
 
 // The sidebar card for sections that publish somewhere other than the shared
 // Facebook Page: YouTube uploads go to the connected channel, TikTok posts to
-// the connected account — so the card reports that platform's own state
+// the connected account, Instagram publishes through the Page's linked
+// professional account — so the card reports that platform's own state
 // instead of a Facebook Page that has nothing to do with it.
 function PlatformStatusCard({
   platform,
   compact = false,
 }: {
-  platform: "youtube" | "tiktok";
+  platform: "youtube" | "tiktok" | "instagram";
   compact?: boolean;
 }) {
   const [status, setStatus] = useState<{
     configured: boolean;
     connected: boolean;
-    account: { name: string } | null;
+    account?: { name: string } | null;
+    ig?: { username: string } | null;
+    reason?: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -635,14 +642,25 @@ function PlatformStatusCard({
     return () => controller.abort();
   }, [platform]);
 
-  const label = platform === "youtube" ? "YouTube" : "TikTok";
+  const label =
+    platform === "youtube"
+      ? "YouTube"
+      : platform === "instagram"
+        ? "Instagram"
+        : "TikTok";
   const state = !status
     ? "Checking…"
     : !status.configured
       ? "Setup needed"
-      : status.connected
-        ? (status.account?.name ?? "Connected")
-        : "Not connected";
+      : platform === "instagram"
+        ? status.connected
+          ? (status.ig?.username ? `@${status.ig.username}` : "Connected")
+          : status.reason === "no_ig_account"
+            ? "No IG linked to the Page"
+            : "Not connected"
+        : status.connected
+          ? (status.account?.name ?? "Connected")
+          : "Not connected";
 
   if (compact) {
     return (
