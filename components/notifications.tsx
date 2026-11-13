@@ -255,7 +255,7 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-haspopup="dialog"
         title="Notifications"
-        className="relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="tap-target-tight relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         <Bell className="size-4 text-faint" aria-hidden />
         {unread > 0 && (

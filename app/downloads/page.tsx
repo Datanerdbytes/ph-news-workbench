@@ -958,7 +958,7 @@ export default function DownloadsPage() {
                     href={`/reels?video=${job.id}`}
                     aria-label={`Use ${job.fileName ?? job.platform} as a reel`}
                     title="Use as reel"
-                    className="grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="tap-target grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                   >
                     <Clapperboard className="size-3.5" aria-hidden="true" />
                   </a>
@@ -973,7 +973,7 @@ export default function DownloadsPage() {
                     busyIcon={
                       <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                     }
-                    className="grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                    className="tap-target grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
                     icon={<Trash2 className="size-3.5" aria-hidden="true" />}
                   />
                 )}

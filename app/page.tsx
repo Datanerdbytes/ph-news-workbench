@@ -623,7 +623,7 @@ export default function Home() {
                 onClick={() => setPane('queue')}
                 aria-pressed={pane === 'queue'}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                  'rounded-md px-3 py-2 text-xs font-semibold transition-colors',
                   pane === 'queue'
                     ? 'bg-ink text-paper'
                     : 'text-muted-foreground hover:text-foreground'
@@ -637,7 +637,7 @@ export default function Home() {
                 aria-pressed={pane === 'compose'}
                 disabled={!selected}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40',
+                  'rounded-md px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-40',
                   pane === 'compose'
                     ? 'bg-ink text-paper'
                     : 'text-muted-foreground hover:text-foreground'
@@ -700,7 +700,7 @@ export default function Home() {
                     onClick={() => setStatusFilter(filter.value)}
                     aria-pressed={statusFilter === filter.value}
                     className={cn(
-                      'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
+                      'rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-colors',
                       statusFilter === filter.value
                         ? 'bg-ink text-paper'
                         : 'text-muted-foreground hover:bg-card hover:text-foreground'
@@ -785,7 +785,7 @@ export default function Home() {
                             armedLabel="Click again to delete this draft"
                             title="Delete draft"
                             disabled={rowDeleting === item.id}
-                            className="absolute right-1.5 top-2.5 rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                            className="tap-target absolute right-1.5 top-2.5 rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
                             icon={<Trash2 className="size-3.5" aria-hidden />}
                           />
                         ) : null}
@@ -941,7 +941,7 @@ export default function Home() {
                                 aria-pressed={language === value}
                                 title={value === 'en' ? 'English' : 'Tagalog'}
                                 className={cn(
-                                  'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
+                                  'rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors',
                                   language === value
                                     ? 'bg-ink text-paper'
                                     : 'text-muted-foreground hover:text-foreground'
@@ -999,7 +999,7 @@ export default function Home() {
                                 type="button"
                                 onClick={() => removeImage(index)}
                                 aria-label={`Remove attachment ${index + 1}`}
-                                className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full border border-border bg-card text-faint shadow-sm transition-colors hover:border-destructive/40 hover:text-destructive"
+                                className="tap-target absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-full border border-border bg-card text-faint shadow-sm transition-colors hover:border-destructive/40 hover:text-destructive"
                               >
                                 <X className="size-3" aria-hidden />
                               </button>

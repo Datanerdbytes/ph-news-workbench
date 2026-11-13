@@ -244,7 +244,7 @@ export default function TeamPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 px-2 text-[11px]"
+                          className="h-8 px-2 text-[11px]"
                           onClick={() => void copyLink(invite.id)}
                         >
                           {copied === invite.id ? (
@@ -261,7 +261,7 @@ export default function TeamPage() {
                             onConfirm={() => revokeInvite(invite.id)}
                             confirmLabel="Confirm revoke"
                             busyLabel="Revoking…"
-                            className="h-7 px-2 text-[11px] font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            className="h-8 px-2 text-[11px] font-semibold text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                           >
                             Revoke
                           </ConfirmButton>

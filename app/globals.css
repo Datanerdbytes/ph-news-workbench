@@ -296,6 +296,38 @@ html[data-theme="forest-amber"] {
     text-transform: uppercase;
   }
 
+  /*
+   * Invisible hit-area extension for small icon-only controls: the
+   * ::after box participates in hit testing, so the effective target
+   * reaches ~40px without changing the visible footprint. Only safe on
+   * controls whose neighbors are at least 12px away (or that are
+   * isolated / absolutely positioned); use tap-target-tight for
+   * controls 8px apart. Positioning: Tailwind's `absolute` (utilities
+   * layer) overrides the relative below, so absolutely-positioned
+   * controls keep their placement and still anchor the pseudo box.
+   */
+  .tap-target {
+    position: relative;
+  }
+
+  .tap-target::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: inherit;
+  }
+
+  .tap-target-tight {
+    position: relative;
+  }
+
+  .tap-target-tight::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: inherit;
+  }
+
   .paper-shadow {
     box-shadow:
       0 1px 2px rgba(16, 24, 40, 0.05),

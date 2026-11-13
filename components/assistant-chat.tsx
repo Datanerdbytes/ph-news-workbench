@@ -194,7 +194,7 @@ export function AssistantChat({
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close assistant"
-                className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="tap-target grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <X className="size-4" aria-hidden />
               </button>

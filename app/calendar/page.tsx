@@ -99,7 +99,7 @@ function CalendarPostRow({
           idleLabel="Cancel scheduled post"
           armedLabel="Click again to cancel this scheduled post"
           busyIcon={<Loader2 className="size-3.5 animate-spin" aria-hidden />}
-          className="rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+          className="tap-target rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
           icon={<X className="size-3.5" aria-hidden />}
         />
       )}
@@ -557,7 +557,7 @@ export default function CalendarPage() {
                             busyIcon={
                               <Loader2 className="size-3.5 animate-spin" aria-hidden />
                             }
-                            className="rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                            className="tap-target rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
                             icon={<X className="size-3.5" aria-hidden />}
                           />
                         </div>

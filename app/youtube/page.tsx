@@ -251,12 +251,12 @@ export default function YouTubePage() {
                 </select>
               </div>
               <div className="flex items-end">
-                <label className="flex items-center gap-2 text-xs font-medium">
+                <label className="flex items-center gap-2 py-1 text-xs font-medium">
                   <input
                     type="checkbox"
                     checked={madeForKids}
                     onChange={(event) => setMadeForKids(event.target.checked)}
-                    className="size-3.5 accent-[var(--brand)]"
+                    className="size-4 accent-[var(--brand)]"
                   />
                   Made for kids
                 </label>

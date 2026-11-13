@@ -118,7 +118,7 @@ function FeedCard({
             variant="ghost"
             size="sm"
             onClick={() => onEdit(feed)}
-            className="h-8 w-8"
+            className="size-9"
             aria-label="Edit feed"
             disabled={isFetching || isToggling}
           >
@@ -128,7 +128,7 @@ function FeedCard({
             variant="ghost"
             size="sm"
             onClick={() => onFetchNow(feed.id)}
-            className="h-8 w-8"
+            className="size-9"
             aria-label="Fetch now"
             disabled={isFetching || isToggling || !feed.enabled}
           >
@@ -142,7 +142,7 @@ function FeedCard({
             variant="ghost"
             size="sm"
             onClick={() => onToggle(feed.id, !feed.enabled)}
-            className="h-8 w-8"
+            className="size-9"
             aria-label={feed.enabled ? 'Disable feed' : 'Enable feed'}
             disabled={isToggling}
           >
@@ -156,7 +156,7 @@ function FeedCard({
             variant="ghost"
             size="sm"
             onClick={() => onDelete(feed)}
-            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            className="size-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
             aria-label="Delete feed"
             disabled={isFetching || isToggling}
           >

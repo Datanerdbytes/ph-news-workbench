@@ -250,7 +250,7 @@ export default function PhotosPage() {
               type="button"
               onClick={() => removeImage(index)}
               aria-label={`Remove image ${index + 1}`}
-              className="absolute right-0.5 top-0.5 rounded bg-ink/70 px-1 text-[10px] font-bold text-paper"
+              className="tap-target absolute right-0 top-0 grid size-6 place-items-center rounded bg-ink/70 text-[13px] font-bold leading-none text-paper"
             >
               ×
             </button>
