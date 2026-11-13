@@ -1,31 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createAuthClient } from "better-auth/react";
 import { toast } from "sonner";
 import { AlertCircle, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { authClient } from "@/lib/auth-client";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FacebookMark } from "@/components/facebook-mark";
 import { AuthBrand } from "@/components/auth-brand";
-
-const authClient = createAuthClient();
+import { AuthAlert } from "@/components/auth-alert";
+import { PasswordInput } from "@/components/auth-password-input";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { data: session, isPending: sessionPending } = authClient.useSession();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [inviteToken, setInviteToken] = useState("");
+  const [inviteState, setInviteState] = useState<"idle" | "accepted" | "failed">(
+    "idle",
+  );
   const [error, setError] = useState("");
   const [needsVerification, setNeedsVerification] = useState(false);
   const [resending, setResending] = useState(false);
   const [loading, setLoading] = useState(false);
+  const errorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("invite");
@@ -35,13 +40,44 @@ export default function LoginPage() {
     setMode("signup");
   }, []);
 
-  async function enter() {
-    if (inviteToken) {
-      await fetch("/api/workspace/accept", {
+  // A signed-in visitor opening an invite link: accept it immediately and
+  // report the outcome instead of showing them a sign-in form.
+  useEffect(() => {
+    if (!inviteToken || sessionPending || !session || inviteState !== "idle")
+      return;
+    void acceptInvite().then((ok) => setInviteState(ok ? "accepted" : "failed"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inviteToken, sessionPending, session, inviteState]);
+
+  // Move focus to the error so sighted keyboard users don't have to hunt
+  // for it (screen readers already announce the role="alert").
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+
+  async function acceptInvite(): Promise<boolean> {
+    if (!inviteToken) return true;
+    try {
+      const res = await fetch("/api/workspace/accept", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ token: inviteToken }),
-      }).catch(() => {});
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function enter() {
+    if (inviteToken) {
+      const ok = await acceptInvite();
+      if (!ok) {
+        setError(
+          "This invite is invalid or has expired. Ask the workspace owner for a fresh link — your account was created, but the workspace wasn't joined.",
+        );
+        return;
+      }
     }
     router.push("/platforms");
     router.refresh();
@@ -69,11 +105,11 @@ export default function LoginPage() {
     setLoading(false);
     if (error) {
       // Sign-in stays closed until the email is verified; offer a resend
-      // (the link lands in the server console — lib/mailer.ts).
+      // (the workspace uses a log-only mailer — lib/mailer.ts).
       if (error.code === "EMAIL_NOT_VERIFIED") {
         setNeedsVerification(true);
         setError(
-          "Your email isn't verified yet. Open the verification link that was sent when you signed up — it appears in the server console.",
+          "Your email isn't verified yet. Open the verification link from when you signed up — links aren't emailed, so ask the workspace owner to share it with you.",
         );
       } else {
         setError(error.message ?? "Login failed");
@@ -91,10 +127,11 @@ export default function LoginPage() {
     });
     setResending(false);
     if (error) {
-      setError(error.message ?? "Could not resend the verification email");
+      setError(error.message ?? "Could not generate the verification link");
     } else {
-      toast.success("Verification email generated", {
-        description: "The link appears in the server console.",
+      toast.success("Verification link generated", {
+        description:
+          "Links aren't emailed — ask the workspace owner to share it with you.",
       });
       setNeedsVerification(false);
       setError("");
@@ -142,8 +179,7 @@ export default function LoginPage() {
           </p>
           <h1 className="mt-5 text-balance font-heading text-5xl leading-[1.05] tracking-[-0.02em] xl:text-6xl">
             The day&rsquo;s news, ready to publish.
-          </h1>
-          <p className="mt-5 max-w-md text-sm leading-relaxed text-paper/70">
+          </h1>          <p className="mt-5 max-w-md text-sm leading-relaxed text-paper/70">
             Draft from trusted Philippine outlets, shape the voice, add an
             illustration, and prepare a post for your Facebook Page — all in one
             desk.
@@ -189,18 +225,46 @@ export default function LoginPage() {
           <p className="eyebrow text-brand">
             {mode === "signup" ? "Invite only" : "Welcome back"}
           </p>
-          <h2 className="mt-2 text-balance font-heading text-3xl tracking-[-0.02em]">
+          {/* The only h1 on mobile — the marketing headline lives in the
+              desktop-only panel. */}
+          <h1 className="mt-2 text-balance font-heading text-3xl tracking-[-0.02em]">
             {mode === "signup"
               ? "Join the workbench"
               : "Sign in to the workbench"}
-          </h2>
+          </h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {mode === "signup"
               ? "Create a desk account with the invite code from the workspace owner."
               : "Use your desk account to open the news queue and drafts."}
           </p>
 
-          <form onSubmit={onSubmit} className="mt-7 space-y-4">
+          {!sessionPending && session ? (
+            <div className="mt-7 space-y-4">
+              {inviteToken && (
+                <AuthAlert kind={inviteState === "failed" ? "error" : "status"}>
+                  {inviteState === "accepted"
+                    ? "Invite accepted — this desk is now part of your workspace."
+                    : inviteState === "failed"
+                      ? "This invite is invalid or has expired. Ask the workspace owner for a fresh link."
+                      : "Accepting the invite…"}
+                </AuthAlert>
+              )}
+              <p className="text-sm text-muted-foreground">
+                You&apos;re already signed in
+                {session.user?.email ? ` as ${session.user.email}` : ""}.
+              </p>
+              <Link
+                href="/platforms"
+                className={buttonVariants({
+                  variant: "brand",
+                  className: "h-10 w-full",
+                })}
+              >
+                Go to the desk
+              </Link>
+            </div>
+          ) : (
+            <form onSubmit={onSubmit} className="mt-7 space-y-4">
             {mode === "signup" && (
               <div className="space-y-1.5">
                 <Label htmlFor="name">Name</Label>
@@ -231,16 +295,15 @@ export default function LoginPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
-                autoComplete="current-password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={setPassword}
                 required
-                minLength={8}
-                className="h-10 bg-card"
+                minLength={mode === "signup" ? 8 : undefined}
+                className="h-10 bg-card pr-10"
               />
             </div>
             {mode === "signup" && (
@@ -249,7 +312,7 @@ export default function LoginPage() {
                 <Input
                   id="inviteCode"
                   type="text"
-                  autoComplete="one-time-code"
+                  autoComplete="off"
                   placeholder="Provided by the owner"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
@@ -261,8 +324,10 @@ export default function LoginPage() {
 
             {error && (
               <div
+                ref={errorRef}
                 role="alert"
-                className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs leading-relaxed text-destructive"
+                tabIndex={-1}
+                className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs leading-relaxed text-destructive focus-visible:outline-none"
               >
                 <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                 {error}
@@ -307,6 +372,7 @@ export default function LoginPage() {
               </p>
             )}
           </form>
+          )}
 
           <p className="mt-4 text-center text-[11.5px] text-muted-foreground">
             {mode === "signup" ? "Already have an account?" : "New to the workbench?"}{" "}

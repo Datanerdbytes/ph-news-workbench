@@ -39,6 +39,7 @@ type PlatformEntry = {
   note: string;
   action: string;
   href?: string;
+  connecting?: boolean;
   onAction?: () => void;
   title?: string;
 };
@@ -137,15 +138,16 @@ export default function PlatformsPage() {
           ? "Connected through the Facebook Login for Business OAuth flow."
           : facebook.configured
             ? "Ready — sign in with the Facebook account that manages the Page."
-            : "Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET to this environment.",
+            : "The workspace owner still needs to finish the Facebook app setup.",
       action: "Connect Facebook",
       href: "/post",
+      connecting: facebook.connecting,
       onAction: facebook.connect,
       title: facebook.connected
         ? undefined
         : facebook.configured
           ? "Opens Facebook's OAuth screen"
-          : "Facebook app credentials are missing from this environment",
+          : "Facebook app setup is still pending",
     },
     {
       platform: "instagram",
@@ -182,12 +184,13 @@ export default function PlatformsPage() {
             : "Instagram uses the same Meta app credentials as Facebook.",
       action: "Connect Instagram",
       href: "/instagram",
+      connecting: instagram.connecting,
       onAction: instagram.connect,
       title: instagram.connected
         ? undefined
         : instagram.configured
           ? "Opens the Meta OAuth screen"
-          : "Facebook app credentials are missing from this environment",
+          : "Facebook app setup is still pending",
     },
     {
       platform: "youtube",
@@ -216,15 +219,16 @@ export default function PlatformsPage() {
           ? "Uploads land on this channel with the granted youtube.upload scope."
           : youtube.configured
             ? "Ready — sign in with a Google account that owns the channel."
-            : "Add the Google OAuth client credentials to this environment.",
+            : "The workspace owner still needs to finish the YouTube app setup.",
       action: "Connect YouTube",
       href: "/youtube",
+      connecting: youtube.connecting,
       onAction: youtube.connect,
       title: youtube.connected
         ? undefined
         : youtube.configured
           ? "Opens Google's OAuth screen"
-          : "Google OAuth client credentials are missing from this environment",
+          : "YouTube app setup is still pending",
     },
     {
       platform: "tiktok",
@@ -256,15 +260,16 @@ export default function PlatformsPage() {
             : "Connected, but public posting waits on the Content Posting API audit."
           : tiktok.configured
             ? "Ready — sign in with the TikTok business account to publish from."
-            : "Add the TikTok client key and secret to this environment.",
+            : "The workspace owner still needs to finish the TikTok app setup.",
       action: "Connect TikTok",
       href: "/tiktok",
+      connecting: tiktok.connecting,
       onAction: tiktok.connect,
       title: tiktok.connected
         ? undefined
         : tiktok.configured
           ? "Opens TikTok's OAuth screen"
-          : "TikTok client credentials are missing from this environment",
+          : "TikTok app setup is still pending",
     },
     { ...LINKEDIN, state: "gated" },
   ];
@@ -455,7 +460,7 @@ function PlatformCard({ entry }: { entry: PlatformEntry }) {
               variant={entry.state === "ready" ? "brand" : "outline"}
               size="sm"
               onClick={entry.onAction}
-              disabled={!actionable || !entry.onAction}
+              disabled={!actionable || !entry.onAction || entry.connecting}
               title={
                 entry.title ??
                 (entry.state === "checking"
@@ -464,7 +469,11 @@ function PlatformCard({ entry }: { entry: PlatformEntry }) {
               }
               className="h-8 w-full rounded-[7px] text-[11.5px]"
             >
-              {entry.state === "checking" ? "Checking…" : entry.action}
+              {entry.connecting
+                ? "Redirecting…"
+                : entry.state === "checking"
+                  ? "Checking…"
+                  : entry.action}
             </Button>
           )}
         </div>

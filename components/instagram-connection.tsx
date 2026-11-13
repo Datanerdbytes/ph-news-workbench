@@ -31,6 +31,7 @@ export type InstagramStatus = {
 
 type InstagramConnectionValue = {
   loading: boolean;
+  connecting: boolean;
   configured: boolean;
   connected: boolean;
   unreachable: boolean;
@@ -61,9 +62,15 @@ function notifyOutcome(search: string, status: InstagramStatus | null) {
     }
   } else if (outcome === 'denied') {
     toast.error('Instagram authorization was denied.');
-  } else if (outcome && outcome !== 'reconnect') {
+  } else if (outcome === 'reconnect') {
+    toast.info('Instagram reconnected', {
+      description:
+        'Nothing needed changing — the existing connection is still good.',
+    });
+  } else if (outcome) {
     toast.error('Instagram connection failed.', {
-      description: `Outcome: ${outcome}`,
+      description:
+        'Please try again. If it keeps failing, ask the workspace owner to check the setup.',
     });
   }
 }
@@ -77,6 +84,7 @@ export function InstagramConnectionProvider({
   const pathname = usePathname();
   const [status, setStatus] = useState<InstagramStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(false);
   const [reachAttempt, setReachAttempt] = useState(0);
   const flashHandled = useRef(false);
 
@@ -132,10 +140,15 @@ export function InstagramConnectionProvider({
   }, [loading, status]);
 
   const connect = useCallback(() => {
+    // The other providers guard on `loading`; Instagram skips its own
+    // redirect if the status probe hasn't settled yet either.
+    if (loading || connecting) return;
+
+    setConnecting(true);
     window.location.href = `/api/instagram/connect?next=${encodeURIComponent(
       window.location.pathname
     )}`;
-  }, []);
+  }, [loading, connecting]);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -145,6 +158,7 @@ export function InstagramConnectionProvider({
   const value = useMemo<InstagramConnectionValue>(
     () => ({
       loading,
+      connecting,
       configured: status?.configured ?? false,
       connected: Boolean(status?.connected),
       // A settled fetch that produced nothing means the status endpoint was
@@ -158,7 +172,7 @@ export function InstagramConnectionProvider({
       connect,
       refresh,
     }),
-    [loading, status, connect, refresh]
+    [loading, connecting, status, connect, refresh]
   );
 
   return (

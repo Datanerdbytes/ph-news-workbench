@@ -37,9 +37,9 @@ export default function ForgotPasswordPage() {
         <AuthBrand />
 
         <p className="eyebrow text-brand">Password reset</p>
-        <h2 className="mt-2 text-balance font-heading text-3xl tracking-[-0.02em]">
+        <h1 className="mt-2 text-balance font-heading text-3xl tracking-[-0.02em]">
           Forgot your password?
-        </h2>
+        </h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Enter your desk email and we&rsquo;ll start a password reset for it.
         </p>
@@ -48,8 +48,8 @@ export default function ForgotPasswordPage() {
           <div className="mt-7 space-y-4">
             <AuthAlert kind="status">
               If that email belongs to a workbench account, a reset link was
-              generated for it. The link appears in the server console — ask
-              the workspace owner if you can&rsquo;t reach it.
+              generated for it. Links aren&rsquo;t emailed — ask the workspace
+              owner to share it with you.
             </AuthAlert>
             <Link
               href="/login"
