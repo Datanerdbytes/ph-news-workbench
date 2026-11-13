@@ -224,6 +224,50 @@ describe("AppFrame publishing card", () => {
     expect(screen.getAllByText("Not connected").length).toBeGreaterThan(0);
   });
 
+  it("reports the linked IG account on /instagram", async () => {
+    pathnameRef.current = "/instagram";
+    stubFetchWith({
+      "/api/instagram/status": {
+        configured: true,
+        connected: true,
+        ig: { id: "ig-1", username: "iamwowie_", picture: null },
+      },
+    });
+    render(
+      <AppFrame>
+        <p>Page body</p>
+      </AppFrame>
+    );
+    await flush();
+
+    expect(screen.getByText("Publishing · Instagram")).toBeInTheDocument();
+    expect(screen.getAllByText("@iamwowie_").length).toBeGreaterThan(0);
+    expect(screen.queryByText("The Daily Buzz")).not.toBeInTheDocument();
+  });
+
+  it("says when the Page has no Instagram linked", async () => {
+    pathnameRef.current = "/instagram";
+    stubFetchWith({
+      "/api/instagram/status": {
+        configured: true,
+        connected: false,
+        ig: null,
+        reason: "no_ig_account",
+      },
+    });
+    render(
+      <AppFrame>
+        <p>Page body</p>
+      </AppFrame>
+    );
+    await flush();
+
+    expect(screen.getByText("Publishing · Instagram")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("No IG linked to the Page").length
+    ).toBeGreaterThan(0);
+  });
+
   it("keeps the Facebook Page card on Facebook-family routes", async () => {
     pathnameRef.current = "/post";
     stubFetchWith({});
