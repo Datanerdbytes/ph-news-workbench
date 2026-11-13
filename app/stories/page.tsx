@@ -313,7 +313,7 @@ export default function StoriesPage() {
           </span>
         </div>
 
-        {results && <ResultList results={results} />}
+        <ResultList results={results ?? []} />
       </ComposerCard>
       <AssistantChat />
     </PublishPage>

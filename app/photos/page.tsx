@@ -394,7 +394,7 @@ export default function PhotosPage() {
                     : 'Publishes to the selected Page(s).'}
                 </span>
               </div>
-              {results && <ResultList results={results} />}
+              <ResultList results={results ?? []} />
             </ComposerCard>
           ) : (
             <div className="space-y-4">

@@ -343,7 +343,7 @@ export default function VideosPage() {
           </span>
         </div>
 
-        {results && <ResultList results={results} />}
+        <ResultList results={results ?? []} />
       </ComposerCard>
       <AssistantChat
         draft={description}

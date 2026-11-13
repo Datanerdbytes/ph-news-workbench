@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { FacebookMark } from '@/components/facebook-mark';
 import { AppFrame } from '@/components/app-frame';
@@ -360,6 +360,8 @@ export function FilePicker({
           type="file"
           accept={accept}
           className="sr-only"
+          aria-invalid={Boolean(pickError)}
+          aria-describedby={pickError ? `${id}-error` : undefined}
           onChange={(event) => {
             const picked = event.target.files?.[0] ?? null;
             event.target.value = '';
@@ -388,7 +390,11 @@ export function FilePicker({
         )}
       </div>
       {pickError && (
-        <p role="alert" className="mt-1.5 text-[11px] text-destructive">
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="mt-1.5 text-[11px] text-destructive"
+        >
           {pickError}
         </p>
       )}
@@ -409,6 +415,45 @@ export function PageSelector({
 }) {
   const selectedId = selected[0] ?? null;
   const activePage = pages.find((page) => page.id === selectedId);
+  const radioRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // Roving tabindex: the selected radio (or the first one) is tabbable.
+  const tabIndexId = selectedId ?? pages[0]?.id ?? null;
+
+  function moveSelection(fromIndex: number, step: number) {
+    if (!pages.length) return;
+    const next =
+      (((fromIndex + step) % pages.length) + pages.length) % pages.length;
+    onSelect(pages[next].id);
+    radioRefs.current[next]?.focus();
+  }
+
+  // Radio semantics: arrows move from the focused radio (selection follows
+  // focus), not from the controlled selection, so repeated presses keep
+  // walking even before the parent state round-trips.
+  function onKeyDown(event: React.KeyboardEvent) {
+    if (!pages.length) return;
+    const target =
+      event.target instanceof HTMLButtonElement ? event.target : null;
+    const focused = target ? radioRefs.current.indexOf(target) : -1;
+    const selected = pages.findIndex((page) => page.id === selectedId);
+    const origin = focused !== -1 ? focused : selected !== -1 ? selected : 0;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveSelection(origin, 1);
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveSelection(origin, -1);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      moveSelection(origin, (pages.length - origin) % pages.length);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      moveSelection(
+        origin,
+        (pages.length - 1 - origin + pages.length) % pages.length
+      );
+    }
+  }
   return (
     <div>
       <FieldLabel hint="One page per post">Pages</FieldLabel>
@@ -425,16 +470,21 @@ export function PageSelector({
           <div
             role="radiogroup"
             aria-label="Publishing page"
+            onKeyDown={onKeyDown}
             className="mt-1.5 flex flex-wrap gap-1.5"
           >
-            {pages.map((page) => {
+            {pages.map((page, index) => {
               const active = page.id === selectedId;
               return (
                 <button
                   key={page.id}
+                  ref={(el) => {
+                    radioRefs.current[index] = el;
+                  }}
                   type="button"
                   role="radio"
                   aria-checked={active}
+                  tabIndex={page.id === tabIndexId ? 0 : -1}
                   onClick={() => onSelect(page.id)}
                   className={cn(
                     'flex cursor-pointer items-center gap-1.5 rounded-full border py-1.5 pl-2 pr-3 text-xs font-semibold transition-colors',
@@ -501,6 +551,8 @@ export function ScheduleField({
           <input
             type="datetime-local"
             aria-label="Publish date and time"
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? 'schedule-error' : undefined}
             min={bounds.min}
             max={bounds.max}
             value={value}
@@ -508,7 +560,11 @@ export function ScheduleField({
             className={cn(inputClass, 'mt-1.5')}
           />
           {error && (
-            <p role="alert" className="mt-1 text-[11px] text-destructive">
+            <p
+              id="schedule-error"
+              role="alert"
+              className="mt-1 text-[11px] text-destructive"
+            >
               {error}
             </p>
           )}
@@ -573,9 +629,10 @@ export type PublishResult = {
 };
 
 export function ResultList({ results }: { results: PublishResult[] }) {
-  if (!results.length) return null;
+  // The live region must exist before results arrive for screen readers to
+  // announce them, so the list renders even when empty (zero height).
   return (
-    <ul className="space-y-1.5">
+    <ul aria-live="polite" className="space-y-1.5">
       {results.map((result) => (
         <li
           key={result.page.id}

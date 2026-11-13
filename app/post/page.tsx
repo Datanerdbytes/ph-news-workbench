@@ -178,7 +178,7 @@ export default function PostPage() {
           </span>
         </div>
 
-        {results && <ResultList results={results} />}
+        <ResultList results={results ?? []} />
       </ComposerCard>
         </div>
 

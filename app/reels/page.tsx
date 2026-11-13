@@ -366,7 +366,7 @@ export default function ReelsPage() {
         </div>
 
         <div ref={resultsRef}>
-          {results && <ResultList results={results} />}
+          <ResultList results={results ?? []} />
         </div>
       </ComposerCard>
         </div>
