@@ -49,12 +49,21 @@ function notif(id: number, overrides: Partial<Row> = {}): Row {
 }
 
 let pollData: PollPayload;
+let moreData: PollPayload;
+let moreFail = false;
+let moreStatus = 200;
 
 const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
   void init; // the bell never inspects request options
   const url = String(input);
   if (url.includes("/api/notifications/read")) {
     return { ok: true, json: async () => ({ ok: true }) };
+  }
+  if (url.includes("before=")) {
+    if (moreFail) {
+      return { ok: false, status: moreStatus, json: async () => ({}) };
+    }
+    return { ok: true, json: async () => moreData };
   }
   return { ok: true, json: async () => pollData };
 });
@@ -71,6 +80,8 @@ async function openPanel() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
+  moreFail = false;
+  moreStatus = 200;
   vi.stubGlobal("fetch", fetchMock);
 });
 
@@ -237,5 +248,93 @@ describe("NotificationBell", () => {
     expect(
       screen.queryByRole("button", { name: "Mark all read" })
     ).toBeNull();
+  });
+});
+
+describe("NotificationBell load more", () => {
+  it("appends the next page using the last row as the cursor", async () => {
+    pollData = {
+      rows: [notif(1), notif(2)],
+      unread: 2,
+      nextCursor: 2,
+      hasMore: true,
+    };
+    moreData = { rows: [notif(3)], unread: 3, nextCursor: null, hasMore: false };
+
+    render(<NotificationBell />);
+    await flush();
+    await openPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await flush();
+
+    const more = fetchMock.mock.calls.find((call) =>
+      String(call[0]).includes("before=")
+    );
+    expect(more).toBeDefined();
+    expect(String(more![0])).toContain("limit=15");
+    expect(String(more![0])).toContain("before=2");
+    expect(screen.getByText("Notification 3")).toBeInTheDocument();
+    // hasMore flipped false — the control goes away.
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
+  });
+
+  it("guards against double-fire while a page is loading", async () => {
+    pollData = { rows: [notif(1)], unread: 1, nextCursor: 1, hasMore: true };
+    moreData = { rows: [notif(2)], unread: 2, nextCursor: null, hasMore: false };
+
+    render(<NotificationBell />);
+    await flush();
+    await openPanel();
+
+    let release!: (value: Awaited<ReturnType<typeof fetchMock>>) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await flush();
+
+    const loading = screen.getByRole("button", { name: "Loading…" });
+    expect(loading).toBeDisabled();
+    fireEvent.click(loading);
+    await flush();
+
+    release({ ok: true, json: async () => moreData });
+    await flush();
+
+    expect(screen.getByText("Notification 2")).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.filter((call) =>
+        String(call[0]).includes("before=")
+      ).length
+    ).toBe(1);
+  });
+
+  it("keeps the list and toasts when the page request fails", async () => {
+    pollData = { rows: [notif(1)], unread: 1, nextCursor: 1, hasMore: true };
+
+    render(<NotificationBell />);
+    await flush();
+    await openPanel();
+
+    moreFail = true;
+    moreStatus = 500;
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await flush();
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast.error).mock.calls[0][0]).toBe(
+      "Could not load more notifications"
+    );
+    expect(vi.mocked(toast.error).mock.calls[0][1]).toEqual({
+      description: "Request failed (500)",
+    });
+    expect(screen.getByText("Notification 1")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Load more" })
+    ).toBeInTheDocument();
   });
 });

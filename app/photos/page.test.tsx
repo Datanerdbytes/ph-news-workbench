@@ -18,8 +18,19 @@ vi.mock("@/components/publishing/publish-page", () => ({
   PageSelector: () => null,
   ScheduleField: () => null,
   ResultList: () => null,
-  FieldLabel: ({ htmlFor, children }: { htmlFor?: string; children?: ReactNode }) => (
-    <label htmlFor={htmlFor}>{children}</label>
+  FieldLabel: ({
+    htmlFor,
+    children,
+    hint,
+  }: {
+    htmlFor?: string;
+    children?: ReactNode;
+    hint?: string;
+  }) => (
+    <label htmlFor={htmlFor}>
+      {children}
+      {hint ? <span data-testid="field-hint">{hint}</span> : null}
+    </label>
   ),
   defaultScheduleValue: () => "2026-11-07T12:00",
   inputClass: "",
@@ -165,13 +176,13 @@ describe("PhotosPage previews", () => {
     fireEvent.click(screen.getByRole("button", { name: "Albums" }));
     await flush();
 
-    fireEvent.change(screen.getByLabelText("Album"), {
+    fireEvent.change(screen.getByLabelText(/^Album/), {
       target: { value: "al1" },
     });
-    fireEvent.change(screen.getByLabelText("Caption"), {
+    fireEvent.change(screen.getByLabelText(/^Caption/), {
       target: { value: "Launch week highlights" },
     });
-    fireEvent.change(screen.getByLabelText("Images"), {
+    fireEvent.change(screen.getByLabelText(/^Images/), {
       target: {
         files: [
           new File(["a"], "one.png", { type: "image/png" }),
@@ -199,7 +210,7 @@ describe("PhotosPage previews", () => {
     render(<PhotosPage />);
     await flush();
 
-    fireEvent.change(screen.getByLabelText("Message"), {
+    fireEvent.change(screen.getByLabelText(/^Message/), {
       target: { value: "Hello feed" },
     });
 
@@ -208,5 +219,64 @@ describe("PhotosPage previews", () => {
       "Hello feed"
     );
     expect(mockSelectOne).not.toHaveBeenCalled();
+  });
+});
+
+describe("PhotosPage audit regressions", () => {
+  it("gives the album caption the same 63,206 budget and counter as single posts", async () => {
+    render(<PhotosPage />);
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: "Albums" }));
+    await flush();
+
+    expect(screen.getByLabelText(/^Caption/)).toHaveAttribute(
+      "maxlength",
+      "63206"
+    );
+    expect(screen.getByText("0/63,206")).toBeInTheDocument();
+  });
+
+  it("formats the single-post message budget", async () => {
+    render(<PhotosPage />);
+    await flush();
+
+    expect(screen.getByLabelText(/^Message/)).toHaveAttribute(
+      "maxlength",
+      "63206"
+    );
+    expect(screen.getByText("0/63,206")).toBeInTheDocument();
+  });
+
+  it("deletes the staged blob when a photo is removed", async () => {
+    render(<PhotosPage />);
+    await flush();
+
+    fireEvent.change(screen.getByLabelText(/^Images/), {
+      target: {
+        files: [new File(["a"], "one.png", { type: "image/png" })],
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("fb-post-preview")).toHaveAttribute(
+        "data-images",
+        "1"
+      )
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove image 1" }));
+    await flush();
+
+    const del = (fetch as Mock).mock.calls.find((call) =>
+      String(call[0]).includes("/api/blob")
+    );
+    expect(del).toBeDefined();
+    expect(del![1]?.method).toBe("DELETE");
+    expect(JSON.parse(String(del![1]?.body)).url).toMatch(
+      /^https:\/\/store\.public\.blob\.vercel-storage\.com\//
+    );
+    expect(screen.getByTestId("fb-post-preview")).toHaveAttribute(
+      "data-images",
+      "0"
+    );
   });
 });
