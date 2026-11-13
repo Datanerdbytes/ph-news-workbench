@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CircleAlert,
   CircleCheck,
+  Eye,
   FileText,
   Heart,
   MessageCircle,
@@ -45,6 +46,32 @@ type InstagramOverview = {
   followers: number | null;
   mediaCount: number | null;
   recent: InstagramPost[];
+};
+
+type YouTubeVideo = {
+  id: string;
+  title: string;
+  publishedAt: string;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  url: string;
+};
+
+type YouTubeChannelStats = {
+  id: string;
+  title: string;
+  subscriberCount: number | null;
+  viewCount: number | null;
+  videoCount: number | null;
+};
+
+type YouTubeInsights = {
+  connected?: boolean;
+  configured?: boolean;
+  channel?: YouTubeChannelStats | null;
+  recent?: YouTubeVideo[];
+  reason?: string | null;
 };
 
 type Totals = {
@@ -113,6 +140,8 @@ export default function AnalyticsPage() {
   const [totals, setTotals] = useState<Totals | null>(null);
   const [daily, setDaily] = useState<Day[]>([]);
   const [insights, setInsights] = useState<PageInsights | null>(null);
+  const [youtube, setYoutube] = useState<YouTubeInsights | null>(null);
+  const [youtubeError, setYoutubeError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [insightsError, setInsightsError] = useState(false);
@@ -155,6 +184,24 @@ export default function AnalyticsPage() {
       })
       .catch(() => {
         if (!controller.signal.aborted) setInsightsError(true);
+      });
+    return () => controller.abort();
+  }, [reloadKey]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/youtube/insights", {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        // Not connected arrives as a 409 with the honest state in the body.
+        const data = await res.json().catch(() => null);
+        setYoutube(data ?? { connected: false });
+        setYoutubeError(false);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setYoutubeError(true);
       });
     return () => controller.abort();
   }, [reloadKey]);
@@ -540,6 +587,84 @@ export default function AnalyticsPage() {
                   {insights?.instagramError
                     ? `Instagram insights are unavailable right now: ${insights.instagramError}`
                     : "No professional Instagram account is linked to your Facebook Pages yet."}
+                </p>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="flex items-center gap-1.5 text-[13px] font-semibold">
+                    <PlatformMark platform="youtube" className="size-3.5" />
+                    YouTube
+                  </h2>
+                  <p className="text-[10.5px] text-muted-foreground">
+                    {youtube?.channel?.title ?? "Your YouTube channel"}
+                  </p>
+                </div>
+                {youtube?.channel && (
+                  <span className="rounded-full bg-success/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-success">
+                    Live
+                  </span>
+                )}
+              </div>
+
+              {youtube?.channel ? (
+                <>
+                  <dl className="mt-3 grid grid-cols-3 gap-3">
+                    <Metric
+                      label="Subscribers"
+                      value={youtube.channel.subscriberCount}
+                    />
+                    <Metric label="Total views" value={youtube.channel.viewCount} />
+                    <Metric label="Videos" value={youtube.channel.videoCount} />
+                  </dl>
+                  {youtube.recent && youtube.recent.length > 0 && (
+                    <ul className="mt-3 flex flex-col gap-1.5">
+                      {youtube.recent.slice(0, 3).map((video) => (
+                        <li
+                          key={video.id}
+                          className="rounded-lg border border-border bg-surface-2 px-2.5 py-1.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                              {shortDate(video.publishedAt)}
+                            </p>
+                            <div className="flex items-center gap-2.5 text-[10px] text-muted-foreground">
+                              {video.views !== null && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Eye className="size-3" aria-hidden />
+                                  {video.views.toLocaleString()}
+                                </span>
+                              )}
+                              {video.likes !== null && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Heart className="size-3" aria-hidden />
+                                  {video.likes}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <a
+                            href={video.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-0.5 line-clamp-1 text-[10.5px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                          >
+                            {video.title}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  {youtubeError
+                    ? "YouTube stats are unavailable right now."
+                    : youtube?.reason
+                      ? youtube.reason
+                      : "Connect YouTube to see channel and upload stats."}
                 </p>
               )}
             </section>

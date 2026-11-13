@@ -149,13 +149,16 @@ export type YouTubeChannel = {
   id: string;
   title: string;
   thumbnail: string | null;
+  subscriberCount: number | null;
+  viewCount: number | null;
+  videoCount: number | null;
 };
 
 export async function fetchYouTubeChannel(
   accessToken: string
 ): Promise<YouTubeChannel | null> {
   const url = new URL('https://www.googleapis.com/youtube/v3/channels');
-  url.searchParams.set('part', 'snippet');
+  url.searchParams.set('part', 'snippet,statistics');
   url.searchParams.set('mine', 'true');
   let response: Response;
   try {
@@ -178,15 +181,131 @@ export async function fetchYouTubeChannel(
         title?: string;
         thumbnails?: { high?: { url?: string } };
       };
+      statistics?: {
+        subscriberCount?: string;
+        viewCount?: string;
+        videoCount?: string;
+      };
     }[];
   } | null;
   const channel = body?.items?.[0];
   if (!channel) return null;
+  // Counts arrive as strings per the YouTube API contract; hidden sub counts
+  // come back as 0 — surface the number, the card renders what it gets.
+  const stats = channel.statistics ?? {};
   return {
     id: channel.id,
     title: channel.snippet?.title ?? 'YouTube',
     thumbnail: channel.snippet?.thumbnails?.high?.url ?? null,
+    subscriberCount:
+      stats.subscriberCount != null ? Number(stats.subscriberCount) : null,
+    viewCount: stats.viewCount != null ? Number(stats.viewCount) : null,
+    videoCount: stats.videoCount != null ? Number(stats.videoCount) : null,
   };
+}
+
+export type YouTubeVideoStat = {
+  id: string;
+  title: string;
+  publishedAt: string;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  url: string;
+};
+
+// Public stats for the channel's most recent uploads: the uploads playlist is
+// the channel id with the UC→UU prefix, then per-video statistics in a batch.
+export async function fetchYouTubeRecentVideos(
+  accessToken: string,
+  channelId: string,
+  limit = 5
+): Promise<YouTubeVideoStat[]> {
+  if (!channelId.startsWith('UC')) return [];
+  const uploadsPlaylistId = `UU${channelId.slice(2)}`;
+
+  const listUrl = new URL('https://www.googleapis.com/youtube/v3/playlistItems');
+  listUrl.searchParams.set('part', 'snippet');
+  listUrl.searchParams.set('playlistId', uploadsPlaylistId);
+  listUrl.searchParams.set('maxResults', String(Math.min(limit, 50)));
+  let listResponse: Response;
+  try {
+    listResponse = await fetch(listUrl, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    throw new Error('YouTube could not be reached.');
+  }
+  if (!listResponse.ok) {
+    throw new Error(`YouTube returned ${listResponse.status}.`);
+  }
+  const listBody = (await listResponse.json().catch(() => null)) as {
+    items?: {
+      snippet?: {
+        title?: string;
+        publishedAt?: string;
+        resourceId?: { videoId?: string };
+      };
+    }[];
+  } | null;
+  const items = (listBody?.items ?? []).slice(0, limit);
+  const videoIds = items
+    .map((item) => item.snippet?.resourceId?.videoId)
+    .filter((id): id is string => Boolean(id));
+  if (!videoIds.length) return [];
+
+  const statsUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+  statsUrl.searchParams.set('part', 'statistics');
+  statsUrl.searchParams.set('id', videoIds.join(','));
+  const statsResponse = await fetch(statsUrl, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  }).catch(() => null);
+  const statsById = new Map<string, { views: number | null; likes: number | null; comments: number | null }>();
+  if (statsResponse?.ok) {
+    const statsBody = (await statsResponse.json().catch(() => null)) as {
+      items?: {
+        id: string;
+        statistics?: {
+          viewCount?: string;
+          likeCount?: string;
+          commentCount?: string;
+        };
+      }[];
+    } | null;
+    for (const item of statsBody?.items ?? []) {
+      statsById.set(item.id, {
+        views:
+          item.statistics?.viewCount != null
+            ? Number(item.statistics.viewCount)
+            : null,
+        likes:
+          item.statistics?.likeCount != null
+            ? Number(item.statistics.likeCount)
+            : null,
+        comments:
+          item.statistics?.commentCount != null
+            ? Number(item.statistics.commentCount)
+            : null,
+      });
+    }
+  }
+
+  return items.flatMap((item) => {
+    const videoId = item.snippet?.resourceId?.videoId;
+    if (!videoId) return [];
+    const stats = statsById.get(videoId);
+    return [
+      {
+        id: videoId,
+        title: item.snippet?.title ?? 'Untitled video',
+        publishedAt: item.snippet?.publishedAt ?? '',
+        views: stats?.views ?? null,
+        likes: stats?.likes ?? null,
+        comments: stats?.comments ?? null,
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+      },
+    ];
+  });
 }
 
 export type YouTubeMetadata = {
