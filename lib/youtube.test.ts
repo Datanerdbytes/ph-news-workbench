@@ -9,6 +9,7 @@ import {
   ensureFreshYouTubeToken,
   exchangeGoogleCode,
   fetchYouTubeChannel,
+  fetchYouTubeRecentVideos,
   uploadYouTubeBytes,
   YouTubeAuthError,
 } from "./youtube";
@@ -148,12 +149,102 @@ describe("fetchYouTubeChannel", () => {
       id: "UC_channel",
       title: "NeuralVerse News",
       thumbnail: "https://yt/img.jpg",
+      subscriberCount: null,
+      viewCount: null,
+      videoCount: null,
     });
+  });
+
+  it("parses channel statistics into numbers", async () => {
+    respond({
+      items: [
+        {
+          id: "UC_channel",
+          snippet: { title: "NeuralVerse News" },
+          statistics: {
+            subscriberCount: "142",
+            viewCount: "9102",
+            videoCount: "7",
+          },
+        },
+      ],
+    });
+    const channel = await fetchYouTubeChannel("token");
+    expect(channel?.subscriberCount).toBe(142);
+    expect(channel?.viewCount).toBe(9102);
+    expect(channel?.videoCount).toBe(7);
   });
 
   it("returns null without items and fails on token rejection", async () => {
     respond({ items: [] });
     expect(await fetchYouTubeChannel("token")).toBeNull();
+  });
+});
+
+describe("fetchYouTubeRecentVideos", () => {
+  it("reads the uploads playlist (UC→UU) and merges per-video statistics", async () => {
+    respond({
+      items: [
+        {
+          snippet: {
+            title: "First upload",
+            publishedAt: "2026-11-01T00:00:00Z",
+            resourceId: { videoId: "v1" },
+          },
+        },
+        {
+          snippet: {
+            title: "Second upload",
+            publishedAt: "2026-11-02T00:00:00Z",
+            resourceId: { videoId: "v2" },
+          },
+        },
+      ],
+    });
+    respond({
+      items: [
+        { id: "v1", statistics: { viewCount: "310", likeCount: "12" } },
+        { id: "v2", statistics: { viewCount: "88", commentCount: "3" } },
+      ],
+    });
+
+    const videos = await fetchYouTubeRecentVideos("token", "UC123", 5);
+    expect(videos).toEqual([
+      {
+        id: "v1",
+        title: "First upload",
+        publishedAt: "2026-11-01T00:00:00Z",
+        views: 310,
+        likes: 12,
+        comments: null,
+        url: "https://www.youtube.com/watch?v=v1",
+      },
+      {
+        id: "v2",
+        title: "Second upload",
+        publishedAt: "2026-11-02T00:00:00Z",
+        views: 88,
+        likes: null,
+        comments: 3,
+        url: "https://www.youtube.com/watch?v=v2",
+      },
+    ]);
+    const playlistUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(playlistUrl.searchParams.get("playlistId")).toBe("UU123");
+    const statsUrl = new URL(fetchMock.mock.calls[1][0] as string);
+    expect(statsUrl.searchParams.get("id")).toBe("v1,v2");
+  });
+
+  it("returns no videos for a channel id that is not a UC id", async () => {
+    const videos = await fetchYouTubeRecentVideos("token", "unknown", 5);
+    expect(videos).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty list when the uploads playlist is empty", async () => {
+    respond({ items: [] });
+    const videos = await fetchYouTubeRecentVideos("token", "UC123", 5);
+    expect(videos).toEqual([]);
   });
 });
 
