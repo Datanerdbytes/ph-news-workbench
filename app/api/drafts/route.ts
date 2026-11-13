@@ -7,15 +7,39 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const access = await requireWorkspace(request);
   if (!access) return unauthorized();
-  const rows = await sql`
+  const params = new URL(request.url).searchParams;
+  const before = Number(params.get('before'));
+  const requestedLimit = Number(params.get('limit'));
+  const limit =
+    Number.isFinite(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, 200)
+      : 100;
+  // One extra row decides hasMore without a separate count query.
+  const rows =
+    before > 0
+      ? await sql`
+    SELECT d.id, d.news_item_id, d.status, d.error_message, d.correlation_id, d.created_at,
+           n.title AS news_title
+    FROM drafts d
+    LEFT JOIN news_items n ON n.id = d.news_item_id
+    WHERE d.workspace_id = ${access.workspace.id} AND d.id < ${before}
+    ORDER BY d.id DESC
+    LIMIT ${limit + 1}`
+      : await sql`
     SELECT d.id, d.news_item_id, d.status, d.error_message, d.correlation_id, d.created_at,
            n.title AS news_title
     FROM drafts d
     LEFT JOIN news_items n ON n.id = d.news_item_id
     WHERE d.workspace_id = ${access.workspace.id}
     ORDER BY d.id DESC
-    LIMIT 100`;
-  return NextResponse.json(rows);
+    LIMIT ${limit + 1}`;
+  const hasMore = rows.length > limit;
+  const drafts = rows.slice(0, limit);
+  return NextResponse.json({
+    drafts,
+    nextCursor: hasMore ? (drafts.at(-1)?.id ?? null) : null,
+    hasMore,
+  });
 }
 
 export async function DELETE(req: Request) {

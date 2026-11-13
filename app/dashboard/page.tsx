@@ -147,14 +147,14 @@ export default function DashboardPage() {
         throw new Error("Could not load the workspace.");
       }
 
-      const draftData = (await draftsRes.json()) as Draft[];
+      const draftData = (await draftsRes.json()) as { drafts?: Draft[] };
       const storyData = (await itemsRes.json()) as
         | Story[]
         | { rows?: Story[] };
       const activityData = (await activitiesRes.json()) as
         | Activity[]
         | { rows?: Activity[]; nextCursor?: number | null; hasMore?: boolean };
-      setDrafts(Array.isArray(draftData) ? draftData : []);
+      setDrafts(Array.isArray(draftData?.drafts) ? draftData.drafts : []);
       setStories(
         Array.isArray(storyData) ? storyData : (storyData.rows ?? [])
       );

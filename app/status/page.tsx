@@ -33,13 +33,20 @@ export default function StatusPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/drafts');
+      const res = await fetch('/api/drafts', { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Could not load drafts.');
-      setDrafts(Array.isArray(data) ? data : []);
+      setDrafts(Array.isArray(data?.drafts) ? data.drafts : []);
+      setNextCursor(
+        typeof data?.nextCursor === 'number' ? data.nextCursor : null
+      );
+      setHasMore(Boolean(data?.hasMore));
       setLoadError(false);
     } catch (error) {
       setLoadError(true);
@@ -56,6 +63,34 @@ export default function StatusPage() {
     load();
   }, [load]);
 
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/drafts?before=${nextCursor}`, {
+        cache: 'no-store',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Could not load more drafts.');
+      const page: Draft[] = Array.isArray(data?.drafts) ? data.drafts : [];
+      setDrafts((prev) => {
+        const seen = new Set(prev.map((draft) => draft.id));
+        return [...prev, ...page.filter((draft) => !seen.has(draft.id))];
+      });
+      setNextCursor(
+        typeof data?.nextCursor === 'number' ? data.nextCursor : null
+      );
+      setHasMore(Boolean(data?.hasMore));
+    } catch (error) {
+      toast.error('Could not load more drafts', {
+        description:
+          error instanceof Error ? error.message : 'Please try again.',
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore]);
+
   async function refresh() {
     setRefreshing(true);
     await load();
@@ -69,7 +104,7 @@ export default function StatusPage() {
     {
       label: 'Total drafts',
       value: drafts.length,
-      hint: 'Last 100 records',
+      hint: 'Loaded so far',
       icon: FileText,
       tone: 'text-foreground',
     },
@@ -171,43 +206,68 @@ export default function StatusPage() {
               ))}
             </div>
           ) : drafts.length ? (
-            <div className="divide-y divide-border/50">
-              {drafts.map((draft) => (
-                <Link
-                  key={draft.id}
-                  href={`/drafts/${draft.id}`}
-                  className="group grid gap-2 px-5 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusPill status={draft.status} />
-                      <span className="text-[11px] tabular-nums text-muted-foreground">
-                        Draft #{draft.id}
-                      </span>
-                    </div>
-                    <p className="mt-1.5 truncate font-heading text-[17px] leading-snug">
-                      {draft.news_title ?? 'Unknown story'}
-                    </p>
-                    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
-                      <span>{formatDateTime(draft.created_at)}</span>
-                      <span aria-hidden>·</span>
-                      <span className="font-mono text-[10px]">
-                        {draft.correlation_id.slice(0, 8)}
-                      </span>
-                    </p>
-                    {draft.error_message && (
-                      <p className="mt-1.5 line-clamp-2 text-xs text-destructive">
-                        {draft.error_message}
+            <>
+              <div className="divide-y divide-border/50">
+                {drafts.map((draft) => (
+                  <Link
+                    key={draft.id}
+                    href={`/drafts/${draft.id}`}
+                    className="group grid gap-2 px-5 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusPill status={draft.status} />
+                        <span className="text-[11px] tabular-nums text-muted-foreground">
+                          Draft #{draft.id}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 truncate font-heading text-[17px] leading-snug">
+                        {draft.news_title ?? 'Unknown story'}
                       </p>
-                    )}
-                  </div>
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
-                    Open
-                    <ArrowUpRight className="size-3.5" aria-hidden />
+                      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                        <span>{formatDateTime(draft.created_at)}</span>
+                        <span aria-hidden>·</span>
+                        <span className="font-mono text-[10px]">
+                          {draft.correlation_id.slice(0, 8)}
+                        </span>
+                      </p>
+                      {draft.error_message && (
+                        <p className="mt-1.5 line-clamp-2 text-xs text-destructive">
+                          {draft.error_message}
+                        </p>
+                      )}
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
+                      Open
+                      <ArrowUpRight className="size-3.5" aria-hidden />
+                    </span>
+                  </Link>
+                ))}
+              </div>
+              <div className="border-t border-border/50 px-5 py-3 text-center">
+                {hasMore ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void loadMore()}
+                    disabled={loadingMore}
+                    aria-busy={loadingMore}
+                  >
+                    <Loader2
+                      className={
+                        loadingMore ? 'size-3.5 animate-spin' : 'size-3.5'
+                      }
+                      aria-hidden
+                    />
+                    {loadingMore ? 'Loading…' : 'Load more records'}
+                  </Button>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground">
+                    All records loaded
                   </span>
-                </Link>
-              ))}
-            </div>
+                )}
+              </div>
+            </>
           ) : loadError ? (
             <ErrorState
               compact

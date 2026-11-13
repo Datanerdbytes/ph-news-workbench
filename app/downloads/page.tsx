@@ -242,6 +242,11 @@ export default function DownloadsPage() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let notified = false;
+    let failures = 0;
+    // A still-running job must survive blips: retry with backoff instead of
+    // ending polling on the first transient error. A gone job is terminal.
+    const POLL_MS = 2000;
+    const GIVE_UP_AFTER = 4;
 
     async function poll() {
       try {
@@ -250,11 +255,21 @@ export default function DownloadsPage() {
         });
         const data = await response.json().catch(() => null);
         if (!response.ok) {
+          if (response.status === 404) {
+            if (!cancelled) {
+              toast.error("This download is no longer available.", {
+                description: data?.error ?? undefined,
+              });
+              setActiveJobId(null);
+            }
+            return;
+          }
           throw new Error(data?.error ?? "Could not check the download status.");
         }
         if (cancelled) return;
 
         const job = data.job as DownloadRecord;
+        failures = 0;
         setDownloads((current) => [
           job,
           ...current.filter((item) => item.id !== job.id),
@@ -277,14 +292,21 @@ export default function DownloadsPage() {
           setActiveJobId(null);
           return;
         }
-        timer = setTimeout(poll, 2000);
+        timer = setTimeout(poll, POLL_MS);
       } catch (error) {
-        if (!cancelled) {
-          toast.error("Could not check download progress", {
-            description: error instanceof Error ? error.message : undefined,
-          });
-          setActiveJobId(null);
+        if (cancelled) return;
+        failures += 1;
+        if (failures < GIVE_UP_AFTER) {
+          timer = setTimeout(
+            poll,
+            Math.min(POLL_MS * 2 ** (failures - 1), 16000)
+          );
+          return;
         }
+        toast.error("Could not check download progress", {
+          description: error instanceof Error ? error.message : undefined,
+        });
+        setActiveJobId(null);
       }
     }
 
