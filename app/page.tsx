@@ -334,7 +334,6 @@ export default function Home() {
 
   async function compressImage(file: File): Promise<string> {
     const dataUrl = await readAsDataUrl(file);
-    if (file.type === 'image/gif') return dataUrl;
 
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
       const element = new window.Image();

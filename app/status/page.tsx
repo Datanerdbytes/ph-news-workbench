@@ -126,7 +126,7 @@ export default function StatusPage() {
 
   return (
     <AppFrame>
-      <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:py-7">
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -138,9 +138,7 @@ export default function StatusPage() {
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="eyebrow text-brand">Publishing</p>
-            <h1 className="mt-2 font-heading text-4xl tracking-[-0.02em]">
-              Drafts &amp; activity
-            </h1>
+            <h1 className="page-title mt-2">Drafts &amp; activity</h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
               Every generated draft, its status, and the correlation trail for
               auditing.
