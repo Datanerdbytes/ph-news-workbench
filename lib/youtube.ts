@@ -4,6 +4,12 @@ import type { PlatformConnection } from '@/lib/publishing/connection';
 
 export const YOUTUBE_UPLOAD_SCOPE =
   'https://www.googleapis.com/auth/youtube.upload';
+// channel.list(mine=true) and any channel read needs the readonly scope on
+// top of upload — without it Google answers 403 and analytics can't render.
+export const YOUTUBE_SCOPES = [
+  YOUTUBE_UPLOAD_SCOPE,
+  'https://www.googleapis.com/auth/youtube.readonly',
+];
 
 export function googleConfigured(): boolean {
   return Boolean(
@@ -32,7 +38,7 @@ export function buildGoogleAuthorizationUrl(state: string): string {
   url.searchParams.set('client_id', process.env.GOOGLE_CLIENT_ID!.trim());
   url.searchParams.set('redirect_uri', googleRedirectUri());
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('scope', YOUTUBE_UPLOAD_SCOPE);
+  url.searchParams.set('scope', YOUTUBE_SCOPES.join(' '));
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
   url.searchParams.set('include_granted_scopes', 'true');
@@ -154,6 +160,20 @@ export type YouTubeChannel = {
   videoCount: number | null;
 };
 
+/** Google's API errors carry a human message inside the body — surface it
+ * instead of a bare status code (e.g. 403 "not properly authorized" when the
+ * grant lacks a read scope). */
+async function youtubeErrorReason(response: Response): Promise<string | null> {
+  const body = (await response.json().catch(() => null)) as {
+    error?: { message?: string } | string;
+  } | null;
+  const message =
+    typeof body?.error === 'string'
+      ? body.error
+      : body?.error?.message ?? null;
+  return message ? `YouTube returned ${response.status}: ${message}` : null;
+}
+
 export async function fetchYouTubeChannel(
   accessToken: string
 ): Promise<YouTubeChannel | null> {
@@ -172,7 +192,10 @@ export async function fetchYouTubeChannel(
     throw new Error('The YouTube access token was rejected.');
   }
   if (!response.ok) {
-    throw new Error(`YouTube returned ${response.status}.`);
+    throw new Error(
+      (await youtubeErrorReason(response)) ??
+        `YouTube returned ${response.status}.`
+    );
   }
   const body = (await response.json().catch(() => null)) as {
     items?: {
