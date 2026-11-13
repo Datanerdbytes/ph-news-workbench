@@ -326,18 +326,16 @@ export default function PhotosPage() {
                 <>
                   <p className="font-semibold text-secondary-foreground">How it posts</p>
                   <p>
-                    A single image goes straight to
-                    <code className="mx-1 rounded bg-surface-3 px-1 py-0.5 text-[10px]">/photos</code>.
-                    Multiple images are uploaded unpublished first, then attached to one
-                    feed post.
+                    A single image posts on its own. Multiple images are staged
+                    quietly first, then attached together as one album post.
                   </p>
-                  <p>Scheduling uses published=false with scheduled_publish_time.</p>
+                  <p>Scheduled posts go live at the time you pick.</p>
                 </>
               }
             >
               {imagePicker}
               <div>
-                <FieldLabel htmlFor="photo-message" hint={`${message.length}/63206`}>
+                <FieldLabel htmlFor="photo-message" hint={`${message.length}/63,206`}>
                   Message
                 </FieldLabel>
                 <textarea
@@ -345,7 +343,7 @@ export default function PhotosPage() {
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   rows={4}
-                  maxLength={63206}
+                  maxLength={63_206}
                   placeholder="Write the caption for this post…"
                   className={textareaClass}
                 />
@@ -444,12 +442,15 @@ export default function PhotosPage() {
                 </div>
                 {imagePicker}
                 <div>
-                  <FieldLabel htmlFor="album-message">Caption</FieldLabel>
+                  <FieldLabel htmlFor="album-message" hint={`${message.length}/63,206`}>
+                    Caption
+                  </FieldLabel>
                   <textarea
                     id="album-message"
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
                     rows={3}
+                    maxLength={63_206}
                     className={textareaClass}
                   />
                 </div>

@@ -99,10 +99,8 @@ export default function PostPage() {
           <>
             <p className="font-semibold text-secondary-foreground">How a post publishes</p>
             <p>
-              Text posts go to the Page&apos;s{' '}
-              <code className="mx-1 rounded bg-surface-3 px-1 py-0.5 text-[10px]">/feed</code>{' '}
-              edge with the Page access token. A link field turns the post into a link
-              share with Facebook&apos;s own preview card.
+              Text posts publish straight to the Page&apos;s feed. A link turns
+              the post into a link share with Facebook&apos;s own preview card.
             </p>
             <p>Scheduled posts are queued by Facebook and appear once published.</p>
           </>

@@ -137,7 +137,7 @@ export default function StatusPage() {
 
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="eyebrow text-brand">Publishing desk</p>
+            <p className="eyebrow text-brand">Publishing</p>
             <h1 className="mt-2 font-heading text-4xl tracking-[-0.02em]">
               Drafts &amp; activity
             </h1>

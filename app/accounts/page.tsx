@@ -246,7 +246,7 @@ export default function AccountsPage() {
                 </p>
               ) : connection.unreachable ? (
                 <p className="mt-2 text-[12px] text-muted-foreground">
-                  Status unavailable. The dev server or database may be down.
+                  Status unavailable. The server or database may be down.
                 </p>
               ) : connection.connected ? (
                 <div className="mt-2">
@@ -282,9 +282,10 @@ export default function AccountsPage() {
                     Facebook app credentials are missing
                   </p>
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                    Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET to{" "}
-                    <span className="font-mono text-[10.5px]">.env.local</span>,
-                    then restart the dev server.
+                    Add FACEBOOK_APP_ID and FACEBOOK_APP_SECRET to the
+                    server&apos;s{" "}
+                    <span className="font-mono text-[10.5px]">.env.local</span>{" "}
+                    and restart it.
                   </p>
                 </div>
               ) : (
@@ -382,7 +383,7 @@ export default function AccountsPage() {
                 </p>
               ) : instagram.unreachable ? (
                 <p className="mt-2 text-[12px] text-muted-foreground">
-                  Status unavailable. The dev server or database may be down.
+                  Status unavailable. The server or database may be down.
                 </p>
               ) : instagram.connected ? (
                 <div className="mt-2">
@@ -428,9 +429,9 @@ export default function AccountsPage() {
                   </p>
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                     Instagram rides the same Meta app. Add FACEBOOK_APP_ID and
-                    FACEBOOK_APP_SECRET to{" "}
-                    <span className="font-mono text-[10.5px]">.env.local</span>,
-                    then restart the dev server.
+                    FACEBOOK_APP_SECRET to the server&apos;s{" "}
+                    <span className="font-mono text-[10.5px]">.env.local</span>{" "}
+                    and restart it.
                   </p>
                 </div>
               ) : (

@@ -1051,8 +1051,8 @@ export default function Home() {
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] tabular-nums text-muted-foreground">
                           {stats ? (
                             <>
-                              <span>Input {stats.inputTokens} tok</span>
-                              <span>Output {stats.outputTokens} tok</span>
+                              <span>Input {stats.inputTokens} tokens</span>
+                              <span>Output {stats.outputTokens} tokens</span>
                               <span className="font-medium text-foreground/70">
                                 ~{formatCost(stats.estimatedCost)}
                               </span>
