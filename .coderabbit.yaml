@@ -1,0 +1,33 @@
+# Shared CodeRabbit review configuration — applies to every PR on this repo.
+# Docs: https://docs.coderabbit.ai/getting-started/configure-coderabbit
+language: en-US
+reviews:
+  # "chill" keeps the review focused on meaningful issues instead of nitpicks.
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  review_status: true
+  poem: false
+  # Skip generated dependency churn.
+  path_filters:
+    - "!**/package-lock.json"
+  path_instructions:
+    - path: "app/api/**"
+      instructions: >-
+        Route handlers must be force-dynamic and must not touch the database
+        at import time. Check auth with the requirePlatformConnection /
+        requireWorkspace helpers before any data access, and never log or
+        return raw access tokens.
+    - path: "lib/**"
+      instructions: >-
+        Pure helpers in lib/ are unit-tested with vitest in sibling *.test.ts
+        files — flag behavior changes that ship without a matching test
+        update. Secrets are encrypted via lib/facebook-token, never stored
+        in plaintext.
+    - path: "components/**"
+      instructions: >-
+        Follow the Ink & White theme and existing component patterns. Brand
+        marks must use components/platform-mark.tsx (this lucide version has
+        no brand icons). cn() silently drops unknown text-* class names.
+chat:
+  auto_reply: true
