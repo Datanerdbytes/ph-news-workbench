@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Loader2, Play, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppFrame } from "@/components/app-frame";
@@ -37,11 +37,74 @@ function dayKey(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** Human label for a dayKey, parsed as local calendar parts (not UTC). */
+function labelForKey(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-PH", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 function timeLabel(value: string) {
   return new Date(value).toLocaleTimeString("en-PH", {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+/**
+ * Full-detail row for the day panel and the mobile agenda — the month-grid
+ * chips truncate and hide content behind hover-only tooltips, so every
+ * surface that shows one post per line shows the whole thing.
+ */
+function CalendarPostRow({
+  post,
+  onCancel,
+}: {
+  post: ScheduledPost;
+  onCancel: (id: number) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill status={post.status} />
+          <span className="flex items-center gap-1 text-[10.5px] font-semibold text-muted-foreground">
+            <Clock className="size-3" aria-hidden />
+            {timeLabel(post.scheduled_for)}
+          </span>
+          <span className="text-[9.5px] font-bold uppercase tracking-[0.12em] text-brand">
+            {KIND_LABELS[post.kind] ?? post.kind}
+          </span>
+          <span className="font-medium normal-case tracking-normal text-muted-foreground">
+            {post.source === "facebook"
+              ? "· published by Facebook"
+              : "· published by this workspace"}
+          </span>
+        </div>
+        <p className="mt-1.5 whitespace-pre-wrap break-words text-[12.5px] leading-snug">
+          {post.news_title ?? post.text}
+        </p>
+        {post.error_message && (
+          <p className="mt-1 text-[11px] leading-relaxed text-destructive">
+            {post.error_message}
+          </p>
+        )}
+      </div>
+      {post.status === "scheduled" && (
+        <ConfirmIconButton
+          onConfirm={() => onCancel(post.id)}
+          idleLabel="Cancel scheduled post"
+          armedLabel="Click again to cancel this scheduled post"
+          busyIcon={<Loader2 className="size-3.5 animate-spin" aria-hidden />}
+          className="rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+          icon={<X className="size-3.5" aria-hidden />}
+        />
+      )}
+    </div>
+  );
 }
 
 export default function CalendarPage() {
@@ -53,6 +116,11 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [runningDue, setRunningDue] = useState(false);
+  // Day panel: key of the day whose posts are expanded below the grid
+  // (chips and "+N more" open it; chips alone truncate and hide the rest).
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const hadDaySelected = useRef(false);
   // One shared clock for every "is it due yet?" comparison in the render —
   // refreshed on the same minute cadence as load().
   const [now, setNow] = useState(() => Date.now());
@@ -143,6 +211,16 @@ export default function CalendarPage() {
 
   const queued = [...overdue, ...upcoming];
 
+  const selectedPosts = selectedDay ? (byDay.get(selectedDay) ?? []) : [];
+
+  // Move focus into the day panel when it opens from a chip press.
+  useEffect(() => {
+    if (selectedDay && !hadDaySelected.current) {
+      detailRef.current?.focus();
+    }
+    hadDaySelected.current = Boolean(selectedDay);
+  }, [selectedDay]);
+
   async function publishDue() {
     setRunningDue(true);
     try {
@@ -213,7 +291,7 @@ export default function CalendarPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -268,7 +346,33 @@ export default function CalendarPage() {
         </div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="panel overflow-hidden">
+          {/* Mobile agenda: the 7-column grid gives ~46px cells at phone
+              widths, so phones get a linear month list instead. */}
+          <section className="panel p-3 sm:hidden">
+            <div className="flex items-center justify-between px-1">
+              <h2 className="text-[12.5px] font-semibold">{monthLabel}</h2>
+              <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                {monthPosts.length}
+              </span>
+            </div>
+            {monthPosts.length ? (
+              <ul className="mt-1 divide-y divide-border">
+                {[...monthPosts]
+                  .sort((a, b) => a.scheduled_for.localeCompare(b.scheduled_for))
+                  .map((post) => (
+                    <li key={post.id} className="px-1 py-2.5">
+                      <CalendarPostRow post={post} onCancel={cancelPost} />
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              <p className="px-1 py-6 text-center text-[11.5px] text-muted-foreground">
+                Nothing scheduled this month.
+              </p>
+            )}
+          </section>
+
+          <section className="panel overflow-hidden sm:block hidden">
             <div className="grid grid-cols-7 border-b border-border bg-surface-2/60">
               {WEEKDAYS.map((day) => (
                 <div
@@ -316,16 +420,21 @@ export default function CalendarPage() {
                     </div>
                     <div className="mt-1 space-y-1">
                       {items.slice(0, 2).map((post) => (
-                        <div
+                        <button
                           key={post.id}
+                          type="button"
+                          onClick={() => setSelectedDay(key)}
+                          aria-label={`${labelForKey(key)}, ${timeLabel(post.scheduled_for)} — ${
+                            KIND_LABELS[post.kind] ?? post.kind
+                          } — ${post.news_title ?? post.text}`}
                           title={post.text}
                           className={cn(
-                            "truncate rounded px-1.5 py-1 text-[10px] font-medium",
+                            "block w-full truncate rounded px-1.5 py-1 text-left text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
                             post.status === "published"
-                              ? "bg-success-soft text-success"
+                              ? "bg-success-soft text-success hover:bg-success/20"
                               : post.status === "failed"
-                                ? "bg-destructive/10 text-destructive"
-                                : "bg-brand-soft text-brand-strong"
+                                ? "bg-destructive/10 text-destructive hover:bg-destructive/15"
+                                : "bg-brand-soft text-brand-strong hover:bg-brand/15"
                           )}
                         >
                           {timeLabel(post.scheduled_for)} ·{" "}
@@ -334,18 +443,64 @@ export default function CalendarPage() {
                           </span>
                           {" · "}
                           {post.news_title ?? post.text}
-                        </div>
+                        </button>
                       ))}
                       {items.length > 2 && (
-                        <p className="px-1.5 text-[9.5px] text-muted-foreground">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDay(key)}
+                          aria-label={`Show all ${items.length} posts on ${labelForKey(key)}`}
+                          className="block w-full rounded px-1.5 py-0.5 text-left text-[9.5px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                        >
                           +{items.length - 2} more
-                        </p>
+                        </button>
                       )}
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {selectedDay && (
+              <div
+                ref={detailRef}
+                tabIndex={-1}
+                className="border-t border-border bg-surface-2/40 px-4 py-3 focus-visible:outline-none"
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[12.5px] font-semibold">
+                    {labelForKey(selectedDay)} ·{" "}
+                    {selectedPosts.length === 1
+                      ? "1 post"
+                      : `${selectedPosts.length} posts`}
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() => setSelectedDay(null)}
+                  >
+                    Close
+                  </Button>
+                </div>
+                {selectedPosts.length ? (
+                  <ul className="mt-2 space-y-2">
+                    {selectedPosts.map((post) => (
+                      <li
+                        key={post.id}
+                        className="rounded-lg border border-border bg-card px-3 py-2.5"
+                      >
+                        <CalendarPostRow post={post} onCancel={cancelPost} />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-[11.5px] text-muted-foreground">
+                    No posts on this day.
+                  </p>
+                )}
+              </div>
+            )}
           </section>
 
           <aside className="space-y-4">
