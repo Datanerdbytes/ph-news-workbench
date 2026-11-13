@@ -30,6 +30,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "cn";
+import { toast } from "sonner";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { FacebookMark } from "@/components/facebook-mark";
 import { useFacebookConnection } from "@/components/facebook-connection";
@@ -179,6 +180,7 @@ export function AppFrame({
       }));
   const [navOpen, setNavOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [workspace, setWorkspace] = useState<{
     name: string;
     role: string;
@@ -238,9 +240,18 @@ export function AppFrame({
   }, [accountOpen]);
 
   async function signOut() {
-    await authClient.signOut();
-    router.replace("/login");
-    router.refresh();
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await authClient.signOut();
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      setSigningOut(false);
+      toast.error("Could not sign out", {
+        description: "Please try again.",
+      });
+    }
   }
 
   useEffect(() => {
@@ -326,7 +337,7 @@ export function AppFrame({
               type="button"
               onClick={() => setNavOpen(false)}
               aria-label="Close navigation"
-              className="tap-target grid size-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
+              className="tap-target grid size-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 lg:hidden"
             >
               <X className="size-4" aria-hidden />
             </button>
@@ -335,7 +346,7 @@ export function AppFrame({
           {showFacebookTools && (
             <Link
               href="/"
-              className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-brand text-[12.5px] font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-brand text-[12.5px] font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               <Plus className="size-4" aria-hidden />
               New post
@@ -378,7 +389,7 @@ export function AppFrame({
                       href={item.href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                        "flex items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                         active
                           ? "bg-brand-soft font-semibold text-brand-strong shadow-[inset_2px_0_0_var(--brand)]"
                           : "text-secondary-foreground hover:bg-surface-3 hover:text-foreground"
@@ -402,7 +413,7 @@ export function AppFrame({
           <div className="flex flex-col gap-2.5">
             <Link
               href="/accounts"
-              className="rounded-lg border border-border bg-surface-2 px-3 py-2.5 transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="rounded-lg border border-border bg-surface-2 px-3 py-2.5 transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               <p className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 Publishing
@@ -457,7 +468,7 @@ export function AppFrame({
                 }
                 aria-expanded={accountOpen}
                 aria-haspopup="dialog"
-                className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                className="flex w-full items-center gap-2.5 rounded-lg px-1 py-1.5 text-left transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-3 text-[10.5px] font-bold text-secondary-foreground">
                   {initials(userName)}
@@ -487,10 +498,11 @@ export function AppFrame({
                   <button
                     type="button"
                     onClick={() => void signOut()}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[11.5px] font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    disabled={signingOut}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[11.5px] font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
                   >
                     <LogOut className="size-3.5" aria-hidden />
-                    Sign out
+                    {signingOut ? "Signing out…" : "Sign out"}
                   </button>
                 </div>
               )}
@@ -517,7 +529,7 @@ export function AppFrame({
               ref={hamburgerRef}
               onClick={() => setNavOpen(true)}
               aria-label="Open navigation"
-              className="tap-target grid size-8 place-items-center rounded-[7px] border border-border bg-card text-secondary-foreground hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
+              className="tap-target grid size-8 place-items-center rounded-[7px] border border-border bg-card text-secondary-foreground hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 lg:hidden"
             >
               <Menu className="size-4" aria-hidden />
             </button>
@@ -574,7 +586,7 @@ function StoryQueueQuickLink() {
       aria-current={active ? "page" : undefined}
       title="Story Queue"
       className={cn(
-        "flex items-center gap-1.5 rounded-[7px] px-2 py-1.5 text-[11.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        "flex items-center gap-1.5 rounded-[7px] px-2 py-1.5 text-[11.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         active
           ? "bg-brand-soft text-brand-strong"
           : "text-muted-foreground hover:bg-surface-3 hover:text-foreground"
@@ -628,7 +640,7 @@ function PublishQuickNav() {
               aria-current={active ? "page" : undefined}
               title={label}
               className={cn(
-                "flex items-center gap-1.5 rounded-[7px] px-2 py-1.5 text-[11.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                "flex items-center gap-1.5 rounded-[7px] px-2 py-1.5 text-[11.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 active
                   ? "bg-brand-soft text-brand-strong"
                   : "text-muted-foreground hover:bg-surface-3 hover:text-foreground"
@@ -650,7 +662,7 @@ function PublishQuickNav() {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="flex items-center gap-1 rounded-[7px] border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
+        className="flex items-center gap-1 rounded-[7px] border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 lg:hidden"
       >
         Publish
         <ChevronDown
@@ -674,7 +686,7 @@ function PublishQuickNav() {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                  "flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                   active
                     ? "bg-brand-soft text-brand-strong"
                     : "text-secondary-foreground hover:bg-surface-3 hover:text-foreground"
@@ -776,7 +788,7 @@ function FacebookConnectionButton() {
         aria-expanded={connection.connected ? menuOpen : undefined}
         aria-haspopup={connection.connected ? "dialog" : undefined}
         title={title}
-        className="tap-target-tight relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="tap-target-tight relative grid size-8 shrink-0 place-items-center rounded-[7px] border border-border bg-card transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         <FacebookMark className="size-5" />
         <span

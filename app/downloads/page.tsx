@@ -426,7 +426,7 @@ export default function DownloadsPage() {
           </div>
           <a
             href="#how-it-works"
-            className="mb-0.5 inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-[11.5px] font-semibold text-secondary-foreground shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="mb-0.5 inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-[11.5px] font-semibold text-secondary-foreground shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <CircleHelp className="size-3.5 text-faint" aria-hidden="true" />
             How it works
@@ -507,7 +507,7 @@ export default function DownloadsPage() {
                   <button
                     type="button"
                     onClick={() => void pasteLink()}
-                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 text-[10.5px] font-semibold text-secondary-foreground transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 text-[10.5px] font-semibold text-secondary-foreground transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                   >
                     {copied ? (
                       <Check className="size-3.5 text-success" aria-hidden="true" />
@@ -731,7 +731,7 @@ export default function DownloadsPage() {
                         href={`/reels?video=${previewJob.id}`}
                         aria-label={`Use ${previewJob.fileName} as a reel`}
                         title="Use as reel"
-                        className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                        className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                       >
                         <Clapperboard className="size-3.5" aria-hidden="true" />
                       </a>
@@ -739,7 +739,7 @@ export default function DownloadsPage() {
                         href={`/api/downloads/${previewJob.id}/file?download=1`}
                         aria-label={`Download ${previewJob.fileName}`}
                         title="Download the video file"
-                        className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                        className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                       >
                         <Download className="size-3.5" aria-hidden="true" />
                       </a>
@@ -920,7 +920,7 @@ export default function DownloadsPage() {
                     type="button"
                     onClick={() => setPreviewId(job.id)}
                     aria-label={`Preview ${job.fileName} in the side panel`}
-                    className="min-w-0 flex-1 cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="min-w-0 flex-1 cursor-pointer rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                   >
                     <p className="truncate text-[11px] font-semibold text-foreground">
                       {job.fileName}
@@ -981,7 +981,7 @@ export default function DownloadsPage() {
                     href={`/reels?video=${job.id}`}
                     aria-label={`Use ${job.fileName ?? job.platform} as a reel`}
                     title="Use as reel"
-                    className="tap-target grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="tap-target grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                   >
                     <Clapperboard className="size-3.5" aria-hidden="true" />
                   </a>
@@ -996,7 +996,7 @@ export default function DownloadsPage() {
                     busyIcon={
                       <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                     }
-                    className="tap-target grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40"
+                    className="tap-target grid size-7 shrink-0 place-items-center rounded-md text-faint transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40"
                     icon={<Trash2 className="size-3.5" aria-hidden="true" />}
                   />
                 )}

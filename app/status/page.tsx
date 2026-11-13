@@ -212,7 +212,7 @@ export default function StatusPage() {
                   <Link
                     key={draft.id}
                     href={`/drafts/${draft.id}`}
-                    className="group grid gap-2 px-5 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                    className="group grid gap-2 px-5 py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">

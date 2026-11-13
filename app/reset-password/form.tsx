@@ -153,7 +153,7 @@ export function ResetPasswordForm({
         <p className="mt-4 text-center text-[11.5px] text-muted-foreground">
           <Link
             href="/login"
-            className="font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             Back to sign in
           </Link>
