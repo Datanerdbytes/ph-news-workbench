@@ -284,3 +284,124 @@ describe("AppFrame publishing card", () => {
     expect(screen.getAllByText(/News Workbench/).length).toBeGreaterThan(0);
   });
 });
+
+describe("AppFrame platform nav", () => {
+  function stubFetchWith(payloads: Record<string, unknown>) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        for (const [needle, payload] of Object.entries(payloads)) {
+          if (url.includes(needle)) {
+            return { ok: true, json: async () => payload };
+          }
+        }
+        return { ok: false, json: async () => ({}) };
+      })
+    );
+  }
+
+  it("lists the platform studios in the sidebar on Facebook routes too", async () => {
+    pathnameRef.current = "/post";
+    stubFetchWith({});
+    render(
+      <AppFrame>
+        <p>Page body</p>
+      </AppFrame>
+    );
+    await flush();
+
+    expect(screen.getByRole("link", { name: "Instagram" })).toHaveAttribute(
+      "href",
+      "/instagram"
+    );
+    expect(screen.getByRole("link", { name: "YouTube" })).toHaveAttribute(
+      "href",
+      "/youtube"
+    );
+  });
+
+  it("shows a platform quick-nav with an external channel link on /youtube", async () => {
+    pathnameRef.current = "/youtube";
+    stubFetchWith({
+      "/api/youtube/status": {
+        configured: true,
+        connected: true,
+        account: { id: "UC123", name: "Roel's Channel" },
+        scopes: [],
+      },
+    });
+    render(
+      <AppFrame>
+        <p>Page body</p>
+      </AppFrame>
+    );
+    await flush();
+
+    const upload = screen.getByRole("link", { name: "Upload video" });
+    expect(upload).toHaveAttribute("href", "/youtube");
+    const channel = screen.getByRole("link", { name: "Open channel" });
+    expect(channel).toHaveAttribute(
+      "href",
+      "https://www.youtube.com/channel/UC123"
+    );
+    expect(channel).toHaveAttribute("target", "_blank");
+    // The composer CTA is platform-aware.
+    expect(screen.getByText("New upload")).toBeInTheDocument();
+    // The Facebook-only header control hides inside platform studios.
+    expect(
+      screen.queryByRole("button", { name: "Connect Facebook Page" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("omits the external channel link when the channel id is unknown", async () => {
+    pathnameRef.current = "/youtube";
+    stubFetchWith({
+      "/api/youtube/status": {
+        configured: true,
+        connected: true,
+        account: { id: "unknown", name: "YouTube" },
+        scopes: [],
+      },
+    });
+    render(
+      <AppFrame>
+        <p>Page body</p>
+      </AppFrame>
+    );
+    await flush();
+
+    expect(
+      screen.getByRole("link", { name: "Upload video" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Open channel" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("links the Instagram profile and swaps the CTA on /instagram", async () => {
+    pathnameRef.current = "/instagram";
+    stubFetchWith({
+      "/api/instagram/status": {
+        configured: true,
+        connected: true,
+        ig: { id: "ig-1", username: "iamwowie_", picture: null },
+      },
+    });
+    render(
+      <AppFrame>
+        <p>Page body</p>
+      </AppFrame>
+    );
+    await flush();
+
+    const profile = screen.getByRole("link", { name: "Open profile" });
+    expect(profile).toHaveAttribute("href", "https://instagram.com/iamwowie_");
+    expect(screen.getByText("New Instagram post")).toBeInTheDocument();
+  });
+});

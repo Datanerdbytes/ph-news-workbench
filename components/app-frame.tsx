@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ChevronsUpDown,
   Download,
+  ExternalLink,
   Film,
   FileText,
   Globe,
@@ -33,7 +34,7 @@ import { cn } from "cn";
 import { toast } from "sonner";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { FacebookMark } from "@/components/facebook-mark";
-import { PlatformMark } from "@/components/platform-mark";
+import { PlatformMark, type PlatformKind } from "@/components/platform-mark";
 import { useFacebookConnection } from "@/components/facebook-connection";
 import { NotificationBell } from "@/components/notifications";
 import {
@@ -41,7 +42,11 @@ import {
   useManagedPages,
 } from "@/components/publishing/publish-page";
 import { authClient } from "@/lib/auth-client";
-import { facebookToolsVisible } from "@/lib/platform-nav";
+import {
+  facebookToolsVisible,
+  platformSectionFromPath,
+  type PlatformSection,
+} from "@/lib/platform-nav";
 import {
   focusFirstIn,
   trapTabFocus,
@@ -52,7 +57,10 @@ import {
 type NavItem = {
   href?: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  // lucide dropped brand icons, so platform entries carry a brand tile
+  // (PlatformMark) instead of a glyph component.
+  icon?: typeof LayoutDashboard;
+  mark?: PlatformKind;
   exact?: boolean;
   facebookOnly?: boolean;
 };
@@ -77,6 +85,8 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/reels", label: "Reels", icon: Video, facebookOnly: true },
       { href: "/live", label: "Live", icon: Radio, facebookOnly: true },
       { href: "/stories", label: "Stories", icon: Sparkles, facebookOnly: true },
+      { href: "/instagram", label: "Instagram", mark: "instagram" },
+      { href: "/youtube", label: "YouTube", mark: "youtube" },
     ],
   },
   {
@@ -152,6 +162,9 @@ function pageLabel(pathname: string) {
   if (pathname.startsWith("/reels")) return "Reels";
   if (pathname.startsWith("/live")) return "Live";
   if (pathname.startsWith("/stories")) return "Stories";
+  if (pathname.startsWith("/instagram")) return "Instagram";
+  if (pathname.startsWith("/youtube")) return "YouTube";
+  if (pathname.startsWith("/tiktok")) return "TikTok";
   if (pathname.startsWith("/sources")) return "Sources";
   return "Workspace";
 }
@@ -209,14 +222,40 @@ export function AppFrame({
   // never claims "The Daily Buzz" while you're looking at YouTube. Instagram
   // publishes through the Page's linked professional account, so its card
   // reports the IG link state instead of the Page name.
-  const platformSection =
-    pathname === "/youtube" || pathname.startsWith("/youtube/")
-      ? ("youtube" as const)
-      : pathname === "/tiktok" || pathname.startsWith("/tiktok/")
-        ? ("tiktok" as const)
-        : pathname === "/instagram" || pathname.startsWith("/instagram/")
-          ? ("instagram" as const)
-          : null;
+  const platformSection = platformSectionFromPath(pathname);
+  // Status payload for the current platform studio, fetched once per section
+  // and tagged with the section it belongs to so a navigation never shows a
+  // previous platform's data while the next one is loading.
+  const [platformStatus, setPlatformStatus] = useState<{
+    section: PlatformSection;
+    data: {
+      configured: boolean;
+      connected: boolean;
+      account?: { id?: string; name?: string } | null;
+      ig?: { username: string } | null;
+      reason?: string | null;
+    } | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!platformSection) return;
+    const controller = new AbortController();
+    fetch(`/api/${platformSection}/status`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data)
+          setPlatformStatus({
+            section: platformSection,
+            data: data as PlatformStatus | null,
+          });
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [platformSection]);
+  const platformStatusForSection =
+    platformStatus?.section === platformSection
+      ? platformStatus.data
+      : null;
 
   const workspaceName =
     workspace?.name ?? connection.page?.name ?? "News Workbench";
@@ -336,7 +375,10 @@ export function AppFrame({
         >
           <div className="flex items-center gap-2.5 rounded-[10px] border border-border bg-surface-2 px-2.5 py-2">
             {platformSection ? (
-              <PlatformStatusCard platform={platformSection} />
+              <PlatformStatusCard
+                platform={platformSection}
+                status={platformStatusForSection}
+              />
             ) : (
               <>
                 {activePublishingPage ? (
@@ -373,7 +415,7 @@ export function AppFrame({
             </button>
           </div>
 
-          {showFacebookTools && (
+          {showFacebookTools ? (
             <Link
               href="/"
               className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-brand text-[12.5px] font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -381,7 +423,19 @@ export function AppFrame({
               <Plus className="size-4" aria-hidden />
               New post
             </Link>
-          )}
+          ) : platformSection ? (
+            <Link
+              href={`/${platformSection}`}
+              className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-brand text-[12.5px] font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              <Plus className="size-4" aria-hidden />
+              {platformSection === "youtube"
+                ? "New upload"
+                : platformSection === "instagram"
+                  ? "New Instagram post"
+                  : "New TikTok post"}
+            </Link>
+          ) : null}
 
           <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-1">
             {navGroups.map((group) => (
@@ -401,10 +455,12 @@ export function AppFrame({
                         title="Coming soon"
                         className="flex cursor-not-allowed items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-[12.5px] font-medium text-muted-foreground/70"
                       >
-                        <Icon
-                          className="size-4 shrink-0 text-faint"
-                          aria-hidden
-                        />
+                        {Icon ? (
+                          <Icon
+                            className="size-4 shrink-0 text-faint"
+                            aria-hidden
+                          />
+                        ) : null}
                         {item.label}
                         <span className="ml-auto rounded-full bg-surface-3 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
                           Soon
@@ -425,13 +481,20 @@ export function AppFrame({
                           : "text-secondary-foreground hover:bg-surface-3 hover:text-foreground"
                       )}
                     >
-                      <Icon
-                        className={cn(
-                          "size-4 shrink-0",
-                          active ? "text-brand" : "text-muted-foreground"
-                        )}
-                        aria-hidden
-                      />
+                      {item.mark ? (
+                        <PlatformMark
+                          platform={item.mark}
+                          className="size-[18px] shrink-0"
+                        />
+                      ) : Icon ? (
+                        <Icon
+                          className={cn(
+                            "size-4 shrink-0",
+                            active ? "text-brand" : "text-muted-foreground"
+                          )}
+                          aria-hidden
+                        />
+                      ) : null}
                       {item.label}
                     </Link>
                   );
@@ -450,7 +513,11 @@ export function AppFrame({
               </p>
               <div className="mt-1.5 flex items-center gap-2">
                 {platformSection ? (
-                  <PlatformStatusCard platform={platformSection} compact />
+                  <PlatformStatusCard
+                    platform={platformSection}
+                    status={platformStatusForSection}
+                    compact
+                  />
                 ) : (
                   <>
                     {activePublishingPage ? (
@@ -582,15 +649,20 @@ export function AppFrame({
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-              {showFacebookTools && (
+              {platformSection ? (
+                <PlatformQuickNav
+                  platform={platformSection}
+                  status={platformStatusForSection}
+                />
+              ) : showFacebookTools ? (
                 <>
                   <StoryQueueQuickLink />
                   <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
                   <PublishQuickNav />
                 </>
-              )}
+              ) : null}
               <NotificationBell />
-              <FacebookConnectionButton />
+              {!platformSection && <FacebookConnectionButton />}
             </div>
           </header>
 
@@ -615,52 +687,52 @@ export function AppFrame({
 // Facebook Page: YouTube uploads go to the connected channel, TikTok posts to
 // the connected account, Instagram publishes through the Page's linked
 // professional account — so the card reports that platform's own state
-// instead of a Facebook Page that has nothing to do with it.
+// instead of a Facebook Page that has nothing to do with it. The status is
+// fetched once in AppFrame and shared with PlatformQuickNav.
+type PlatformStatus = {
+  configured: boolean;
+  connected: boolean;
+  account?: { id?: string; name?: string } | null;
+  ig?: { username: string } | null;
+  reason?: string | null;
+};
+
+function platformStateLine(
+  platform: PlatformSection,
+  status: PlatformStatus | null
+) {
+  if (!status) return "Checking…";
+  if (!status.configured) return "Setup needed";
+  if (platform === "instagram") {
+    if (!status.connected) {
+      return status.reason === "no_ig_account"
+        ? "No IG linked to the Page"
+        : "Not connected";
+    }
+    return status.ig?.username ? `@${status.ig.username}` : "Connected";
+  }
+  return status.connected ? (status.account?.name ?? "Connected") : "Not connected";
+}
+
+function platformLabel(platform: PlatformSection) {
+  return platform === "youtube"
+    ? "YouTube"
+    : platform === "instagram"
+      ? "Instagram"
+      : "TikTok";
+}
+
 function PlatformStatusCard({
   platform,
+  status,
   compact = false,
 }: {
-  platform: "youtube" | "tiktok" | "instagram";
+  platform: PlatformSection;
+  status: PlatformStatus | null;
   compact?: boolean;
 }) {
-  const [status, setStatus] = useState<{
-    configured: boolean;
-    connected: boolean;
-    account?: { name: string } | null;
-    ig?: { username: string } | null;
-    reason?: string | null;
-  } | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(`/api/${platform}/status`, { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) setStatus(data);
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, [platform]);
-
-  const label =
-    platform === "youtube"
-      ? "YouTube"
-      : platform === "instagram"
-        ? "Instagram"
-        : "TikTok";
-  const state = !status
-    ? "Checking…"
-    : !status.configured
-      ? "Setup needed"
-      : platform === "instagram"
-        ? status.connected
-          ? (status.ig?.username ? `@${status.ig.username}` : "Connected")
-          : status.reason === "no_ig_account"
-            ? "No IG linked to the Page"
-            : "Not connected"
-        : status.connected
-          ? (status.account?.name ?? "Connected")
-          : "Not connected";
+  const label = platformLabel(platform);
+  const state = platformStateLine(platform, status);
 
   if (compact) {
     return (
@@ -690,6 +762,104 @@ function PlatformStatusCard({
         </p>
       </div>
     </div>
+  );
+}
+
+// Header quick-nav for the platform studios, mirroring the Facebook pair
+// (Story Queue + Publish dropdown): a link to the studio's composer plus,
+// when the platform is connected and its public URL is derivable, an
+// external link to the profile/channel itself.
+const PLATFORM_QUICK_NAV: Record<
+  PlatformSection,
+  { href: string; label: string; externalLabel: string | null }
+> = {
+  instagram: {
+    href: "/instagram",
+    label: "Instagram post",
+    externalLabel: "Open profile",
+  },
+  youtube: {
+    href: "/youtube",
+    label: "Upload video",
+    externalLabel: "Open channel",
+  },
+  tiktok: {
+    href: "/tiktok",
+    label: "TikTok post",
+    externalLabel: null,
+  },
+};
+
+function platformExternalHref(
+  platform: PlatformSection,
+  status: PlatformStatus | null
+): string | null {
+  if (!status?.connected) return null;
+  if (platform === "instagram") {
+    return status.ig?.username
+      ? `https://instagram.com/${status.ig.username}`
+      : null;
+  }
+  if (platform === "youtube") {
+    const id = status.account?.id;
+    return id && id !== "unknown"
+      ? `https://www.youtube.com/channel/${id}`
+      : null;
+  }
+  return null;
+}
+
+function PlatformQuickNav({
+  platform,
+  status,
+}: {
+  platform: PlatformSection;
+  status: PlatformStatus | null;
+}) {
+  const pathname = usePathname();
+  const config = PLATFORM_QUICK_NAV[platform];
+  const external = platformExternalHref(platform, status);
+  const active = pathname === config.href || pathname.startsWith(`${config.href}/`);
+  const externalLabel =
+    platform === "youtube"
+      ? "Open channel"
+      : platform === "instagram"
+        ? "Open profile"
+        : null;
+
+  return (
+    <nav
+      aria-label={`${platformLabel(platform)} publishing tools`}
+      className="flex items-center gap-1.5"
+    >
+      <Link
+        href={config.href}
+        aria-label={config.label}
+        aria-current={active ? "page" : undefined}
+        title={config.label}
+        className="tap-target grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:w-auto sm:rounded-lg sm:px-2.5"
+      >
+        <PlatformMark platform={platform} className="size-4" />
+        <span className="hidden text-[11.5px] font-semibold sm:inline">
+          {config.label}
+        </span>
+      </Link>
+      {external && externalLabel ? (
+        <a
+          href={external}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={externalLabel}
+          title={externalLabel}
+          className="tap-target grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:w-auto sm:rounded-lg sm:px-2.5"
+        >
+          <ExternalLink className="size-4" aria-hidden />
+          <span className="hidden text-[11.5px] font-semibold sm:inline">
+            {externalLabel}
+          </span>
+        </a>
+      ) : null}
+    </nav>
   );
 }
 

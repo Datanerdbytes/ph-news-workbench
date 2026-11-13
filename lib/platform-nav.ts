@@ -12,3 +12,24 @@ export function facebookToolsVisible(pathname: string): boolean {
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
 }
+
+// The platform studios — routes that publish to their own channel/account
+// rather than the shared Facebook Page. Inside one of these sections the
+// chrome reports that platform's own state (sidebar card, quick-nav, CTA).
+export type PlatformSection = "youtube" | "tiktok" | "instagram";
+
+const PLATFORM_STUDIO_ROUTES: Record<PlatformSection, string> = {
+  youtube: "/youtube",
+  tiktok: "/tiktok",
+  instagram: "/instagram",
+};
+
+export function platformSectionFromPath(pathname: string): PlatformSection | null {
+  for (const [section, route] of Object.entries(PLATFORM_STUDIO_ROUTES) as [
+    PlatformSection,
+    string,
+  ][]) {
+    if (pathname === route || pathname.startsWith(`${route}/`)) return section;
+  }
+  return null;
+}
