@@ -551,7 +551,7 @@ export default function AnalyticsPage() {
             </p>
             <ul className="mt-3 flex flex-col gap-2">
               <li className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-2.5 py-2">
-                <span className="grid size-7 place-items-center rounded-md bg-[#1877f2] text-[10px] font-bold text-white">
+                <span className="grid size-7 place-items-center rounded-md bg-facebook text-[10px] font-bold text-white">
                   f
                 </span>
                 <div className="min-w-0 flex-1">

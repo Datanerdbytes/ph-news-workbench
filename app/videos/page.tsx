@@ -48,7 +48,7 @@ export default function VideosPage() {
   }
 
   const videoAside = (
-    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-[#171923] p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
+    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-ink p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-16 -top-20 -z-10 size-[220px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
@@ -58,7 +58,7 @@ export default function VideosPage() {
           <span
             className={cn(
               "size-1.5 rounded-full",
-              file ? "bg-[#79d2ae]" : "bg-white/70"
+              file ? "bg-success-bright" : "bg-white/70"
             )}
           />
           {file ? "Ready to publish" : "Upload preview"}

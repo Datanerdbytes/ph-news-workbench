@@ -40,6 +40,7 @@
   --color-facebook-strong: var(--facebook-strong);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
+  --color-success-bright: var(--success-bright);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
   --color-warning: var(--warning);
@@ -99,6 +100,9 @@
 
   --success: #0d7355;
   --success-soft: #e7f5ef;
+  /* Bright mint for success marks sitting on dark preview panels, where
+     the AA-on-white --success is too dim. */
+  --success-bright: #79d2ae;
   --info: #1f5fbf;
   --info-soft: #eaf1fc;
   --warning: #9a5a00;

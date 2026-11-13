@@ -508,7 +508,7 @@ export default function SettingsPage() {
             The Facebook Page this workspace publishes to.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface-2 px-3 py-2.5">
-            <span className="grid size-8 place-items-center rounded-md bg-[#1877f2] text-[11px] font-bold text-white">
+            <span className="grid size-8 place-items-center rounded-md bg-facebook text-[11px] font-bold text-white">
               f
             </span>
             <div className="min-w-0 flex-1">

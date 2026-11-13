@@ -654,7 +654,7 @@ export default function DownloadsPage() {
 
           <aside
             id="how-it-works"
-            className="relative isolate flex min-h-[380px] flex-col overflow-hidden rounded-xl bg-[#171923] p-5 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)] sm:p-6"
+            className="relative isolate flex min-h-[380px] flex-col overflow-hidden rounded-xl bg-ink p-5 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)] sm:p-6"
           >
             <div
               aria-hidden="true"
@@ -664,7 +664,7 @@ export default function DownloadsPage() {
               <>
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
-                    <span className="size-1.5 rounded-full bg-[#79d2ae]" />
+                    <span className="size-1.5 rounded-full bg-success-bright" />
                     Download complete
                   </span>
                   <span className="font-mono text-[9px] uppercase text-white/60">
@@ -711,7 +711,7 @@ export default function DownloadsPage() {
                 <div className="mt-auto pt-4">
                   <div className="rounded-xl border border-white/10 bg-white/[0.045] p-3.5">
                     <div className="flex items-center gap-2.5">
-                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-success/10 text-[#79d2ae]">
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-success/10 text-success-bright">
                         <Check className="size-3.5" aria-hidden="true" />
                       </span>
                       <div className="min-w-0">
@@ -794,7 +794,7 @@ export default function DownloadsPage() {
                 <p className="text-[10px] font-semibold text-white/80">
                   Your download flow
                 </p>
-                <span className="rounded-full bg-success/10 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.1em] text-[#79d2ae]">
+                <span className="rounded-full bg-success/10 px-2 py-1 text-[8px] font-bold uppercase tracking-[0.1em] text-success-bright">
                   yt-dlp ready
                 </span>
               </div>

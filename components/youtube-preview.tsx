@@ -52,7 +52,7 @@ export function YouTubePreview({
         </p>
         <div className="mt-1.5 flex items-center gap-2">
           <span
-            className="grid size-6 place-items-center rounded-full bg-[#cc0000] text-[9px] font-bold text-white"
+            className="grid size-6 place-items-center rounded-full bg-youtube text-[9px] font-bold text-white"
             aria-hidden
           >
             Y
