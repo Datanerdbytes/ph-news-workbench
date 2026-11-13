@@ -12,8 +12,10 @@ vi.mock("@/components/app-frame", async () => {
 });
 
 import {
+  FilePicker,
   PlatformPublishPage,
   ScheduleField,
+  mediaFileError,
   resolveScheduledFor,
   type PlatformConnectionState,
 } from "./publish-page";
@@ -108,6 +110,102 @@ describe("resolveScheduledFor", () => {
     expect(resolveScheduledFor("2026-11-13T09:05", now)).toBeNull();
     // 80 days out — past the 75-day ceiling.
     expect(resolveScheduledFor("2027-02-01T09:00", now)).toBeNull();
+  });
+});
+
+function makeFile(name: string, type: string, size: number): File {
+  const file = new File(["x"], name, { type });
+  Object.defineProperty(file, "size", { value: size });
+  return file;
+}
+
+const storyVideoOpts = {
+  types: ["video/mp4", "video/quicktime"],
+  extensions: [".mp4", ".mov"],
+  typeLabel: "an MP4 or MOV file",
+  maxBytes: 100 * 1024 * 1024,
+  maxLabel: "100 MB",
+} as const;
+
+describe("mediaFileError", () => {
+  it("accepts a supported, in-limit file", () => {
+    expect(
+      mediaFileError(makeFile("clip.mp4", "video/mp4", 1024), storyVideoOpts)
+    ).toBeNull();
+  });
+
+  it("rejects unsupported types with the label copy", () => {
+    expect(
+      mediaFileError(
+        makeFile("clip.avi", "video/x-msvideo", 1024),
+        storyVideoOpts
+      )
+    ).toBe("Choose an MP4 or MOV file.");
+  });
+
+  it("rejects oversized files before any upload starts", () => {
+    expect(
+      mediaFileError(
+        makeFile("clip.mp4", "video/mp4", 100 * 1024 * 1024 + 1),
+        storyVideoOpts
+      )
+    ).toBe("The file must be 100 MB or smaller.");
+  });
+
+  it("falls back to the extension when the browser reports no MIME type", () => {
+    expect(mediaFileError(makeFile("clip.MOV", "", 1024), storyVideoOpts)).toBeNull();
+    expect(mediaFileError(makeFile("clip.webm", "", 1024), storyVideoOpts)).toBe(
+      "Choose an MP4 or MOV file."
+    );
+  });
+});
+
+describe("FilePicker validation", () => {
+  const imageLimit = 20 * 1024 * 1024;
+
+  function renderImagePicker(onPick: (file: File | null) => void) {
+    return render(
+      <FilePicker
+        id="test-file"
+        accept="image/jpeg,image/png,image/webp"
+        label="Choose an image"
+        file={null}
+        onPick={onPick}
+        icon={<span />}
+        validate={(file) =>
+          mediaFileError(file, {
+            types: ["image/jpeg", "image/png", "image/webp"],
+            typeLabel: "a JPEG, PNG, or WebP image",
+            maxBytes: imageLimit,
+            maxLabel: "20 MB",
+          })
+        }
+      />
+    );
+  }
+
+  it("shows an inline reason and does not stage an invalid pick", () => {
+    const onPick = vi.fn();
+    renderImagePicker(onPick);
+    const input = screen.getByLabelText("File");
+    fireEvent.change(input, {
+      target: { files: [makeFile("huge.png", "image/png", imageLimit + 1)] },
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The file must be 20 MB or smaller."
+    );
+    expect(onPick).not.toHaveBeenCalled();
+  });
+
+  it("stages a valid pick and clears the error", () => {
+    const onPick = vi.fn();
+    renderImagePicker(onPick);
+    const input = screen.getByLabelText("File");
+    fireEvent.change(input, {
+      target: { files: [makeFile("ok.png", "image/png", 1024)] },
+    });
+    expect(onPick).toHaveBeenCalledWith(expect.any(File));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
 

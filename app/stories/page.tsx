@@ -13,6 +13,7 @@ import {
   PublishPage,
   ResultList,
   inputClass,
+  mediaFileError,
   useManagedPages,
   type PublishResult,
 } from '@/components/publishing/publish-page';
@@ -245,6 +246,14 @@ export default function StoriesPage() {
               onPick={applyStoryPhoto}
               onClear={() => applyStoryPhoto(null)}
               icon={<ImagePlus className="size-3.5" />}
+              validate={(file) =>
+                mediaFileError(file, {
+                  types: ['image/jpeg', 'image/png', 'image/webp'],
+                  typeLabel: 'a JPEG, PNG, or WebP image',
+                  maxBytes: 20 * 1024 * 1024,
+                  maxLabel: '20 MB',
+                })
+              }
             />
             <div>
               <FieldLabel htmlFor="story-photo-url" hint="Or paste a URL">
@@ -270,6 +279,15 @@ export default function StoriesPage() {
             onPick={applyStoryVideo}
             onClear={() => applyStoryVideo(null)}
             icon={<Video className="size-3.5" />}
+            validate={(file) =>
+              mediaFileError(file, {
+                types: ['video/mp4', 'video/quicktime'],
+                extensions: ['.mp4', '.mov'],
+                typeLabel: 'an MP4 or MOV file',
+                maxBytes: 100 * 1024 * 1024,
+                maxLabel: '100 MB',
+              })
+            }
           />
         )}
 

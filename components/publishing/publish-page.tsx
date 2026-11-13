@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { FacebookMark } from '@/components/facebook-mark';
 import { AppFrame } from '@/components/app-frame';
@@ -288,6 +289,36 @@ export const textareaClass =
 export const inputClass =
   'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40';
 
+/**
+ * Pick-time media validation, mirrored from the server-side limits: returns
+ * a human reason the file can't be published, or null when it's acceptable —
+ * so wrong-type or oversized files never start a long upload.
+ */
+export function mediaFileError(
+  file: File,
+  opts: {
+    types: readonly string[];
+    /** Fallback extensions checked when the browser reports no MIME type. */
+    extensions?: readonly string[];
+    /** Noun phrase with article, e.g. "an MP4 or MOV file". */
+    typeLabel: string;
+    maxBytes: number;
+    maxLabel: string;
+  }
+): string | null {
+  const extensionOk =
+    !file.type &&
+    (opts.extensions?.some((ext) => file.name.toLowerCase().endsWith(ext)) ??
+      false);
+  if (!opts.types.includes(file.type) && !extensionOk) {
+    return `Choose ${opts.typeLabel}.`;
+  }
+  if (file.size > opts.maxBytes) {
+    return `The file must be ${opts.maxLabel} or smaller.`;
+  }
+  return null;
+}
+
 export function FilePicker({
   id,
   accept,
@@ -297,6 +328,7 @@ export function FilePicker({
   onPick,
   onClear,
   icon,
+  validate,
 }: {
   id: string;
   accept: string;
@@ -306,7 +338,10 @@ export function FilePicker({
   onPick: (file: File | null) => void;
   onClear?: () => void;
   icon: React.ReactNode;
+  /** Pick-time validation: return a human reason to reject, or null to accept. */
+  validate?: (file: File) => string | null;
 }) {
+  const [pickError, setPickError] = useState<string | null>(null);
   return (
     <div>
       <FieldLabel htmlFor={id} hint={hint}>
@@ -326,20 +361,37 @@ export function FilePicker({
           accept={accept}
           className="sr-only"
           onChange={(event) => {
-            onPick(event.target.files?.[0] ?? null);
+            const picked = event.target.files?.[0] ?? null;
             event.target.value = '';
+            if (picked && validate) {
+              const reason = validate(picked);
+              if (reason) {
+                setPickError(reason);
+                return;
+              }
+            }
+            setPickError(null);
+            onPick(picked);
           }}
         />
         {file && onClear && (
           <button
             type="button"
-            onClick={onClear}
+            onClick={() => {
+              setPickError(null);
+              onClear();
+            }}
             className="tap-target rounded px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
           >
             Clear
           </button>
         )}
       </div>
+      {pickError && (
+        <p role="alert" className="mt-1.5 text-[11px] text-destructive">
+          {pickError}
+        </p>
+      )}
     </div>
   );
 }

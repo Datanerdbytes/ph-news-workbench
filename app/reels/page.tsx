@@ -18,6 +18,7 @@ import {
   ScheduleField,
   defaultScheduleValue,
   resolveScheduledFor,
+  mediaFileError,
   textareaClass,
   useManagedPages,
   type PublishResult,
@@ -65,6 +66,21 @@ export default function ReelsPage() {
    * for clips the browser cannot play; playable originals pass through as-is.
    */
   const handlePick = useCallback(async (picked: File | null) => {
+    // Reject wrong-type/oversized picks before touching state, so an invalid
+    // pick never interrupts an in-flight normalization of the current file.
+    if (picked) {
+      const reason = mediaFileError(picked, {
+        types: ['video/mp4', 'video/quicktime'],
+        extensions: ['.mp4', '.mov'],
+        typeLabel: 'an MP4 or MOV file',
+        maxBytes: MAX_BYTES,
+        maxLabel: '1 GB',
+      });
+      if (reason) {
+        toast.error(reason);
+        return;
+      }
+    }
     const generation = ++pickGeneration.current;
     setFile(picked);
     if (!picked) return;
