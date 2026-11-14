@@ -71,7 +71,8 @@ function useDb(overrides: {
     const query = strings.join(" ");
     if (query.includes("attempts = attempts + 1"))
       // Per-row conditional claim — succeeds unless the test overrides it.
-      return overrides.claimRow ?? [{ id: 1 }];
+      // attempts mirrors the fixture's pre-claim value + 1.
+      return overrides.claimRow ?? [{ id: 1, attempts: 2 }];
     if (query.includes("source = 'local'")) return overrides.claim ?? [];
     if (query.includes("status = 'publishing'")) return overrides.stuck ?? [];
     if (query.includes("source IN ('facebook', 'youtube')"))
@@ -192,7 +193,10 @@ describe("publishDuePosts", () => {
   it("fails the post once the attempt budget is exhausted", async () => {
     // attempts is the pre-claim value — the per-row claim makes this the
     // third attempt, which is the last one.
-    useDb({ claim: [claimedRow({ attempts: 2 })] });
+    useDb({
+      claim: [claimedRow({ attempts: 2 })],
+      claimRow: [{ id: 1, attempts: 3 }], // the claim lands the third attempt
+    });
     vi.mocked(getPrimaryPage).mockResolvedValue({
       pageId: "pg1",
       token: "tok",

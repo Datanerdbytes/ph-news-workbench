@@ -100,15 +100,21 @@ export async function publishDuePosts(
   let failed = 0;
 
   for (const post of due) {
-    // Conditional claim: only a row still in 'scheduled' may publish. An
-    // overlapping sweep that already claimed (or a stuck-sweep requeue race)
-    // leaves this UPDATE empty — skip instead of publishing twice.
+    // Conditional claim: only a row still in 'scheduled' may publish, and the
+    // eligibility gates (attempt budget, retry backoff) are re-checked
+    // against the CURRENT row — a concurrent sweep's stale candidate cannot
+    // claim a row that just failed a retry. The claim returns the updated
+    // attempt count, which drives the failure decisions below.
     const claimed = (await sql`
       UPDATE scheduled_posts
       SET status = 'publishing', attempts = attempts + 1, updated_at = now()
       WHERE id = ${post.id} AND status = 'scheduled'
-      RETURNING id`) as unknown as { id: number }[];
+        AND attempts < ${MAX_ATTEMPTS}
+        AND (attempts = 0
+             OR updated_at < now() - (${RETRY_BACKOFF_MINUTES} * interval '1 minute'))
+      RETURNING id, attempts`) as unknown as { id: number; attempts: number }[];
     if (!claimed.length) continue;
+    const attemptCount = claimed[0].attempts;
 
     await recordScheduleEvent({
       workspaceId: post.workspace_id,
@@ -144,11 +150,23 @@ export async function publishDuePosts(
         mediaId = result.id;
       }
 
+      // Durable publication record FIRST — anything after this line must not
+      // send the row back to 'scheduled' (the content is already live).
       await sql`
         UPDATE scheduled_posts
         SET status = 'published', facebook_post_id = ${mediaId},
             error_message = NULL, updated_at = now()
         WHERE id = ${post.id}`;
+
+      // Only now is cleanup safe: the retry path can no longer need the
+      // staged image. Best-effort — an orphaned blob is harmless.
+      if (post.kind === "instagram-post" && post.image_url) {
+        try {
+          await deleteStagedBlobs([post.image_url]);
+        } catch {
+          // Cleanup only.
+        }
+      }
 
       if (post.draft_id) {
         await sql`UPDATE drafts SET status = 'published' WHERE id = ${post.draft_id}`;
@@ -184,11 +202,10 @@ export async function publishDuePosts(
         error instanceof FacebookApiError &&
         (error.code === 10 || error.code === 200 || error.code === 190);
 
-      // A transient Facebook failure should not kill the scheduled post. Keep
-      // it queued until the attempt budget runs out. The per-row claim
-      // already incremented attempts, so the pre-claim value + 1 is the
-      // attempt number that just failed.
-      const exhausted = post.attempts + 1 >= MAX_ATTEMPTS;
+      // A transient failure should not kill the scheduled post. Keep it
+      // queued until the attempt budget runs out — using the count returned
+      // by the claim, never the stale candidate value.
+      const exhausted = attemptCount >= MAX_ATTEMPTS;
 
       await sql`
         UPDATE scheduled_posts
@@ -204,7 +221,7 @@ export async function publishDuePosts(
         source: options.source,
         actorUserId: options.actorUserId,
         errorMessage: message,
-        metadata: { attempt: post.attempts + 1, maxAttempts: MAX_ATTEMPTS },
+        metadata: { attempt: attemptCount, maxAttempts: MAX_ATTEMPTS },
       });
 
       if (permissionIssue) {
@@ -253,6 +270,8 @@ function instagramGateMessage(
  * scheduling API, so the row holds a staged blob image and the worker runs
  * the container → publish flow at the due time. The media id lands in the
  * same column Facebook uses (it is a generic platform-media-id column).
+ * Staged-image cleanup happens AFTER the durable published write in the
+ * caller — deleting earlier would break the retry path on a write failure.
  */
 async function publishScheduledInstagramPost(
   post: ClaimedRow
@@ -272,16 +291,6 @@ async function publishScheduledInstagramPost(
     imageUrl: post.image_url,
     caption: stripMarkdown(post.text),
   });
-
-  // Instagram consumed the staged image — same post-publish cleanup the
-  // FB reels route performs, via the server-side blob API (the browser-only
-  // helper in lib/blob-cleanup.ts carries no auth here). A failed cleanup is
-  // harmless (orphaned blob).
-  try {
-    await deleteStagedBlobs([post.image_url]);
-  } catch {
-    // Cleanup only.
-  }
 
   return result.id;
 }
