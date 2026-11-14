@@ -338,7 +338,22 @@ export async function syncNativeSchedules(): Promise<number> {
 
   for (const row of rows) {
     if (row.source === "youtube") {
-      synced += await syncYouTubeSchedule(row);
+      // Per-row boundary: a failing terminal write (status flip, event,
+      // notification) must not abort the sweep or starve the local claim.
+      try {
+        synced += await syncYouTubeSchedule(row);
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            route: "schedule-sync",
+            event: "failed",
+            scheduledPostId: row.id,
+            kind: row.kind,
+            source: "youtube",
+            error: error instanceof Error ? error.message : String(error),
+          })
+        );
+      }
       continue;
     }
 
