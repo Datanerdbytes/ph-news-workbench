@@ -415,6 +415,72 @@ describe("syncNativeSchedules", () => {
       });
     });
 
+    it("keeps inconclusive probe results retryable and never fails on them", async () => {
+      const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      useDb({
+        native: [youtubeRow({ scheduled_for: minutesAgo(90) })],
+      });
+      // Non-OK responses surface as null — the video may already be public.
+      vi.mocked(fetchYouTubeVideoStatus).mockResolvedValue({
+        uploadStatus: null,
+        thumbnail: null,
+        privacyStatus: null,
+      });
+
+      await expect(syncNativeSchedules()).resolves.toBe(0);
+      expect(events()).toEqual([]);
+
+      // The back-off marker bumps updated_at so the row skips the next
+      // sweep instead of occupying the LIMIT 10 slot every run.
+      const updateTexts = sqlMock.mock.calls.map((call) =>
+        (call[0] as TemplateStringsArray).join(" ")
+      );
+      expect(
+        updateTexts.some((text) => text.includes("SET updated_at = now()"))
+      ).toBe(true);
+      expect(errorSpy.mock.calls[0][0]).toContain("probe_failed");
+    });
+
+    it("backs off within the grace window when the probe errors", async () => {
+      const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      useDb({ native: [youtubeRow()] });
+      vi.mocked(ensureFreshYouTubeToken).mockRejectedValue(
+        new Error("Google could not be reached.")
+      );
+
+      await expect(syncNativeSchedules()).resolves.toBe(0);
+      expect(events()).toEqual([]);
+
+      const updateTexts = sqlMock.mock.calls.map((call) =>
+        (call[0] as TemplateStringsArray).join(" ")
+      );
+      expect(
+        updateTexts.some((text) => text.includes("SET updated_at = now()"))
+      ).toBe(true);
+      expect(errorSpy.mock.calls[0][0]).toContain("probe_failed");
+    });
+
+    it("fails a row it cannot probe once the grace window passes", async () => {
+      useDb({
+        native: [youtubeRow({ scheduled_for: minutesAgo(90) })],
+      });
+      vi.mocked(ensureFreshYouTubeToken).mockRejectedValue(
+        new Error("Google could not be reached.")
+      );
+
+      await expect(syncNativeSchedules()).resolves.toBe(1);
+      expect(events()[0]).toMatchObject({
+        event: "failed",
+        errorMessage:
+          "YouTube could not be probed: Google could not be reached.",
+        metadata: { kind: "video", executor: "youtube" },
+      });
+    });
+
     it("fails the row when the YouTube connection is gone", async () => {
       useDb({ native: [youtubeRow()] });
       vi.mocked(resolvePlatformAccount).mockResolvedValue(null);

@@ -462,6 +462,8 @@ export async function syncNativeSchedules(): Promise<number> {
  * keeps them Private until the slot, then flips them public. The probe reads
  * exactly that flag; still private well past the slot means the video never
  * went out (processing failure, removed in Studio) and is surfaced as failed.
+ * Inconclusive probes (non-OK or malformed responses) stay retryable — they
+ * must never record a failure, because the video may already be public.
  */
 async function syncYouTubeSchedule(row: NativeRow): Promise<number> {
   const videoId = row.facebook_post_id;
@@ -470,64 +472,131 @@ async function syncYouTubeSchedule(row: NativeRow): Promise<number> {
     return 1;
   }
 
+  const overdueBy = Date.now() - new Date(row.scheduled_for).getTime();
+
+  let connection;
   try {
-    const connection = await resolvePlatformAccount(row.workspace_id, "youtube");
-    if (!connection) {
-      await markNativeFailed(row, "The YouTube connection is gone. Reconnect YouTube.");
-      return 1;
-    }
-
-    const token = await ensureFreshYouTubeToken(connection, row.workspace_id);
-    const status = await fetchYouTubeVideoStatus(videoId, token);
-
-    if (status.privacyStatus === "public") {
-      await sql`
-        UPDATE scheduled_posts
-        SET status = 'published', error_message = NULL, updated_at = now()
-        WHERE id = ${row.id} AND status = 'scheduled'`;
-      await recordScheduleEvent({
-        workspaceId: row.workspace_id,
-        scheduledPostId: row.id,
-        newsItemId: row.news_item_id,
-        event: "published",
-        source: "scheduler",
-        facebookPostId: videoId,
-        metadata: { kind: row.kind, executor: "youtube" },
-      });
-      const youtubeCopy = scheduledOutcomeCopy(row.kind, true);
-      await notifyWorkspace({
-        workspaceId: row.workspace_id,
-        type: "scheduled_publish_success",
-        title: youtubeCopy.title,
-        body: youtubeCopy.body,
-        link: `/calendar?post=${row.id}`,
-      });
-      return 1;
-    }
-
-    const slot = new Date(row.scheduled_for).getTime();
-    const overdueBy = Date.now() - slot;
-    if (overdueBy > YOUTUBE_GRACE_MINUTES * 60_000) {
-      await markNativeFailed(
-        row,
-        "YouTube did not publish this video at its scheduled time."
-      );
-      return 1;
-    }
+    connection = await resolvePlatformAccount(row.workspace_id, "youtube");
   } catch (error) {
+    return backOffYouTubeProbe(row, error, overdueBy);
+  }
+  if (!connection) {
+    await markNativeFailed(row, "The YouTube connection is gone. Reconnect YouTube.");
+    return 1;
+  }
+
+  let token: string;
+  let status: Awaited<ReturnType<typeof fetchYouTubeVideoStatus>>;
+  try {
+    token = await ensureFreshYouTubeToken(connection, row.workspace_id);
+    status = await fetchYouTubeVideoStatus(videoId, token);
+  } catch (error) {
+    return backOffYouTubeProbe(row, error, overdueBy);
+  }
+
+  if (status.privacyStatus === "public") {
+    await sql`
+      UPDATE scheduled_posts
+      SET status = 'published', error_message = NULL, updated_at = now()
+      WHERE id = ${row.id} AND status = 'scheduled'`;
+    await recordScheduleEvent({
+      workspaceId: row.workspace_id,
+      scheduledPostId: row.id,
+      newsItemId: row.news_item_id,
+      event: "published",
+      source: "scheduler",
+      facebookPostId: videoId,
+      metadata: { kind: row.kind, executor: "youtube" },
+    });
+    const youtubeCopy = scheduledOutcomeCopy(row.kind, true);
+    await notifyWorkspace({
+      workspaceId: row.workspace_id,
+      type: "scheduled_publish_success",
+      title: youtubeCopy.title,
+      body: youtubeCopy.body,
+      link: `/calendar?post=${row.id}`,
+    });
+    return 1;
+  }
+
+  if (status.privacyStatus === null) {
+    // Non-OK or malformed response — the answer is unknown, and the video
+    // may already be public. An inconclusive probe never records a failure:
+    // back off and retry on a later sweep.
+    await bumpYouTubeRetryMarker(row);
     console.error(
       JSON.stringify({
         route: "schedule-sync",
-        event: "failed",
+        event: "probe_failed",
         scheduledPostId: row.id,
         kind: row.kind,
         source: "youtube",
-        error: error instanceof Error ? error.message : String(error),
+        error: "inconclusive probe response",
       })
     );
+    return 0;
   }
 
+  // Confirmed still non-public. Past the grace window YouTube is not going
+  // to publish it — surface that instead of leaving it queued forever.
+  if (overdueBy > YOUTUBE_GRACE_MINUTES * 60_000) {
+    await markNativeFailed(
+      row,
+      "YouTube did not publish this video at its scheduled time."
+    );
+    return 1;
+  }
   return 0;
+}
+
+/**
+ * A YouTube probe failed transiently (token refresh, network). Bump
+ * `updated_at` so the row skips the sweep's 2-minute staleness gate —
+ * otherwise the same row would occupy the sweep's LIMIT 10 slot every run
+ * and starve the rows behind it. The bump is best-effort: a failed marker
+ * must not abort the rest of the sweep. Only `scheduled` native rows read
+ * `updated_at` this way (the publish claim filters `source='local'`), so
+ * publish timing is unaffected.
+ */
+async function backOffYouTubeProbe(
+  row: NativeRow,
+  error: unknown,
+  overdueBy: number
+): Promise<number> {
+  const message =
+    error instanceof Error ? error.message : String(error ?? "unknown error");
+  console.error(
+    JSON.stringify({
+      route: "schedule-sync",
+      event: "probe_failed",
+      scheduledPostId: row.id,
+      kind: row.kind,
+      source: "youtube",
+      error: message,
+    })
+  );
+
+  // Broken well past the slot, sweep after sweep — surface it rather than
+  // leave the row queued forever with a connection that never answers.
+  if (overdueBy > YOUTUBE_GRACE_MINUTES * 60_000) {
+    await markNativeFailed(row, `YouTube could not be probed: ${message}`);
+    return 1;
+  }
+
+  await bumpYouTubeRetryMarker(row);
+  return 0;
+}
+
+/** Best-effort retry marker — see backOffYouTubeProbe. */
+async function bumpYouTubeRetryMarker(row: NativeRow): Promise<void> {
+  try {
+    await sql`
+      UPDATE scheduled_posts
+      SET updated_at = now()
+      WHERE id = ${row.id} AND status = 'scheduled'`;
+  } catch {
+    // The marker only delays the next probe; never fail the sweep for it.
+  }
 }
 
 async function markNativeFailed(row: NativeRow, reason: string) {
