@@ -20,6 +20,11 @@ vi.mock("@/lib/facebook", async (importOriginal) => {
 vi.mock("@/lib/publishing/connection", () => ({
   resolvePlatformAccount: vi.fn(),
 }));
+vi.mock("@/lib/publishing/instagram", () => ({
+  publishInstagramImagePost: vi.fn(),
+  resolveInstagramAccount: vi.fn(),
+}));
+vi.mock("@/lib/blob", () => ({ deleteStagedBlobs: vi.fn() }));
 vi.mock("@/lib/youtube", () => ({
   ensureFreshYouTubeToken: vi.fn(),
   fetchYouTubeVideoStatus: vi.fn(),
@@ -37,6 +42,11 @@ import { getPrimaryPage, resolvePageToken } from "@/lib/facebook-page-token";
 import { recordScheduleEvent } from "@/lib/schedule-events";
 import { resolvePlatformAccount } from "@/lib/publishing/connection";
 import {
+  publishInstagramImagePost,
+  resolveInstagramAccount,
+} from "@/lib/publishing/instagram";
+import { deleteStagedBlobs } from "@/lib/blob";
+import {
   ensureFreshYouTubeToken,
   fetchYouTubeVideoStatus,
 } from "@/lib/youtube";
@@ -53,12 +63,16 @@ const events = () =>
  */
 function useDb(overrides: {
   claim?: unknown[];
+  claimRow?: unknown[];
   stuck?: unknown[];
   native?: unknown[];
 }) {
   sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
     const query = strings.join(" ");
-    if (query.includes("WITH due AS")) return overrides.claim ?? [];
+    if (query.includes("attempts = attempts + 1"))
+      // Per-row conditional claim — succeeds unless the test overrides it.
+      return overrides.claimRow ?? [{ id: 1 }];
+    if (query.includes("source = 'local'")) return overrides.claim ?? [];
     if (query.includes("status = 'publishing'")) return overrides.stuck ?? [];
     if (query.includes("source IN ('facebook', 'youtube')"))
       return overrides.native ?? [];
@@ -150,6 +164,8 @@ describe("publishDuePosts", () => {
   });
 
   it("requeues the post while attempts remain", async () => {
+    // attempts is the pre-claim value; the per-row claim makes this the
+    // second attempt.
     useDb({ claim: [claimedRow({ attempts: 1 })] });
     vi.mocked(getPrimaryPage).mockResolvedValue({
       pageId: "pg1",
@@ -169,12 +185,14 @@ describe("publishDuePosts", () => {
     ]);
     expect(events()[1]).toMatchObject({
       errorMessage: "token expired",
-      metadata: { attempt: 1, maxAttempts: 3 },
+      metadata: { attempt: 2, maxAttempts: 3 },
     });
   });
 
   it("fails the post once the attempt budget is exhausted", async () => {
-    useDb({ claim: [claimedRow({ attempts: 3 })] });
+    // attempts is the pre-claim value — the per-row claim makes this the
+    // third attempt, which is the last one.
+    useDb({ claim: [claimedRow({ attempts: 2 })] });
     vi.mocked(getPrimaryPage).mockResolvedValue({
       pageId: "pg1",
       token: "tok",
@@ -188,6 +206,25 @@ describe("publishDuePosts", () => {
       failed: 1,
     });
     expect(events().map((event) => event.event)).toEqual(["claimed", "failed"]);
+  });
+
+  it("skips a row another sweep already claimed", async () => {
+    useDb({
+      claim: [claimedRow()],
+      claimRow: [], // the conditional claim updates nothing — contested
+    });
+    vi.mocked(getPrimaryPage).mockResolvedValue({
+      pageId: "pg1",
+      token: "tok",
+    });
+
+    await expect(publishDuePosts({ source: "scheduler" })).resolves.toMatchObject({
+      due: 1,
+      published: 0,
+      failed: 0,
+    });
+    expect(publishPagePost).not.toHaveBeenCalled();
+    expect(events()).toEqual([]);
   });
 
   it("redacts token material from Facebook error messages", async () => {
@@ -214,6 +251,106 @@ describe("publishDuePosts", () => {
     expect(events()[1]).toMatchObject({
       event: "retrying",
       errorMessage: "This workspace has no connected Facebook Page.",
+    });
+  });
+
+  describe("scheduled Instagram posts", () => {
+    const igImage =
+      "https://bucket.public.blob.vercel-storage.com/instagram/img.jpg";
+
+    function instagramRow(overrides: Record<string, unknown> = {}) {
+      return claimedRow({
+        kind: "instagram-post",
+        image_url: igImage,
+        ...overrides,
+      });
+    }
+
+    const igConnection = {
+      ok: true as const,
+      account: { id: "ig1", username: "iamwowie_", picture: null },
+      accessToken: "page-token",
+      scopes: ["instagram_content_publish"],
+      pageId: "pg1",
+    };
+
+    beforeEach(() => {
+      vi.mocked(resolveInstagramAccount).mockResolvedValue(igConnection);
+      vi.mocked(publishInstagramImagePost).mockResolvedValue({
+        id: "ig_media_1",
+        permalink: "https://www.instagram.com/p/xyz",
+      });
+    });
+
+    it("publishes via the container flow and deletes the staged image", async () => {
+      useDb({ claim: [instagramRow({ draft_id: 31 })] });
+
+      await expect(publishDuePosts({ source: "scheduler" })).resolves.toEqual({
+        due: 1,
+        published: 1,
+        failed: 0,
+        synced: 0,
+      });
+
+      expect(resolveInstagramAccount).toHaveBeenCalledWith("ws1");
+      expect(publishInstagramImagePost).toHaveBeenCalledWith({
+        account: igConnection.account,
+        accessToken: "page-token",
+        imageUrl: igImage,
+        caption: "hello",
+      });
+      expect(deleteStagedBlobs).toHaveBeenCalledWith([igImage]);
+      expect(events().map((event) => event.event)).toEqual([
+        "claimed",
+        "published",
+      ]);
+      expect(events()[1]).toMatchObject({
+        event: "published",
+        facebookPostId: "ig_media_1",
+      });
+
+      const updateTexts = sqlMock.mock.calls.map((call) =>
+        (call[0] as TemplateStringsArray).join(" ")
+      );
+      expect(
+        updateTexts.some((text) => text.includes("status = 'published'"))
+      ).toBe(true);
+      expect(
+        updateTexts.some((text) => text.includes("UPDATE drafts"))
+      ).toBe(true);
+    });
+
+    it("retries with the gate message when no Instagram account is linked", async () => {
+      useDb({ claim: [instagramRow()] });
+      vi.mocked(resolveInstagramAccount).mockResolvedValue({
+        ok: false,
+        reason: "no_ig_account",
+        detail: "This Page has no professional Instagram account linked to it.",
+      });
+
+      await publishDuePosts({ source: "scheduler" });
+
+      expect(publishInstagramImagePost).not.toHaveBeenCalled();
+      expect(deleteStagedBlobs).not.toHaveBeenCalled();
+      expect(events()[1]).toMatchObject({
+        event: "retrying",
+        errorMessage:
+          "This Page has no professional Instagram account linked to it.",
+      });
+    });
+
+    it("retries when Instagram refuses the publish", async () => {
+      useDb({ claim: [instagramRow()] });
+      vi.mocked(publishInstagramImagePost).mockRejectedValue(
+        new Error("Instagram is still processing the image. Retry shortly.")
+      );
+
+      await publishDuePosts({ source: "scheduler" });
+
+      expect(events()[1]).toMatchObject({
+        event: "retrying",
+        errorMessage: "Instagram is still processing the image. Retry shortly.",
+      });
     });
   });
 });

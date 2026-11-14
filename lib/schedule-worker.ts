@@ -20,6 +20,12 @@ import {
   scheduledOutcomeCopy,
 } from "@/lib/notifications";
 import { getPrimaryPage, resolvePageToken } from "@/lib/facebook-page-token";
+import { deleteStagedBlobs } from "@/lib/blob";
+import {
+  publishInstagramImagePost,
+  resolveInstagramAccount,
+  type InstagramAccountResolution,
+} from "@/lib/publishing/instagram";
 import { resolvePlatformAccount } from "@/lib/publishing/connection";
 import {
   ensureFreshYouTubeToken,
@@ -74,29 +80,36 @@ export async function publishDuePosts(
   const synced = await syncNativeSchedules();
   await requeueStuckPosts();
 
+  // Candidate selection only — the real claim happens per row, immediately
+  // before its publish, so a slow publish (Instagram's container polling)
+  // cannot let an overlapping sweep double-publish a waiting row.
   const due = (await sql`
-    WITH due AS (
-      SELECT id FROM scheduled_posts
-      WHERE status = 'scheduled' AND scheduled_for <= now()
-        AND source = 'local'
-        AND attempts < ${MAX_ATTEMPTS}
-        AND (attempts = 0
-             OR updated_at < now() - (${RETRY_BACKOFF_MINUTES} * interval '1 minute'))
-      ORDER BY scheduled_for ASC
-      LIMIT 10
-      FOR UPDATE SKIP LOCKED
-    )
-    UPDATE scheduled_posts s
-    SET status = 'publishing', attempts = s.attempts + 1, updated_at = now()
-    FROM due
-    WHERE s.id = due.id
-    RETURNING s.id, s.workspace_id, s.news_item_id, s.draft_id, s.text,
-              s.image_url, s.image_urls, s.kind, s.attempts`) as unknown as ClaimedRow[];
+    SELECT id, workspace_id, news_item_id, draft_id, text,
+           image_url, image_urls, kind, attempts
+    FROM scheduled_posts
+    WHERE status = 'scheduled' AND scheduled_for <= now()
+      AND source = 'local'
+      AND attempts < ${MAX_ATTEMPTS}
+      AND (attempts = 0
+           OR updated_at < now() - (${RETRY_BACKOFF_MINUTES} * interval '1 minute'))
+    ORDER BY scheduled_for ASC
+    LIMIT 10
+    FOR UPDATE SKIP LOCKED`) as unknown as ClaimedRow[];
 
   let published = 0;
   let failed = 0;
 
   for (const post of due) {
+    // Conditional claim: only a row still in 'scheduled' may publish. An
+    // overlapping sweep that already claimed (or a stuck-sweep requeue race)
+    // leaves this UPDATE empty — skip instead of publishing twice.
+    const claimed = (await sql`
+      UPDATE scheduled_posts
+      SET status = 'publishing', attempts = attempts + 1, updated_at = now()
+      WHERE id = ${post.id} AND status = 'scheduled'
+      RETURNING id`) as unknown as { id: number }[];
+    if (!claimed.length) continue;
+
     await recordScheduleEvent({
       workspaceId: post.workspace_id,
       scheduledPostId: post.id,
@@ -107,27 +120,33 @@ export async function publishDuePosts(
     });
 
     try {
-      const primary = await getPrimaryPage(post.workspace_id);
-      if (!primary) {
-        throw new Error("This workspace has no connected Facebook Page.");
+      let mediaId: string;
+      if (post.kind === "instagram-post") {
+        mediaId = await publishScheduledInstagramPost(post);
+      } else {
+        const primary = await getPrimaryPage(post.workspace_id);
+        if (!primary) {
+          throw new Error("This workspace has no connected Facebook Page.");
+        }
+
+        const storedImages = Array.isArray(post.image_urls)
+          ? post.image_urls
+          : post.image_url
+            ? [post.image_url]
+            : [];
+
+        const result = await publishPagePost({
+          pageId: primary.pageId,
+          accessToken: primary.token,
+          message: stripMarkdown(post.text),
+          images: parseImages(storedImages),
+        });
+        mediaId = result.id;
       }
-
-      const storedImages = Array.isArray(post.image_urls)
-        ? post.image_urls
-        : post.image_url
-          ? [post.image_url]
-          : [];
-
-      const result = await publishPagePost({
-        pageId: primary.pageId,
-        accessToken: primary.token,
-        message: stripMarkdown(post.text),
-        images: parseImages(storedImages),
-      });
 
       await sql`
         UPDATE scheduled_posts
-        SET status = 'published', facebook_post_id = ${result.id},
+        SET status = 'published', facebook_post_id = ${mediaId},
             error_message = NULL, updated_at = now()
         WHERE id = ${post.id}`;
 
@@ -142,7 +161,7 @@ export async function publishDuePosts(
         event: "published",
         source: options.source,
         actorUserId: options.actorUserId,
-        facebookPostId: result.id,
+        facebookPostId: mediaId,
       });
 
       const successCopy = scheduledOutcomeCopy(post.kind, true, post.text);
@@ -166,8 +185,10 @@ export async function publishDuePosts(
         (error.code === 10 || error.code === 200 || error.code === 190);
 
       // A transient Facebook failure should not kill the scheduled post. Keep
-      // it queued until the attempt budget runs out.
-      const exhausted = post.attempts >= MAX_ATTEMPTS;
+      // it queued until the attempt budget runs out. The per-row claim
+      // already incremented attempts, so the pre-claim value + 1 is the
+      // attempt number that just failed.
+      const exhausted = post.attempts + 1 >= MAX_ATTEMPTS;
 
       await sql`
         UPDATE scheduled_posts
@@ -183,7 +204,7 @@ export async function publishDuePosts(
         source: options.source,
         actorUserId: options.actorUserId,
         errorMessage: message,
-        metadata: { attempt: post.attempts, maxAttempts: MAX_ATTEMPTS },
+        metadata: { attempt: post.attempts + 1, maxAttempts: MAX_ATTEMPTS },
       });
 
       if (permissionIssue) {
@@ -205,6 +226,64 @@ export async function publishDuePosts(
   }
 
   return { due: due.length, published, failed, synced };
+}
+
+/** Human copy for each Instagram resolution failure — mirrors the gates the
+ * IG publish route shows, so retries fail with the same actionable text. */
+function instagramGateMessage(
+  resolution: Extract<InstagramAccountResolution, { ok: false }>
+): string {
+  switch (resolution.reason) {
+    case "scope_missing":
+      return `Reconnect to grant ${resolution.detail ?? "the Instagram scopes"} before posting.`;
+    case "no_ig_account":
+      return (
+        resolution.detail ??
+        "This Page has no professional Instagram account linked to it."
+      );
+    case "probe_failed":
+      return `Could not verify the Instagram connection${resolution.detail ? `: ${resolution.detail}` : "."}`;
+    default:
+      return "Connect your Facebook Page with Instagram permissions before posting to Instagram.";
+  }
+}
+
+/**
+ * The local executor for scheduled Instagram posts. Instagram has no
+ * scheduling API, so the row holds a staged blob image and the worker runs
+ * the container → publish flow at the due time. The media id lands in the
+ * same column Facebook uses (it is a generic platform-media-id column).
+ */
+async function publishScheduledInstagramPost(
+  post: ClaimedRow
+): Promise<string> {
+  if (!post.image_url) {
+    throw new Error("The scheduled Instagram post is missing its staged image.");
+  }
+
+  const connection = await resolveInstagramAccount(post.workspace_id);
+  if (!connection.ok) {
+    throw new Error(instagramGateMessage(connection));
+  }
+
+  const result = await publishInstagramImagePost({
+    account: connection.account,
+    accessToken: connection.accessToken,
+    imageUrl: post.image_url,
+    caption: stripMarkdown(post.text),
+  });
+
+  // Instagram consumed the staged image — same post-publish cleanup the
+  // FB reels route performs, via the server-side blob API (the browser-only
+  // helper in lib/blob-cleanup.ts carries no auth here). A failed cleanup is
+  // harmless (orphaned blob).
+  try {
+    await deleteStagedBlobs([post.image_url]);
+  } catch {
+    // Cleanup only.
+  }
+
+  return result.id;
 }
 
 /**

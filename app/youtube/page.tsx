@@ -315,7 +315,10 @@ export default function YouTubePage() {
                 setScheduleError('');
               }}
               value={scheduledFor}
-              onChange={setScheduledFor}
+              onChange={(value) => {
+                setScheduledFor(value);
+                setScheduleError('');
+              }}
               error={scheduleError}
               label="Schedule on YouTube"
               hint="10 minutes to 75 days from now. YouTube publishes it from its own queue."
