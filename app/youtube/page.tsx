@@ -11,6 +11,9 @@ import {
   ComposerCard,
   FieldLabel,
   ResultList,
+  ScheduleField,
+  defaultScheduleValue,
+  resolveScheduledFor,
   textareaClass,
   inputClass,
   mediaFileError,
@@ -41,6 +44,9 @@ export default function YouTubePage() {
   const [staging, setStaging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PublishResult[]>([]);
+  const [scheduleOn, setScheduleOn] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState(defaultScheduleValue);
+  const [scheduleError, setScheduleError] = useState('');
 
   const pickVideo = useCallback(async (file: File | null) => {
     if (!file) return;
@@ -79,6 +85,14 @@ export default function YouTubePage() {
       toast.error('Choose a video file to upload.');
       return;
     }
+    let scheduledForIso: string | null = null;
+    if (scheduleOn) {
+      scheduledForIso = resolveScheduledFor(scheduledFor);
+      if (!scheduledForIso) {
+        setScheduleError('Pick a time between 10 minutes and 75 days from now.');
+        return;
+      }
+    }
     setBusy(true);
     try {
       const response = await fetch('/api/youtube/videos', {
@@ -87,14 +101,18 @@ export default function YouTubePage() {
         body: JSON.stringify({
           title,
           description,
-          privacyStatus: privacy,
+          // publishAt only works from Private — YouTube flips it public at
+          // the scheduled moment, so a scheduled upload always ships Private.
+          privacyStatus: scheduleOn ? 'private' : privacy,
           madeForKids,
           videoUrl,
+          ...(scheduledForIso ? { scheduledFor: scheduledForIso } : {}),
         }),
       });
       const data = (await response.json().catch(() => null)) as {
         id?: string;
         permalink?: string;
+        scheduledFor?: string | null;
         account?: { name?: string };
         error?: string;
       } | null;
@@ -109,9 +127,16 @@ export default function YouTubePage() {
         ]);
         return;
       }
-      toast.success('Published to YouTube', {
-        description: 'Processing happens in YouTube Studio; check it there.',
-      });
+      if (scheduledForIso) {
+        toast.success('Video scheduled on YouTube', {
+          description:
+            'YouTube keeps it Private and publishes it at the chosen time; the Calendar tracks it.',
+        });
+      } else {
+        toast.success('Published to YouTube', {
+          description: 'Processing happens in YouTube Studio; check it there.',
+        });
+      }
       setResults([
         {
           page: { id: 'yt', name: data?.account?.name ?? 'YouTube' },
@@ -123,12 +148,14 @@ export default function YouTubePage() {
       setTitle('');
       setDescription('');
       setVideoUrl(null);
+      setScheduleOn(false);
+      setScheduleError('');
     } catch {
       toast.error('The publish call could not be reached.');
     } finally {
       setBusy(false);
     }
-  }, [title, description, privacy, madeForKids, videoUrl]);
+  }, [title, description, privacy, madeForKids, videoUrl, scheduleOn, scheduledFor]);
 
   const canPublish =
     Boolean(videoUrl) && title.trim().length > 0 && !staging && !busy;
@@ -249,7 +276,8 @@ export default function YouTubePage() {
                 <FieldLabel htmlFor="yt-privacy">Visibility</FieldLabel>
                 <select
                   id="yt-privacy"
-                  value={privacy}
+                  value={scheduleOn ? 'private' : privacy}
+                  disabled={scheduleOn}
                   onChange={(event) =>
                     setPrivacy(event.target.value as Privacy)
                   }
@@ -261,6 +289,11 @@ export default function YouTubePage() {
                     </option>
                   ))}
                 </select>
+                {scheduleOn && (
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Scheduled videos stay Private until YouTube publishes them.
+                  </p>
+                )}
               </div>
               <div className="flex items-end">
                 <label className="flex items-center gap-2 py-1 text-xs font-medium">
@@ -275,6 +308,19 @@ export default function YouTubePage() {
               </div>
             </div>
 
+            <ScheduleField
+              enabled={scheduleOn}
+              onEnabled={(next) => {
+                setScheduleOn(next);
+                setScheduleError('');
+              }}
+              value={scheduledFor}
+              onChange={setScheduledFor}
+              error={scheduleError}
+              label="Schedule on YouTube"
+              hint="10 minutes to 75 days from now. YouTube publishes it from its own queue."
+            />
+
             <div className="flex flex-wrap items-center gap-3">
               <Button variant="brand" onClick={publish} disabled={!canPublish}>
                 {busy ? (
@@ -282,7 +328,7 @@ export default function YouTubePage() {
                 ) : (
                   <Clapperboard className="size-4" aria-hidden />
                 )}
-                Publish to YouTube
+                {scheduleOn ? 'Schedule video' : 'Publish to YouTube'}
               </Button>
               {busy && (
                 <span className="text-[11px] text-muted-foreground">

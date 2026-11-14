@@ -4,6 +4,8 @@ import { assertStagedBlob } from '@/lib/blob';
 import { ensureFreshYouTubeToken, YouTubeAuthError } from '@/lib/youtube';
 import { requirePlatformConnection } from '@/lib/publishing/connection';
 import { publishYouTubeVideo, type YouTubePublishResult } from '@/lib/publishing/youtube';
+import { parseScheduledPublishTime } from '@/lib/publishing/schedule';
+import { recordNativeSchedule } from '@/lib/schedule-mirror';
 import { youtubeErrorResponse } from '@/lib/publishing/errors';
 
 export const dynamic = 'force-dynamic';
@@ -25,19 +27,29 @@ export async function POST(request: Request) {
     privacyStatus?: unknown;
     madeForKids?: unknown;
     videoUrl?: unknown;
+    scheduledFor?: unknown;
   } | null;
 
   const title = typeof body?.title === 'string' ? body.title.trim() : '';
   const description =
     typeof body?.description === 'string' ? body.description : '';
-  const privacyStatus =
-    body?.privacyStatus === 'public' ||
-    body?.privacyStatus === 'unlisted' ||
-    body?.privacyStatus === 'private'
-      ? body.privacyStatus
-      : 'private';
   const madeForKids = body?.madeForKids === true;
   const videoUrl = typeof body?.videoUrl === 'string' ? body.videoUrl.trim() : '';
+
+  // publishAt requires the video to sit in Private — YouTube flips it public
+  // at the scheduled moment, so a scheduled upload must not ship as public.
+  const schedule = parseScheduledPublishTime(body?.scheduledFor);
+  if (schedule.error) {
+    return NextResponse.json({ error: schedule.error }, { status: 400 });
+  }
+  const scheduled = schedule.unix !== null;
+  const privacyStatus = scheduled
+    ? 'private'
+    : body?.privacyStatus === 'public' ||
+        body?.privacyStatus === 'unlisted' ||
+        body?.privacyStatus === 'private'
+      ? body.privacyStatus
+      : 'private';
 
   if (title.length < 1 || title.length > 100) {
     return NextResponse.json(
@@ -88,14 +100,45 @@ export async function POST(request: Request) {
         description,
         privacyStatus,
         madeForKids,
+        ...(scheduled
+          ? { publishAt: new Date(schedule.unix! * 1000).toISOString() }
+          : {}),
       },
       videoUrl,
+    });
+
+    // Mirror into the calendar — 'scheduled' when the slot is in the future
+    // (the worker probes YouTube until publishAt flips the video public),
+    // 'published' for immediate uploads so Analytics counts them.
+    await recordNativeSchedule({
+      workspaceId,
+      userId: access.user.id,
+      kind: 'video',
+      text: title,
+      scheduledFor: scheduled
+        ? new Date(schedule.unix! * 1000)
+        : null,
+      results: [
+        {
+          page: {
+            id: connection.platformUserId,
+            name: connection.username,
+          },
+          ok: true,
+          id: published.id,
+          permalink: published.permalink,
+        },
+      ],
+      platform: 'youtube',
     });
 
     return NextResponse.json(
       {
         id: published.id,
         permalink: published.permalink,
+        scheduledFor: scheduled
+          ? new Date(schedule.unix! * 1000).toISOString()
+          : null,
         account: { id: connection.platformUserId, name: connection.username },
       },
       { status: 201 }

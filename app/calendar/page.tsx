@@ -30,6 +30,16 @@ const KIND_LABELS: Record<string, string> = {
   live: "Live",
 };
 
+/** Who executes the publish: the platform's own queue or this workspace. */
+const SOURCE_LABELS: Record<string, string> = {
+  facebook: "· published by Facebook",
+  youtube: "· published by YouTube",
+};
+
+function sourceLabel(source: string): string {
+  return SOURCE_LABELS[source] ?? "· published by this workspace";
+}
+
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function dayKey(date: Date) {
@@ -79,9 +89,7 @@ function CalendarPostRow({
             {KIND_LABELS[post.kind] ?? post.kind}
           </span>
           <span className="font-medium normal-case tracking-normal text-muted-foreground">
-            {post.source === "facebook"
-              ? "· published by Facebook"
-              : "· published by this workspace"}
+            {sourceLabel(post.source)}
           </span>
         </div>
         <p className="mt-1.5 whitespace-pre-wrap break-words text-[12.5px] leading-snug">
@@ -541,9 +549,7 @@ export default function CalendarPage() {
                             <p className="mt-1 flex items-center gap-1.5 text-[9.5px] font-bold uppercase tracking-[0.12em] text-brand">
                               {KIND_LABELS[post.kind] ?? post.kind}
                               <span className="font-medium normal-case tracking-normal text-muted-foreground">
-                                {post.source === "facebook"
-                                  ? "· published by Facebook"
-                                  : "· published by this workspace"}
+                                {sourceLabel(post.source)}
                               </span>
                             </p>
                             <p className="mt-1 line-clamp-2 text-[12px] leading-snug">

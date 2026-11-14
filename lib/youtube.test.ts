@@ -278,6 +278,38 @@ describe("createYouTubeUploadSession", () => {
     );
   });
 
+  it("carries publishAt into the status body for scheduled uploads", async () => {
+    respond({}, { headers: { location: "https://upload.google/session-1" } });
+    const publishAt = new Date(Date.now() + 60 * 60_000).toISOString();
+    await createYouTubeUploadSession({
+      accessToken: "token",
+      sizeBytes: 100,
+      contentType: "video/mp4",
+      metadata: { ...metadata, publishAt },
+    });
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const sent = JSON.parse(String(init.body)) as {
+      status: { publishAt?: string; privacyStatus: string };
+    };
+    expect(sent.status.publishAt).toBe(publishAt);
+    expect(sent.status.privacyStatus).toBe("private");
+  });
+
+  it("omits publishAt for immediate uploads", async () => {
+    respond({}, { headers: { location: "https://upload.google/session-1" } });
+    await createYouTubeUploadSession({
+      accessToken: "token",
+      sizeBytes: 100,
+      contentType: "video/mp4",
+      metadata,
+    });
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const sent = JSON.parse(String(init.body)) as {
+      status: { publishAt?: string };
+    };
+    expect(sent.status.publishAt).toBeUndefined();
+  });
+
   it("fails clearly when the session is refused", async () => {
     respond({ error: { message: "Upload quota exceeded." } }, { ok: false, status: 403 });
     await expect(

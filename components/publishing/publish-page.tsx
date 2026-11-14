@@ -529,12 +529,18 @@ export function ScheduleField({
   value,
   onChange,
   error,
+  label = 'Schedule with Facebook',
+  hint = '10 minutes to 75 days from now. Facebook publishes it from its own queue.',
 }: {
   enabled: boolean;
   onEnabled: (value: boolean) => void;
   value: string;
   onChange: (value: string) => void;
   error?: string;
+  /** Toggle copy — FB composers keep the default. */
+  label?: string;
+  /** Explainer under the picker — FB composers keep the default. */
+  hint?: string;
 }) {
   // Bounds for the native picker; typed values are re-checked by
   // resolveScheduledFor() before submit.
@@ -548,7 +554,7 @@ export function ScheduleField({
           onChange={(event) => onEnabled(event.target.checked)}
           className="size-4 accent-[var(--brand)]"
         />
-        Schedule with Facebook
+        {label}
       </label>
       {enabled && (
         <>
@@ -572,10 +578,7 @@ export function ScheduleField({
               {error}
             </p>
           )}
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            10 minutes to 75 days from now. Facebook publishes it from its own
-            queue.
-          </p>
+          <p className="mt-1 text-[10px] text-muted-foreground">{hint}</p>
         </>
       )}
     </div>

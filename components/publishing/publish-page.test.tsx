@@ -265,6 +265,25 @@ describe("ScheduleField", () => {
     expect(input.getAttribute("aria-invalid")).toBe("false");
     expect(input.getAttribute("aria-describedby")).toBeNull();
   });
+
+  it("lets platform composers override the label and hint copy", () => {
+    render(
+      <ScheduleField
+        enabled
+        onEnabled={() => {}}
+        value="2026-11-14T09:00"
+        onChange={() => {}}
+        label="Schedule on YouTube"
+        hint="YouTube publishes it from its own queue."
+      />
+    );
+    expect(screen.getByText("Schedule on YouTube")).toBeInTheDocument();
+    expect(
+      screen.getByText("YouTube publishes it from its own queue.")
+    ).toBeInTheDocument();
+    // The Facebook default copy must not leak into the overridden field.
+    expect(screen.queryByText("Schedule with Facebook")).not.toBeInTheDocument();
+  });
 });
 
 describe("PageSelector", () => {

@@ -52,6 +52,7 @@ describe("recordNativeSchedule", () => {
       scheduledFor.toISOString(),
       "scheduled",
       "reel",
+      "facebook", // source = platform
       "fb_1",
       JSON.stringify([okResult()]),
       "p1",
@@ -107,10 +108,10 @@ describe("recordNativeSchedule", () => {
     });
 
     expect(insertValues()[5]).toBe("failed");
-    // [7] success id, [9] success page id — both null on failure; [10] error.
-    expect(insertValues()[7]).toBeNull();
-    expect(insertValues()[9]).toBeNull();
-    expect(insertValues()[10]).toBe("boom on p1");
+    // [8] success id, [10] success page id — both null on failure; [11] error.
+    expect(insertValues()[8]).toBeNull();
+    expect(insertValues()[10]).toBeNull();
+    expect(insertValues()[11]).toBe("boom on p1");
     expect(events()[0]).toMatchObject({ event: "failed", errorMessage: "boom on p1" });
   });
 
@@ -124,8 +125,53 @@ describe("recordNativeSchedule", () => {
       results: [failedResult()],
     });
 
-    expect(insertValues()[10]).toBe(
+    expect(insertValues()[11]).toBe(
       "Facebook rejected the publish on every selected Page."
+    );
+  });
+
+  it("mirrors YouTube uploads as source='youtube' rows", async () => {
+    const channel = { id: "UC1", name: "Neural-Verse" };
+
+    await recordNativeSchedule({
+      workspaceId: "ws1",
+      userId: "u1",
+      kind: "video",
+      text: "Launch video",
+      scheduledFor: new Date(Date.now() + 60 * 60_000),
+      results: [
+        {
+          page: channel,
+          ok: true,
+          id: "yt_video_1",
+          permalink: "https://www.youtube.com/watch?v=yt_video_1",
+        },
+      ],
+      platform: "youtube",
+    });
+
+    expect(insertValues()[7]).toBe("youtube");
+    expect(insertValues()[8]).toBe("yt_video_1");
+    expect(insertValues()[10]).toBe("UC1");
+    expect(events()[0]).toMatchObject({
+      event: "scheduled",
+      metadata: { executor: "youtube", kind: "video" },
+    });
+  });
+
+  it("uses a platform-neutral failure message for YouTube", async () => {
+    await recordNativeSchedule({
+      workspaceId: "ws1",
+      userId: "u1",
+      kind: "video",
+      text: "x",
+      scheduledFor: null,
+      results: [failedResult()],
+      platform: "youtube",
+    });
+
+    expect(insertValues()[11]).toBe(
+      "YouTube rejected the publish on every selected target."
     );
   });
 
