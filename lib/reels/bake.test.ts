@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { bakeReelAnimation } from "./bake";
+import { bakeReelAnimation, composeFrame } from "./bake";
+import {
+  endcard,
+  headline,
+  planEffects,
+  type ReelAttachment,
+} from "@/lib/reels/presets";
 
 /**
  * bakeReelAnimation drives the browser's video + canvas + MediaRecorder
@@ -188,7 +194,22 @@ describe("bakeReelAnimation", () => {
   it("rejects unknown presets before touching the DOM", async () => {
     installBrowserStubs(() => Promise.resolve());
     await expect(
-      bakeReelAnimation({ videoUrl: "blob:x", presetId: "nonexistent", values: {} })
+      bakeReelAnimation({
+        videoUrl: "blob:x",
+        attachments: [{ presetId: "nonexistent", slot: "start", loop: false }],
+        values: {},
+      })
+    ).rejects.toThrow("Unknown animation preset.");
+  });
+
+  it("rejects a slot the preset does not suit", async () => {
+    installBrowserStubs(() => Promise.resolve());
+    await expect(
+      bakeReelAnimation({
+        videoUrl: "blob:x",
+        attachments: [{ presetId: "endcard", slot: "start", loop: false }],
+        values: {},
+      })
     ).rejects.toThrow("Unknown animation preset.");
   });
 
@@ -196,7 +217,11 @@ describe("bakeReelAnimation", () => {
     installBrowserStubs(() => Promise.resolve());
     vi.unstubAllGlobals();
     await expect(
-      bakeReelAnimation({ videoUrl: "blob:x", presetId: "headline", values: {} })
+      bakeReelAnimation({
+        videoUrl: "blob:x",
+        attachments: [{ presetId: "headline", slot: "start", loop: false }],
+        values: {},
+      })
     ).rejects.toThrow("This browser cannot record the animation.");
   });
 
@@ -206,7 +231,11 @@ describe("bakeReelAnimation", () => {
     });
 
     await expect(
-      bakeReelAnimation({ videoUrl: "blob:x", presetId: "headline", values: {} })
+      bakeReelAnimation({
+        videoUrl: "blob:x",
+        attachments: [{ presetId: "headline", slot: "start", loop: false }],
+        values: {},
+      })
     ).rejects.toThrow(/Playback was blocked/);
 
     expect(recorder.start).not.toHaveBeenCalled();
@@ -223,8 +252,8 @@ describe("bakeReelAnimation", () => {
 
     const blob = await bakeReelAnimation({
       videoUrl: "blob:x",
-      presetId: "headline",
-      values: { text: "Big news today" },
+      attachments: [{ presetId: "headline", slot: "start", loop: false }],
+      values: { headline: { text: "Big news today" } },
     });
 
     expect(blob.type).toBe("video/webm");
@@ -235,5 +264,104 @@ describe("bakeReelAnimation", () => {
     expect(captureStreamMock).toHaveBeenCalledWith(30);
     expect(recorder.start).toHaveBeenCalledWith(250);
     expect(video.src).toBe("");
+  });
+
+  it("bakes every attached slot effect into one recording", async () => {
+    installBrowserStubs((element) => {
+      setTimeout(() => element.onended?.(new Event("ended")), 0);
+      return Promise.resolve();
+    });
+
+    const blob = await bakeReelAnimation({
+      videoUrl: "blob:x",
+      attachments: [
+        { presetId: "headline", slot: "start", loop: false },
+        { presetId: "endcard", slot: "end", loop: false },
+      ],
+      values: {},
+    });
+
+    // One composited recording at native resolution covering both effects.
+    expect(blob.type).toBe("video/webm");
+    expect(blob.size).toBeGreaterThan(0);
+    expect(canvas.width).toBe(1080);
+    expect(recorder.start).toHaveBeenCalledWith(250);
+    expect(recorder.stop).toHaveBeenCalled();
+    expect(video.src).toBe("");
+  });
+});
+
+describe("composeFrame", () => {
+  const ctx = makeCtx() as unknown as CanvasRenderingContext2D;
+
+  function effects(attachments: ReelAttachment[], duration = 30) {
+    return planEffects(attachments, duration, {});
+  }
+
+  it("draws the footage once, with the active camera zoom applied", () => {
+    const drawFootage = vi.fn();
+    composeFrame(
+      ctx,
+      effects([{ presetId: "punchzoom", slot: "start", loop: false }]),
+      2.3, // punchzoom's start slot begins at 2s; local 0.3s is peak zoom.
+      drawFootage
+    );
+    expect(drawFootage).toHaveBeenCalledWith(1.16);
+  });
+
+  it("multiplies the zoom of every simultaneously active camera effect", () => {
+    const drawFootage = vi.fn();
+    composeFrame(
+      ctx,
+      effects([
+        { presetId: "punchzoom", slot: "start", loop: false },
+        { presetId: "punchzoom", slot: "start", loop: true },
+      ]),
+      2.3,
+      drawFootage
+    );
+    expect(drawFootage).toHaveBeenCalledWith(1.16 * 1.16);
+  });
+
+  it("draws each active overlay in attachment order with its own local time", () => {
+    const headlineSpy = vi.spyOn(headline, "draw");
+    const endcardSpy = vi.spyOn(endcard, "draw");
+    const drawFootage = vi.fn();
+    composeFrame(
+      ctx,
+      effects([
+        { presetId: "endcard", slot: "end", loop: false },
+        { presetId: "headline", slot: "start", loop: false },
+      ]),
+      1 // headline active (local 1s); endcard waits for the reel's end.
+        ,
+      drawFootage
+    );
+    expect(drawFootage).toHaveBeenCalledWith(1);
+    expect(headlineSpy).toHaveBeenCalledWith(ctx, 1, headline.duration, {});
+    expect(endcardSpy).not.toHaveBeenCalled();
+    headlineSpy.mockRestore();
+    endcardSpy.mockRestore();
+  });
+
+  it("skips looped effects while they sit in the gap between repeats", () => {
+    const headlineSpy = vi.spyOn(headline, "draw");
+    const drawFootage = vi.fn();
+    const looping = effects([{ presetId: "headline", slot: "start", loop: true }]);
+    composeFrame(ctx, looping, 1, drawFootage);
+    composeFrame(ctx, looping, 3.6, drawFootage); // inside the 3.4–3.8s gap
+    expect(headlineSpy).toHaveBeenCalledTimes(1);
+    headlineSpy.mockRestore();
+  });
+
+  it("keeps the footage zoom at 1 when no camera effect is active", () => {
+    const drawFootage = vi.fn();
+    composeFrame(
+      ctx,
+      effects([{ presetId: "headline", slot: "start", loop: false }]),
+      20,
+      drawFootage
+    );
+    expect(drawFootage).toHaveBeenCalledWith(1);
   });
 });

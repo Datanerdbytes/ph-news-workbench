@@ -12,7 +12,13 @@ import {
 import { FacebookMark } from '@/components/facebook-mark';
 import { cn } from 'cn';
 import { PageAvatar } from '@/components/publishing/page-selection';
-import { presetStart, type PresetValues, type ReelPreset } from '@/lib/reels/presets';
+import {
+  attachmentsFromSlots,
+  effectLocalTime,
+  planEffects,
+  type PresetSlot,
+  type PresetValues,
+} from '@/lib/reels/presets';
 
 const OVERLAY_W = 810; // 0.75× of the 1080×1920 design space
 const OVERLAY_H = 1440;
@@ -22,26 +28,30 @@ export function FinalReelPreview({
   caption,
   pageName = 'Philippine News',
   pagePicture,
-  preset,
-  presetValues,
+  slots,
+  loops,
+  values,
 }: {
   videoUrl: string | null;
   caption: string;
   pageName?: string;
   pagePicture?: string | null;
-  preset?: ReelPreset | null;
-  presetValues?: PresetValues;
+  slots: Record<PresetSlot, string | null>;
+  loops: Record<PresetSlot, boolean>;
+  values: Record<string, PresetValues>;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ready = Boolean(videoUrl);
 
-  // Live animation overlay: a transparent canvas above the video redraws the
-  // preset at the playhead's local time, so preview matches the baked result.
-  // Camera presets (scale) transform the video element itself.
-  const hasOverlay = Boolean(preset && (preset.draw || preset.scale) && videoUrl);
+  // Live animation overlay: a transparent canvas above the video redraws every
+  // attached effect at the playhead's local time, so preview matches the baked
+  // result. Camera presets (scale) transform the video element itself.
+  const hasOverlay =
+    Boolean(videoUrl) &&
+    attachmentsFromSlots(slots, loops).length > 0;
   useEffect(() => {
-    if (!hasOverlay || !preset) return;
+    if (!hasOverlay) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -50,19 +60,29 @@ export function FinalReelPreview({
     let raf = 0;
     const tick = () => {
       raf = requestAnimationFrame(tick);
-      const duration = Number.isFinite(video.duration) ? video.duration : 0;
-      const local = video.currentTime - presetStart(preset, duration);
-      const active = local >= 0 && local <= preset.duration;
-      if (preset.scale) {
-        const zoom = active ? preset.scale(local) : 1;
-        video.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
+      const duration =
+        Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+      const effects = planEffects(attachmentsFromSlots(slots, loops), duration, values);
+      let zoom = 1;
+      const frames: { effect: (typeof effects)[number]; local: number }[] = [];
+      for (const effect of effects) {
+        const local = effectLocalTime(
+          video.currentTime,
+          effect.start,
+          effect.preset.duration,
+          effect.loop
+        );
+        if (local == null) continue;
+        if (effect.preset.scale) zoom *= effect.preset.scale(local);
+        frames.push({ effect, local });
       }
-      if (!preset.draw) return;
+      video.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
       ctx.clearRect(0, 0, OVERLAY_W, OVERLAY_H);
-      if (active) {
+      for (const { effect, local } of frames) {
+        if (!effect.preset.draw) continue;
         ctx.save();
         ctx.scale(OVERLAY_W / 1080, OVERLAY_H / 1920);
-        preset.draw(ctx, local, preset.duration, presetValues ?? {});
+        effect.preset.draw(ctx, local, effect.preset.duration, effect.values);
         ctx.restore();
       }
     };
@@ -71,7 +91,7 @@ export function FinalReelPreview({
       cancelAnimationFrame(raf);
       video.style.transform = '';
     };
-  }, [hasOverlay, preset, presetValues, videoUrl]);
+  }, [hasOverlay, slots, loops, values, videoUrl]);
 
   return (
     <section className="relative isolate flex flex-col overflow-hidden rounded-xl bg-ink p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
