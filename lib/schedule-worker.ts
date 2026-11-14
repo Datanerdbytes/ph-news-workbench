@@ -20,6 +20,12 @@ import {
   scheduledOutcomeCopy,
 } from "@/lib/notifications";
 import { getPrimaryPage, resolvePageToken } from "@/lib/facebook-page-token";
+import { deleteStagedBlob } from "@/lib/blob-cleanup";
+import {
+  publishInstagramImagePost,
+  resolveInstagramAccount,
+  type InstagramAccountResolution,
+} from "@/lib/publishing/instagram";
 import { resolvePlatformAccount } from "@/lib/publishing/connection";
 import {
   ensureFreshYouTubeToken,
@@ -107,27 +113,33 @@ export async function publishDuePosts(
     });
 
     try {
-      const primary = await getPrimaryPage(post.workspace_id);
-      if (!primary) {
-        throw new Error("This workspace has no connected Facebook Page.");
+      let mediaId: string;
+      if (post.kind === "instagram-post") {
+        mediaId = await publishScheduledInstagramPost(post);
+      } else {
+        const primary = await getPrimaryPage(post.workspace_id);
+        if (!primary) {
+          throw new Error("This workspace has no connected Facebook Page.");
+        }
+
+        const storedImages = Array.isArray(post.image_urls)
+          ? post.image_urls
+          : post.image_url
+            ? [post.image_url]
+            : [];
+
+        const result = await publishPagePost({
+          pageId: primary.pageId,
+          accessToken: primary.token,
+          message: stripMarkdown(post.text),
+          images: parseImages(storedImages),
+        });
+        mediaId = result.id;
       }
-
-      const storedImages = Array.isArray(post.image_urls)
-        ? post.image_urls
-        : post.image_url
-          ? [post.image_url]
-          : [];
-
-      const result = await publishPagePost({
-        pageId: primary.pageId,
-        accessToken: primary.token,
-        message: stripMarkdown(post.text),
-        images: parseImages(storedImages),
-      });
 
       await sql`
         UPDATE scheduled_posts
-        SET status = 'published', facebook_post_id = ${result.id},
+        SET status = 'published', facebook_post_id = ${mediaId},
             error_message = NULL, updated_at = now()
         WHERE id = ${post.id}`;
 
@@ -142,7 +154,7 @@ export async function publishDuePosts(
         event: "published",
         source: options.source,
         actorUserId: options.actorUserId,
-        facebookPostId: result.id,
+        facebookPostId: mediaId,
       });
 
       const successCopy = scheduledOutcomeCopy(post.kind, true, post.text);
@@ -205,6 +217,62 @@ export async function publishDuePosts(
   }
 
   return { due: due.length, published, failed, synced };
+}
+
+/** Human copy for each Instagram resolution failure — mirrors the gates the
+ * IG publish route shows, so retries fail with the same actionable text. */
+function instagramGateMessage(
+  resolution: Extract<InstagramAccountResolution, { ok: false }>
+): string {
+  switch (resolution.reason) {
+    case "scope_missing":
+      return `Reconnect to grant ${resolution.detail ?? "the Instagram scopes"} before posting.`;
+    case "no_ig_account":
+      return (
+        resolution.detail ??
+        "This Page has no professional Instagram account linked to it."
+      );
+    case "probe_failed":
+      return `Could not verify the Instagram connection${resolution.detail ? `: ${resolution.detail}` : "."}`;
+    default:
+      return "Connect your Facebook Page with Instagram permissions before posting to Instagram.";
+  }
+}
+
+/**
+ * The local executor for scheduled Instagram posts. Instagram has no
+ * scheduling API, so the row holds a staged blob image and the worker runs
+ * the container → publish flow at the due time. The media id lands in the
+ * same column Facebook uses (it is a generic platform-media-id column).
+ */
+async function publishScheduledInstagramPost(
+  post: ClaimedRow
+): Promise<string> {
+  if (!post.image_url) {
+    throw new Error("The scheduled Instagram post is missing its staged image.");
+  }
+
+  const connection = await resolveInstagramAccount(post.workspace_id);
+  if (!connection.ok) {
+    throw new Error(instagramGateMessage(connection));
+  }
+
+  const result = await publishInstagramImagePost({
+    account: connection.account,
+    accessToken: connection.accessToken,
+    imageUrl: post.image_url,
+    caption: stripMarkdown(post.text),
+  });
+
+  // Instagram consumed the staged image — same post-publish cleanup the
+  // FB reels route performs. A failed cleanup is harmless (orphaned blob).
+  try {
+    await deleteStagedBlob(post.image_url);
+  } catch {
+    // Cleanup only.
+  }
+
+  return result.id;
 }
 
 /**

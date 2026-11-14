@@ -28,6 +28,7 @@ const KIND_LABELS: Record<string, string> = {
   video: "Video",
   reel: "Reel",
   live: "Live",
+  "instagram-post": "Instagram",
 };
 
 /** Who executes the publish: the platform's own queue or this workspace. */

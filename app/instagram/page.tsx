@@ -11,6 +11,9 @@ import {
   ComposerCard,
   FieldLabel,
   ResultList,
+  ScheduleField,
+  defaultScheduleValue,
+  resolveScheduledFor,
   textareaClass,
   type PublishResult,
 } from '@/components/publishing/publish-page';
@@ -65,6 +68,9 @@ export default function InstagramPage() {
   const [staging, setStaging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<PublishResult[]>([]);
+  const [scheduleOn, setScheduleOn] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState(defaultScheduleValue);
+  const [scheduleError, setScheduleError] = useState('');
 
   const pickImage = useCallback(async (file: File | null) => {
     if (!file) return;
@@ -96,16 +102,29 @@ export default function InstagramPage() {
       toast.error('Choose an image to publish.');
       return;
     }
+    let scheduledForIso: string | null = null;
+    if (scheduleOn) {
+      scheduledForIso = resolveScheduledFor(scheduledFor);
+      if (!scheduledForIso) {
+        setScheduleError('Pick a time between 10 minutes and 75 days from now.');
+        return;
+      }
+    }
     setBusy(true);
     try {
       const response = await fetch('/api/instagram/posts', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message: caption, imageUrl }),
+        body: JSON.stringify({
+          message: caption,
+          imageUrl,
+          ...(scheduledForIso ? { scheduledFor: scheduledForIso } : {}),
+        }),
       });
       const data = (await response.json().catch(() => null)) as {
         id?: string;
         permalink?: string | null;
+        scheduledFor?: string | null;
         account?: { name?: string };
         error?: string;
       } | null;
@@ -120,9 +139,16 @@ export default function InstagramPage() {
         ]);
         return;
       }
-      toast.success('Posted to Instagram', {
-        description: data?.permalink ? 'Feed post is live.' : 'Published.',
-      });
+      if (scheduledForIso) {
+        toast.success('Instagram post scheduled', {
+          description:
+            'Instagram has no scheduling API — the workbench publishes it at the chosen time; the Calendar tracks it.',
+        });
+      } else {
+        toast.success('Posted to Instagram', {
+          description: data?.permalink ? 'Feed post is live.' : 'Published.',
+        });
+      }
       setResults([
         {
           page: { id: 'ig', name: data?.account?.name ?? '@instagram' },
@@ -133,12 +159,14 @@ export default function InstagramPage() {
       ]);
       setCaption('');
       setImageUrl(null);
+      setScheduleOn(false);
+      setScheduleError('');
     } catch {
       toast.error('The publish call could not be reached.');
     } finally {
       setBusy(false);
     }
-  }, [caption, imageUrl]);
+  }, [caption, imageUrl, scheduleOn, scheduledFor]);
 
   const captionBytes = caption.length.toLocaleString();
   const canPublish = Boolean(imageUrl) && caption.trim().length > 0 && !staging && !busy;
@@ -244,6 +272,19 @@ export default function InstagramPage() {
               />
             </div>
 
+            <ScheduleField
+              enabled={scheduleOn}
+              onEnabled={(next) => {
+                setScheduleOn(next);
+                setScheduleError('');
+              }}
+              value={scheduledFor}
+              onChange={setScheduledFor}
+              error={scheduleError}
+              label="Schedule on Instagram"
+              hint="10 minutes to 75 days from now. Instagram has no scheduling API — the workbench publishes it at the chosen time."
+            />
+
             <div className="flex flex-wrap items-center gap-3">
               <Button variant="brand" onClick={publish} disabled={!canPublish}>
                 {busy ? (
@@ -251,7 +292,7 @@ export default function InstagramPage() {
                 ) : (
                   <PlatformMark platform="instagram" className="size-4" aria-hidden />
                 )}
-                Publish to Instagram
+                {scheduleOn ? 'Schedule post' : 'Publish to Instagram'}
               </Button>
             </div>
 
