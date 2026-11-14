@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Film, Play, TriangleAlert, Upload, Video } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from 'cn';
 import { AssistantChat } from '@/components/assistant-chat';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +21,10 @@ import {
   useManagedPages,
   type PublishResult,
 } from '@/components/publishing/publish-page';
+import {
+  MediaPreviewCard,
+  MediaPreviewMedia,
+} from '@/components/publishing/media-preview-card';
 
 const MAX_BYTES = 1024 * 1024 * 1024;
 
@@ -54,26 +57,36 @@ export default function VideosPage() {
     setPreviewFailed(false);
   }
 
-  const videoAside = (
-    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-ink p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-16 -top-20 -z-10 size-[220px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
-      />
-      <div className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
-          <span
-            className={cn(
-              "size-1.5 rounded-full",
-              file ? "bg-success-bright" : "bg-white/70"
-            )}
-          />
-          {file ? "Ready to publish" : "Upload preview"}
-        </span>
-        <span className="font-mono text-[9px] uppercase text-white/60">Preview</span>
-      </div>
-
-      <div className="relative mt-4 flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
+  const videoPreview = (
+    <MediaPreviewCard
+      statusLabel={file ? 'Ready to publish' : 'Upload preview'}
+      ready={Boolean(file)}
+      label="Video"
+      footer={
+        <>
+          {file && (
+            <div className="min-w-0">
+              <p className="truncate text-[12px] font-semibold">{file.name}</p>
+              <p className="mt-1 truncate font-mono text-[9px] text-muted-foreground">
+                {(file.size / (1024 * 1024)).toFixed(1)} MB · ready to publish
+              </p>
+            </div>
+          )}
+          <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-2 p-3">
+            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface-3 text-muted-foreground">
+              <Upload className="size-3.5" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold">Chunked upload</p>
+              <p className="mt-0.5 text-[9px] leading-relaxed text-muted-foreground">
+                Title, description &amp; thumbnail · up to 45 minutes · 1 GB.
+              </p>
+            </div>
+          </div>
+        </>
+      }
+    >
+      <MediaPreviewMedia className="aspect-video">
         {file && fileUrl && !previewFailed ? (
           <video
             key={fileUrl}
@@ -109,37 +122,8 @@ export default function VideosPage() {
             </p>
           </div>
         )}
-      </div>
-
-      {file && (
-        <div className="mt-3 min-w-0">
-          <p className="truncate text-[12px] font-semibold text-white/90">
-            {file.name}
-          </p>
-          <p className="mt-1 truncate font-mono text-[9px] text-white/60">
-            {(file.size / (1024 * 1024)).toFixed(1)} MB · ready to publish
-          </p>
-        </div>
-      )}
-
-      <div className="mt-auto pt-3">
-        <div className="rounded-xl border border-white/10 bg-white/[0.045] p-3">
-          <div className="flex items-center gap-2.5">
-            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.07] text-white/70">
-              <Upload className="size-3.5" aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-white/85">
-                Chunked upload
-              </p>
-              <p className="mt-0.5 text-[9px] leading-relaxed text-white/60">
-                Title, description &amp; thumbnail · up to 45 minutes · 1 GB.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      </MediaPreviewMedia>
+    </MediaPreviewCard>
   );
 
   async function publish() {
@@ -242,153 +226,156 @@ export default function VideosPage() {
 
   return (
     <PublishPage eyebrow="Publishing" title="Videos">
-      <ComposerCard
-        icon={<Film className="size-4" />}
-        title="New video"
-        badge="MP4/MOV · 1 GB max"
-        aside={videoAside}
-        asideWidth="lg:grid-cols-[minmax(0,1fr)_320px]"
-      >
-        <FilePicker
-          id="video-file"
-          accept="video/mp4,video/quicktime"
-          label="Choose an MP4 or MOV"
-          hint="1 GB max"
-          file={file}
-          onPick={applyVideoFile}
-          onClear={() => applyVideoFile(null)}
-          icon={<Video className="size-3.5" />}
-          validate={(picked) =>
-            mediaFileError(picked, {
-              types: ['video/mp4', 'video/quicktime'],
-              extensions: ['.mp4', '.mov'],
-              typeLabel: 'an MP4 or MOV file',
-              maxBytes: MAX_BYTES,
-              maxLabel: '1 GB',
-            })
-          }
-        />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <FieldLabel htmlFor="video-title" hint={`${title.length}/200`}>
-              Title
-            </FieldLabel>
-            <input
-              id="video-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              maxLength={200}
-              placeholder="Headline for the video"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <FieldLabel htmlFor="video-thumbnail" hint="JPEG/PNG/WebP · 20 MB">
-              Thumbnail
-            </FieldLabel>
-            <input
-              id="video-thumbnail"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(event) => {
-                const picked = event.target.files?.[0] ?? null;
-                event.target.value = '';
-                if (picked) {
-                  const reason = mediaFileError(picked, {
-                    types: ['image/jpeg', 'image/png', 'image/webp'],
-                    typeLabel: 'a JPEG, PNG, or WebP image',
-                    maxBytes: 20 * 1024 * 1024,
-                    maxLabel: '20 MB',
-                  });
-                  if (reason) {
-                    toast.error(reason);
-                    return;
-                  }
-                }
-                setThumbnail(picked);
-              }}
-              className="mt-1.5 block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-surface-2 file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-foreground"
-            />
-          </div>
-        </div>
-
-        <div>
-          <FieldLabel htmlFor="video-description" hint={`${description.length}/5000`}>
-            Description
-          </FieldLabel>
-          <textarea
-            id="video-description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            rows={4}
-            maxLength={5000}
-            placeholder="Describe the video…"
-            className={textareaClass}
-          />
-        </div>
-
-        <div>
-          <FieldLabel htmlFor="video-targeting" hint="Optional JSON">
-            Audience targeting
-          </FieldLabel>
-          <textarea
-            id="video-targeting"
-            value={targeting}
-            onChange={(event) => setTargeting(event.target.value)}
-            rows={3}
-            spellCheck={false}
-            placeholder={'{"geo_locations":{"countries":["PH"]}}'}
-            className={`${textareaClass} font-mono text-xs`}
-          />
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            Passed as feed_targeting, the same targeting format as Meta ads.
-          </p>
-        </div>
-
-        <PageSelector
-          pages={pages.pages}
-          selected={pages.selected}
-          onSelect={pages.selectOne}
-          loading={pages.loading}
-        />
-
-        <ScheduleField
-          enabled={scheduleOn}
-          onEnabled={setScheduleOn}
-          value={scheduledFor}
-          onChange={(next) => {
-            setScheduledFor(next);
-            setScheduleError('');
-          }}
-          error={scheduleError}
-        />
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="brand"
-            size="sm"
-            onClick={publish}
-            disabled={!file || busy || !pages.selected.length}
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+        <div className="min-w-0">
+          <ComposerCard
+            icon={<Film className="size-4" />}
+            title="New video"
+            badge="MP4/MOV · 1 GB max"
           >
-            <Video className="size-3.5" aria-hidden />
-            {busy
-              ? uploadPct != null && uploadPct < 100
-                ? `Uploading ${uploadPct}%…`
-                : 'Publishing…'
-              : scheduleOn
-                ? 'Schedule video'
-                : 'Publish video'}
-          </Button>
-          <span className="text-[10px] text-muted-foreground">
-            {file
-              ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · uploads in 4 MB chunks`
-              : 'Chunked upload — large files are fine.'}
-          </span>
-        </div>
+            <FilePicker
+            id="video-file"
+            accept="video/mp4,video/quicktime"
+            label="Choose an MP4 or MOV"
+            hint="1 GB max"
+            file={file}
+            onPick={applyVideoFile}
+            onClear={() => applyVideoFile(null)}
+            icon={<Video className="size-3.5" />}
+            validate={(picked) =>
+              mediaFileError(picked, {
+                types: ['video/mp4', 'video/quicktime'],
+                extensions: ['.mp4', '.mov'],
+                typeLabel: 'an MP4 or MOV file',
+                maxBytes: MAX_BYTES,
+                maxLabel: '1 GB',
+              })
+            }
+          />
 
-        <ResultList results={results ?? []} />
-      </ComposerCard>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <FieldLabel htmlFor="video-title" hint={`${title.length}/200`}>
+                Title
+              </FieldLabel>
+              <input
+                id="video-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                maxLength={200}
+                placeholder="Headline for the video"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <FieldLabel htmlFor="video-thumbnail" hint="JPEG/PNG/WebP · 20 MB">
+                Thumbnail
+              </FieldLabel>
+              <input
+                id="video-thumbnail"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => {
+                  const picked = event.target.files?.[0] ?? null;
+                  event.target.value = '';
+                  if (picked) {
+                    const reason = mediaFileError(picked, {
+                      types: ['image/jpeg', 'image/png', 'image/webp'],
+                      typeLabel: 'a JPEG, PNG, or WebP image',
+                      maxBytes: 20 * 1024 * 1024,
+                      maxLabel: '20 MB',
+                    });
+                    if (reason) {
+                      toast.error(reason);
+                      return;
+                    }
+                  }
+                  setThumbnail(picked);
+                }}
+                className="mt-1.5 block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-surface-2 file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-foreground"
+              />
+            </div>
+          </div>
+
+          <div>
+            <FieldLabel htmlFor="video-description" hint={`${description.length}/5000`}>
+              Description
+            </FieldLabel>
+            <textarea
+              id="video-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={4}
+              maxLength={5000}
+              placeholder="Describe the video…"
+              className={textareaClass}
+            />
+          </div>
+
+          <div>
+            <FieldLabel htmlFor="video-targeting" hint="Optional JSON">
+              Audience targeting
+            </FieldLabel>
+            <textarea
+              id="video-targeting"
+              value={targeting}
+              onChange={(event) => setTargeting(event.target.value)}
+              rows={3}
+              spellCheck={false}
+              placeholder={'{"geo_locations":{"countries":["PH"]}}'}
+              className={`${textareaClass} font-mono text-xs`}
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Passed as feed_targeting, the same targeting format as Meta ads.
+            </p>
+          </div>
+
+          <PageSelector
+            pages={pages.pages}
+            selected={pages.selected}
+            onSelect={pages.selectOne}
+            loading={pages.loading}
+          />
+
+          <ScheduleField
+            enabled={scheduleOn}
+            onEnabled={setScheduleOn}
+            value={scheduledFor}
+            onChange={(next) => {
+              setScheduledFor(next);
+              setScheduleError('');
+            }}
+            error={scheduleError}
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="brand"
+              size="sm"
+              onClick={publish}
+              disabled={!file || busy || !pages.selected.length}
+            >
+              <Video className="size-3.5" aria-hidden />
+              {busy
+                ? uploadPct != null && uploadPct < 100
+                  ? `Uploading ${uploadPct}%…`
+                  : 'Publishing…'
+                : scheduleOn
+                  ? 'Schedule video'
+                  : 'Publish video'}
+            </Button>
+            <span className="text-[10px] text-muted-foreground">
+              {file
+                ? `${(file.size / (1024 * 1024)).toFixed(1)} MB · uploads in 4 MB chunks`
+                : 'Chunked upload — large files are fine.'}
+            </span>
+          </div>
+
+            <ResultList results={results ?? []} />
+          </ComposerCard>
+        </div>
+        <aside className="self-start xl:sticky xl:top-[70px]">{videoPreview}</aside>
+      </div>
       <AssistantChat
         draft={description}
         onDraftChange={setDescription}
