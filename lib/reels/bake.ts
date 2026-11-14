@@ -1,13 +1,21 @@
-import { getPreset, presetStart, type PresetValues } from '@/lib/reels/presets';
+import {
+  effectLocalTime,
+  getPreset,
+  planEffects,
+  type PlannedEffect,
+  type PresetValues,
+  type ReelAttachment,
+} from '@/lib/reels/presets';
 
 /**
- * Bakes a pre-built animation preset into reel footage, in the browser.
+ * Bakes the picked animation presets into reel footage, in the browser.
  *
  * The video plays through once while each frame is drawn onto a 1080×1920
- * canvas — first the cover-cropped footage, then the preset's overlay at the
- * current time — so what gets recorded is already the composited reel. The
- * canvas stream is recorded together with the video's audio into a WebM, which
- * /api/reels/prepare transcodes to H.264 MP4.
+ * canvas — first the cover-cropped footage (scaled by any active camera
+ * preset), then each slot attachment's overlay at the current time — so what
+ * gets recorded is already the composited reel. The canvas stream is recorded
+ * together with the video's audio into a WebM, which /api/reels/prepare
+ * transcodes to H.264 MP4.
  */
 
 const CANVAS_W = 1080;
@@ -42,20 +50,66 @@ function drawFootage(
 export type BakeOptions = {
   /** Blob URL of the (already normalized) source footage. */
   videoUrl: string;
-  presetId: string;
-  values: PresetValues;
+  /** Slot attachments picked in the composer; drawn in the order given. */
+  attachments: ReelAttachment[];
+  /** Edited text values keyed by preset id. */
+  values: Record<string, PresetValues>;
   onProgress?: (fraction: number) => void;
 };
 
 /**
- * Renders the reel with the preset baked in. Resolves with the recorded WebM;
- * throws when the browser cannot record (caller falls back to the original
- * footage).
+ * Draws one composited frame: the footage (with every active camera zoom
+ * multiplied in), then each active overlay in attachment order. Looped
+ * effects repeat — effectLocalTime returns null across each gap between
+ * repeats, skipping them for that frame. Exported for tests.
+ */
+export function composeFrame(
+  ctx: CanvasRenderingContext2D,
+  effects: PlannedEffect[],
+  videoTime: number,
+  drawFootage: (zoom: number) => void
+): void {
+  let zoom = 1;
+  const frames: { effect: PlannedEffect; local: number }[] = [];
+  for (const effect of effects) {
+    const local = effectLocalTime(
+      videoTime,
+      effect.start,
+      effect.preset.duration,
+      effect.loop
+    );
+    if (local == null) continue;
+    frames.push({ effect, local });
+    if (effect.preset.scale) zoom *= effect.preset.scale(local);
+  }
+  drawFootage(zoom);
+  for (const { effect, local } of frames) {
+    if (!effect.preset.draw) continue;
+    ctx.save();
+    effect.preset.draw(ctx, local, effect.preset.duration, effect.values);
+    ctx.restore();
+  }
+}
+
+/**
+ * Renders the reel with the picked animations baked in. Resolves with the
+ * recorded WebM; throws when the browser cannot record (caller falls back to
+ * the original footage).
  */
 export async function bakeReelAnimation(options: BakeOptions): Promise<Blob> {
-  const { videoUrl, presetId, values, onProgress } = options;
-  const preset = getPreset(presetId);
-  if (!preset || (!preset.draw && !preset.scale)) {
+  const { videoUrl, attachments, values, onProgress } = options;
+  // Reject a fully unknown attachment before touching the DOM; planEffects
+  // re-filters after metadata once the reel duration is known.
+  const usable = attachments.some((attachment) => {
+    const preset = getPreset(attachment.presetId);
+    return (
+      preset &&
+      preset.id !== 'none' &&
+      (preset.draw || preset.scale) &&
+      preset.slots.includes(attachment.slot)
+    );
+  });
+  if (!usable) {
     throw new Error('Unknown animation preset.');
   }
   const mimeType = pickMimeType();
@@ -125,7 +179,7 @@ export async function bakeReelAnimation(options: BakeOptions): Promise<Blob> {
   recorder.start(250);
 
   const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
-  const effectStart = presetStart(preset, duration);
+  const effects = planEffects(attachments, duration, values);
 
   await new Promise<void>((resolve) => {
     const fps = 30;
@@ -148,19 +202,11 @@ export async function bakeReelAnimation(options: BakeOptions): Promise<Blob> {
       if (now - lastFrameTime >= minFrameMs) {
         lastFrameTime = now;
         video.currentTime = Math.min(t, duration);
-        const local = video.currentTime - effectStart;
         if (duration) onProgress?.(Math.min(1, video.currentTime / duration));
         ctx.clearRect(0, 0, DESIGN_W, DESIGN_H);
-        const zoom =
-          preset.scale && local >= 0 && local <= preset.duration
-            ? preset.scale(local)
-            : 1;
-        drawFootage(ctx, video, zoom);
-        if (preset.draw && local >= 0 && local <= preset.duration) {
-          ctx.save();
-          preset.draw(ctx, local, preset.duration, values);
-          ctx.restore();
-        }
+        composeFrame(ctx, effects, video.currentTime, (zoom) =>
+          drawFootage(ctx, video, zoom)
+        );
       }
       raf = requestAnimationFrame(tick);
     };

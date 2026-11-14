@@ -27,10 +27,12 @@ import { bakeReelAnimation } from '@/lib/reels/bake';
 import { normalizeVideo } from '@/lib/reels/browser-normalize';
 import { fetchDownloadedVideo, parseVideoParam } from '@/lib/reels/import-download';
 import {
+  attachmentsFromSlots,
   defaultPresetValues,
   getPreset,
   type PresetValues,
 } from '@/lib/reels/presets';
+import type { SlotLoops, SlotSelection } from '@/components/reels/animation-picker';
 
 const MAX_BYTES = 1024 * 1024 * 1024;
 
@@ -50,14 +52,30 @@ export default function ReelsPage() {
   // when its async normalize completed).
   const pickGeneration = useRef(0);
 
-  const [presetId, setPresetId] = useState<string | null>(null);
+  const [slots, setSlots] = useState<SlotSelection>({
+    start: null,
+    middle: null,
+    end: null,
+  });
+  const [loops, setLoops] = useState<SlotLoops>({
+    start: false,
+    middle: false,
+    end: false,
+  });
   const [presetValues, setPresetValues] = useState<Record<string, PresetValues>>(
     () => defaultPresetValues()
   );
   const [renderPct, setRenderPct] = useState<number | null>(null);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [normalizePct, setNormalizePct] = useState<number | null>(null);
-  const preset = getPreset(presetId);
+  // Attachments in overlay draw order (start → middle → end).
+  const attachments = attachmentsFromSlots(slots, loops);
+  const attachmentPresets = attachments
+    .map((attachment) => getPreset(attachment.presetId))
+    .filter((preset) => preset !== null);
+  const attachmentLabel = attachmentPresets
+    .map((preset) => `“${preset.name}”`)
+    .join(' + ');
 
   /**
    * Picked videos are normalized to H.264 1080×1920 before anything else:
@@ -178,13 +196,13 @@ export default function ReelsPage() {
     setRenderPct(null);
     try {
       let uploadFile = file;
-      // Bake the selected animation into the footage first: record the video
-      // + GSAP overlay to WebM in the browser, then normalize back to MP4.
-      if (preset && preset.id !== 'none' && fileUrl) {
+      // Bake the attached animations into the footage first: record the video
+      // + slot overlays to WebM in the browser, then normalize back to MP4.
+      if (attachments.length && fileUrl) {
         const webm = await bakeReelAnimation({
           videoUrl: fileUrl,
-          presetId: preset.id,
-          values: presetValues[preset.id] ?? {},
+          attachments,
+          values: presetValues,
           onProgress: setRenderPct,
         }).catch((error: unknown) => {
           toast.warning('Posting without the animation', {
@@ -286,9 +304,15 @@ export default function ReelsPage() {
         )}
 
         <AnimationPicker
-          value={presetId}
+          slots={slots}
+          loops={loops}
           values={presetValues}
-          onSelect={setPresetId}
+          onSelect={(slot, id) =>
+            setSlots((current) => ({ ...current, [slot]: id }))
+          }
+          onLoopChange={(slot, loop) =>
+            setLoops((current) => ({ ...current, [slot]: loop }))
+          }
           onFieldChange={(id, key, text) =>
             setPresetValues((current) => ({
               ...current,
@@ -356,9 +380,9 @@ export default function ReelsPage() {
             {uploadPct != null
               ? 'Uploading the video to storage — do not close this tab.'
               : renderPct != null
-              ? `Baking “${preset?.name}” into the footage — keep this tab open.`
-              : preset && preset.id !== 'none'
-                ? `“${preset.name}” is rendered into the reel when you post.`
+              ? `Baking ${attachmentLabel} into the footage — keep this tab open.`
+              : attachments.length
+                ? `${attachmentLabel} ${attachments.length > 1 ? 'are' : 'is'} rendered into the reel when you post.`
                 : scheduleOn
                   ? 'Facebook queues the reel and publishes it at the chosen time.'
                   : 'Publishes straight to the selected Page(s).'}
@@ -381,8 +405,9 @@ export default function ReelsPage() {
             pagePicture={
               pages.pages.find((page) => page.id === pages.selected[0])?.picture
             }
-            preset={preset}
-            presetValues={preset ? presetValues[preset.id] : undefined}
+            slots={slots}
+            loops={loops}
+            values={presetValues}
           />
         </div>
       </div>

@@ -9,7 +9,8 @@
  *    the picker's gallery cards, where no video is playing underneath.
  *
  * `draw` receives LOCAL time in seconds (0 at the effect's start), so presets
- * are anchored by the registry (`start` / `anchor: 'end'`), not by callers.
+ * are anchored by the registry — the slot they are attached to (`start`,
+ * `middle`, `end`) decides where each effect lands on the reel, not callers.
  *
  * This module is intentionally GSAP-free so the bake path (lib/reels/bake.ts)
  * can import it without pulling GSAP into module scope. GSAP-dependent mount
@@ -27,20 +28,32 @@ export type PresetCategory =
   | 'Branding'
   | 'Motion';
 
+/** Where on the reel an animation can be attached. */
+export type PresetSlot = 'start' | 'middle' | 'end';
+
+/** One animation picked for a slot; `loop` repeats it through the reel. */
+export type ReelAttachment = {
+  presetId: string;
+  slot: PresetSlot;
+  loop: boolean;
+};
+
+export const SLOT_ORDER: PresetSlot[] = ['start', 'middle', 'end'];
+
 type Ctx = CanvasRenderingContext2D;
 
 export type ReelPreset = {
   id: string;
   name: string;
   category: PresetCategory;
+  /** Slots this effect suits — the picker only offers it there. */
+  slots: PresetSlot[];
   /** Display label for where the effect lands on the reel. */
   window: string;
   /** Effect length in seconds. */
   duration: number;
-  /** Seconds into the reel where the effect starts (when `anchor` is 'start'). */
+  /** Seconds into the reel where the effect starts (in the 'start' slot). */
   start: number;
-  /** 'end' anchors the effect to the last `duration` seconds of the reel. */
-  anchor?: 'start' | 'end';
   /** Text inputs the user can edit for this preset. */
   fields: PresetField[];
   /** Render one frame at local time `t` in a 1080×1920 design space. */
@@ -122,6 +135,7 @@ export const headline: ReelPreset = {
   id: 'headline',
   name: 'Kinetic Headline',
   category: 'Headlines',
+  slots: ['start'],
   window: 'First 3s',
   duration: 3.4,
   start: 0,
@@ -176,6 +190,7 @@ export const breaking: ReelPreset = {
   id: 'breaking',
   name: 'Breaking Banner',
   category: 'Newsroom',
+  slots: ['start', 'middle'],
   window: '0–5s',
   duration: 5,
   start: 0,
@@ -229,6 +244,7 @@ export const lowerthird: ReelPreset = {
   id: 'lowerthird',
   name: 'Lower Third',
   category: 'Newsroom',
+  slots: ['start', 'middle'],
   window: '1–4s',
   duration: 3.4,
   start: 1,
@@ -264,6 +280,7 @@ export const captionpop: ReelPreset = {
   id: 'captionpop',
   name: 'Caption Pop',
   category: 'Captions',
+  slots: ['start', 'middle'],
   window: 'After 1.5s',
   duration: 4,
   start: 1.5,
@@ -329,6 +346,7 @@ export const quote: ReelPreset = {
   id: 'quote',
   name: 'Quote Reveal',
   category: 'Headlines',
+  slots: ['middle'],
   window: 'Mid reel',
   duration: 4,
   start: 3,
@@ -371,6 +389,7 @@ export const stat: ReelPreset = {
   id: 'stat',
   name: 'Stat Pop',
   category: 'Headlines',
+  slots: ['start', 'middle'],
   window: '0–3s',
   duration: 3.2,
   start: 0.5,
@@ -421,6 +440,7 @@ export const punchzoom: ReelPreset = {
   id: 'punchzoom',
   name: 'Punch Zoom',
   category: 'Motion',
+  slots: ['start', 'middle', 'end'],
   window: 'On beat drops',
   duration: 2.4,
   start: 2,
@@ -436,6 +456,7 @@ export const logosting: ReelPreset = {
   id: 'logosting',
   name: 'Logo Sting',
   category: 'Branding',
+  slots: ['start', 'end'],
   window: 'Intro / outro',
   duration: 2.6,
   start: 0.2,
@@ -474,10 +495,10 @@ export const endcard: ReelPreset = {
   id: 'endcard',
   name: 'End Card',
   category: 'Branding',
+  slots: ['end'],
   window: 'Last 4s',
   duration: 3.6,
   start: 0,
-  anchor: 'end',
   fields: [
     { key: 'text', label: 'End card text', value: 'Follow for daily news' },
   ],
@@ -536,7 +557,7 @@ export const endcard: ReelPreset = {
 };
 
 export const REEL_PRESETS: ReelPreset[] = [
-  { id: 'none', name: 'None', category: 'Headlines', window: 'No animation', duration: 0, start: 0, fields: [] },
+  { id: 'none', name: 'None', category: 'Headlines', slots: [], window: 'No animation', duration: 0, start: 0, fields: [] },
   headline,
   breaking,
   lowerthird,
@@ -557,12 +578,89 @@ export const PRESET_CATEGORIES = [
   'Motion',
 ] as const;
 
-/** Effect start time within a reel of `videoDuration` seconds. */
-export function presetStart(preset: ReelPreset, videoDuration: number): number {
-  if (preset.anchor === 'end') {
+/** Silence between looped repeats of an effect, in seconds. */
+export const LOOP_GAP_SECONDS = 0.4;
+
+/** Effect start time for `slot` on a reel of `videoDuration` seconds. */
+export function slotStart(
+  preset: ReelPreset,
+  slot: PresetSlot,
+  videoDuration: number
+): number {
+  if (slot === 'end') {
     return Math.max(0, videoDuration - preset.duration - 0.2);
   }
+  if (slot === 'middle') {
+    return Math.max(0, videoDuration / 2 - preset.duration / 2);
+  }
   return preset.start;
+}
+
+/**
+ * Local seconds into an effect at absolute reel time `t`, or null while the
+ * effect is off screen — before its start, after a single play finishes, or
+ * inside the gap between looped repeats. Looped effects cycle
+ * `duration + LOOP_GAP_SECONDS` so each repeat plays the effect's own in/out
+ * animation before the next one begins.
+ */
+export function effectLocalTime(
+  t: number,
+  start: number,
+  duration: number,
+  loop: boolean
+): number | null {
+  if (t < start) return null;
+  const local = loop ? (t - start) % (duration + LOOP_GAP_SECONDS) : t - start;
+  return local <= duration ? local : null;
+}
+
+/** A planned effect: a preset resolved to one absolute time on a reel. */
+export type PlannedEffect = {
+  preset: ReelPreset;
+  slot: PresetSlot;
+  loop: boolean;
+  /** Absolute reel time the effect (or its first looped cycle) starts. */
+  start: number;
+  values: PresetValues;
+};
+
+/**
+ * Resolves the picker's attachments into concrete timed effects for one reel:
+ * slots become absolute times, unknown/incompatible picks are dropped, and
+ * 'end' effects never loop (their single play already closes the reel).
+ */
+export function planEffects(
+  attachments: ReelAttachment[],
+  videoDuration: number,
+  values: Record<string, PresetValues> = {}
+): PlannedEffect[] {
+  const planned: PlannedEffect[] = [];
+  for (const attachment of attachments) {
+    const preset = getPreset(attachment.presetId);
+    if (!preset || preset.id === 'none') continue;
+    if (!preset.draw && !preset.scale) continue;
+    if (!preset.slots.includes(attachment.slot)) continue;
+    planned.push({
+      preset,
+      slot: attachment.slot,
+      loop: attachment.loop && attachment.slot !== 'end',
+      start: slotStart(preset, attachment.slot, videoDuration),
+      values: values[attachment.presetId] ?? {},
+    });
+  }
+  return planned;
+}
+
+/** Reads the picker's per-slot selection into bake-ready attachments. */
+export function attachmentsFromSlots(
+  slots: Record<PresetSlot, string | null>,
+  loops: Record<PresetSlot, boolean>
+): ReelAttachment[] {
+  return SLOT_ORDER.flatMap((slot) => {
+    const presetId = slots[slot];
+    if (!presetId || presetId === 'none') return [];
+    return [{ presetId, slot, loop: loops[slot] }];
+  });
 }
 
 export function getPreset(id: string | null | undefined): ReelPreset | null {
