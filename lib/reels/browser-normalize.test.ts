@@ -10,11 +10,14 @@ const ffmpegState = vi.hoisted(() => ({
   execCode: 0,
   output: new Uint8Array([1, 2, 3]),
   loadCalls: [] as Array<{ coreURL?: string; wasmURL?: string }>,
+  loaderHangs: false,
 }));
 
 vi.mock("./ffmpeg-loader", () => ({
   loadFfmpegLibs: () =>
-    Promise.resolve({
+    ffmpegState.loaderHangs
+      ? new Promise(() => {})
+      : Promise.resolve({
       FFmpeg: class {
         handlers: Record<string, Array<(e: unknown) => void>> = {};
         lastArgs?: string[];
@@ -153,6 +156,22 @@ describe("finalizeBakedVideo", () => {
       finalizeBakedVideo(new Blob(["fmp4"], { type: "video/mp4" }))
     ).rejects.toThrow("The browser video converter failed.");
     ffmpegState.execCode = 0;
+  });
+
+  it("rejects when the converter libraries hang — the composer must not wait forever", async () => {
+    ffmpegState.loaderHangs = true;
+    vi.useFakeTimers();
+    try {
+      const pending = finalizeBakedVideo(new Blob(["fmp4"], { type: "video/mp4" }));
+      const assertion = expect(pending).rejects.toThrow(
+        "Loading the video converter libraries timed out."
+      );
+      await vi.advanceTimersByTimeAsync(60_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+      ffmpegState.loaderHangs = false;
+    }
   });
 });
 

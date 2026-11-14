@@ -81,7 +81,13 @@ async function runFfmpegInBrowser(
   buildArgs: (inputName: string, outputName: string) => string[],
   onProgress?: (ratio: number) => void
 ): Promise<File> {
-  const { FFmpeg, toBlobURL, fetchFile } = await loadFfmpegLibs();
+  // The loader's dynamic imports can stall on a bad network just like the
+  // CDN fetches below — bound them so the composer's fallback still runs.
+  const { FFmpeg, toBlobURL, fetchFile } = await withTimeout(
+    loadFfmpegLibs(),
+    60_000,
+    "Loading the video converter libraries"
+  );
   const ffmpeg = new FFmpeg();
   ffmpeg.on("progress", ({ progress }) => {
     onProgress?.(Math.max(0, Math.min(1, progress)));
