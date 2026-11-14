@@ -279,7 +279,10 @@ export default function InstagramPage() {
                 setScheduleError('');
               }}
               value={scheduledFor}
-              onChange={setScheduledFor}
+              onChange={(value) => {
+                setScheduledFor(value);
+                setScheduleError('');
+              }}
               error={scheduleError}
               label="Schedule on Instagram"
               hint="10 minutes to 75 days from now. Instagram has no scheduling API — the workbench publishes it at the chosen time."

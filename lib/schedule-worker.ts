@@ -20,7 +20,7 @@ import {
   scheduledOutcomeCopy,
 } from "@/lib/notifications";
 import { getPrimaryPage, resolvePageToken } from "@/lib/facebook-page-token";
-import { deleteStagedBlob } from "@/lib/blob-cleanup";
+import { deleteStagedBlobs } from "@/lib/blob";
 import {
   publishInstagramImagePost,
   resolveInstagramAccount,
@@ -80,29 +80,36 @@ export async function publishDuePosts(
   const synced = await syncNativeSchedules();
   await requeueStuckPosts();
 
+  // Candidate selection only — the real claim happens per row, immediately
+  // before its publish, so a slow publish (Instagram's container polling)
+  // cannot let an overlapping sweep double-publish a waiting row.
   const due = (await sql`
-    WITH due AS (
-      SELECT id FROM scheduled_posts
-      WHERE status = 'scheduled' AND scheduled_for <= now()
-        AND source = 'local'
-        AND attempts < ${MAX_ATTEMPTS}
-        AND (attempts = 0
-             OR updated_at < now() - (${RETRY_BACKOFF_MINUTES} * interval '1 minute'))
-      ORDER BY scheduled_for ASC
-      LIMIT 10
-      FOR UPDATE SKIP LOCKED
-    )
-    UPDATE scheduled_posts s
-    SET status = 'publishing', attempts = s.attempts + 1, updated_at = now()
-    FROM due
-    WHERE s.id = due.id
-    RETURNING s.id, s.workspace_id, s.news_item_id, s.draft_id, s.text,
-              s.image_url, s.image_urls, s.kind, s.attempts`) as unknown as ClaimedRow[];
+    SELECT id, workspace_id, news_item_id, draft_id, text,
+           image_url, image_urls, kind, attempts
+    FROM scheduled_posts
+    WHERE status = 'scheduled' AND scheduled_for <= now()
+      AND source = 'local'
+      AND attempts < ${MAX_ATTEMPTS}
+      AND (attempts = 0
+           OR updated_at < now() - (${RETRY_BACKOFF_MINUTES} * interval '1 minute'))
+    ORDER BY scheduled_for ASC
+    LIMIT 10
+    FOR UPDATE SKIP LOCKED`) as unknown as ClaimedRow[];
 
   let published = 0;
   let failed = 0;
 
   for (const post of due) {
+    // Conditional claim: only a row still in 'scheduled' may publish. An
+    // overlapping sweep that already claimed (or a stuck-sweep requeue race)
+    // leaves this UPDATE empty — skip instead of publishing twice.
+    const claimed = (await sql`
+      UPDATE scheduled_posts
+      SET status = 'publishing', attempts = attempts + 1, updated_at = now()
+      WHERE id = ${post.id} AND status = 'scheduled'
+      RETURNING id`) as unknown as { id: number }[];
+    if (!claimed.length) continue;
+
     await recordScheduleEvent({
       workspaceId: post.workspace_id,
       scheduledPostId: post.id,
@@ -178,8 +185,10 @@ export async function publishDuePosts(
         (error.code === 10 || error.code === 200 || error.code === 190);
 
       // A transient Facebook failure should not kill the scheduled post. Keep
-      // it queued until the attempt budget runs out.
-      const exhausted = post.attempts >= MAX_ATTEMPTS;
+      // it queued until the attempt budget runs out. The per-row claim
+      // already incremented attempts, so the pre-claim value + 1 is the
+      // attempt number that just failed.
+      const exhausted = post.attempts + 1 >= MAX_ATTEMPTS;
 
       await sql`
         UPDATE scheduled_posts
@@ -195,7 +204,7 @@ export async function publishDuePosts(
         source: options.source,
         actorUserId: options.actorUserId,
         errorMessage: message,
-        metadata: { attempt: post.attempts, maxAttempts: MAX_ATTEMPTS },
+        metadata: { attempt: post.attempts + 1, maxAttempts: MAX_ATTEMPTS },
       });
 
       if (permissionIssue) {
@@ -265,9 +274,11 @@ async function publishScheduledInstagramPost(
   });
 
   // Instagram consumed the staged image — same post-publish cleanup the
-  // FB reels route performs. A failed cleanup is harmless (orphaned blob).
+  // FB reels route performs, via the server-side blob API (the browser-only
+  // helper in lib/blob-cleanup.ts carries no auth here). A failed cleanup is
+  // harmless (orphaned blob).
   try {
-    await deleteStagedBlob(post.image_url);
+    await deleteStagedBlobs([post.image_url]);
   } catch {
     // Cleanup only.
   }

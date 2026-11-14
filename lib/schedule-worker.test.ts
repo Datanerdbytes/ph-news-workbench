@@ -24,7 +24,7 @@ vi.mock("@/lib/publishing/instagram", () => ({
   publishInstagramImagePost: vi.fn(),
   resolveInstagramAccount: vi.fn(),
 }));
-vi.mock("@/lib/blob-cleanup", () => ({ deleteStagedBlob: vi.fn() }));
+vi.mock("@/lib/blob", () => ({ deleteStagedBlobs: vi.fn() }));
 vi.mock("@/lib/youtube", () => ({
   ensureFreshYouTubeToken: vi.fn(),
   fetchYouTubeVideoStatus: vi.fn(),
@@ -45,7 +45,7 @@ import {
   publishInstagramImagePost,
   resolveInstagramAccount,
 } from "@/lib/publishing/instagram";
-import { deleteStagedBlob } from "@/lib/blob-cleanup";
+import { deleteStagedBlobs } from "@/lib/blob";
 import {
   ensureFreshYouTubeToken,
   fetchYouTubeVideoStatus,
@@ -63,12 +63,16 @@ const events = () =>
  */
 function useDb(overrides: {
   claim?: unknown[];
+  claimRow?: unknown[];
   stuck?: unknown[];
   native?: unknown[];
 }) {
   sqlMock.mockImplementation(async (strings: TemplateStringsArray) => {
     const query = strings.join(" ");
-    if (query.includes("WITH due AS")) return overrides.claim ?? [];
+    if (query.includes("attempts = attempts + 1"))
+      // Per-row conditional claim — succeeds unless the test overrides it.
+      return overrides.claimRow ?? [{ id: 1 }];
+    if (query.includes("source = 'local'")) return overrides.claim ?? [];
     if (query.includes("status = 'publishing'")) return overrides.stuck ?? [];
     if (query.includes("source IN ('facebook', 'youtube')"))
       return overrides.native ?? [];
@@ -160,6 +164,8 @@ describe("publishDuePosts", () => {
   });
 
   it("requeues the post while attempts remain", async () => {
+    // attempts is the pre-claim value; the per-row claim makes this the
+    // second attempt.
     useDb({ claim: [claimedRow({ attempts: 1 })] });
     vi.mocked(getPrimaryPage).mockResolvedValue({
       pageId: "pg1",
@@ -179,12 +185,14 @@ describe("publishDuePosts", () => {
     ]);
     expect(events()[1]).toMatchObject({
       errorMessage: "token expired",
-      metadata: { attempt: 1, maxAttempts: 3 },
+      metadata: { attempt: 2, maxAttempts: 3 },
     });
   });
 
   it("fails the post once the attempt budget is exhausted", async () => {
-    useDb({ claim: [claimedRow({ attempts: 3 })] });
+    // attempts is the pre-claim value — the per-row claim makes this the
+    // third attempt, which is the last one.
+    useDb({ claim: [claimedRow({ attempts: 2 })] });
     vi.mocked(getPrimaryPage).mockResolvedValue({
       pageId: "pg1",
       token: "tok",
@@ -198,6 +206,25 @@ describe("publishDuePosts", () => {
       failed: 1,
     });
     expect(events().map((event) => event.event)).toEqual(["claimed", "failed"]);
+  });
+
+  it("skips a row another sweep already claimed", async () => {
+    useDb({
+      claim: [claimedRow()],
+      claimRow: [], // the conditional claim updates nothing — contested
+    });
+    vi.mocked(getPrimaryPage).mockResolvedValue({
+      pageId: "pg1",
+      token: "tok",
+    });
+
+    await expect(publishDuePosts({ source: "scheduler" })).resolves.toMatchObject({
+      due: 1,
+      published: 0,
+      failed: 0,
+    });
+    expect(publishPagePost).not.toHaveBeenCalled();
+    expect(events()).toEqual([]);
   });
 
   it("redacts token material from Facebook error messages", async () => {
@@ -272,7 +299,7 @@ describe("publishDuePosts", () => {
         imageUrl: igImage,
         caption: "hello",
       });
-      expect(deleteStagedBlob).toHaveBeenCalledWith(igImage);
+      expect(deleteStagedBlobs).toHaveBeenCalledWith([igImage]);
       expect(events().map((event) => event.event)).toEqual([
         "claimed",
         "published",
@@ -304,7 +331,7 @@ describe("publishDuePosts", () => {
       await publishDuePosts({ source: "scheduler" });
 
       expect(publishInstagramImagePost).not.toHaveBeenCalled();
-      expect(deleteStagedBlob).not.toHaveBeenCalled();
+      expect(deleteStagedBlobs).not.toHaveBeenCalled();
       expect(events()[1]).toMatchObject({
         event: "retrying",
         errorMessage:
