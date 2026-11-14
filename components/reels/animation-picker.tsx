@@ -122,11 +122,13 @@ function SlotEditor({
       </div>
       {preset.fields.map((field) => (
         <div key={field.key}>
-          <FieldLabel htmlFor={`preset-${preset.id}-${field.key}`}>
+          {/* Slot-scoped ids: the same preset can occupy two slots (e.g. Logo
+              Sting at start and end) and the ids must not collide. */}
+          <FieldLabel htmlFor={`preset-${slot}-${preset.id}-${field.key}`}>
             {field.label}
           </FieldLabel>
           <input
-            id={`preset-${preset.id}-${field.key}`}
+            id={`preset-${slot}-${preset.id}-${field.key}`}
             type="text"
             value={values[field.key] ?? field.value}
             onChange={(event) => onFieldChange(field.key, event.target.value)}

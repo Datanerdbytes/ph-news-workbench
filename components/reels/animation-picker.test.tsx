@@ -131,6 +131,29 @@ describe("AnimationPicker", () => {
     expect(presetCard("Logo Sting").textContent).toContain("start");
   });
 
+  it("gives same-preset editors unique input ids per slot", () => {
+    render(<Harness />);
+    fireEvent.click(presetCard("Logo Sting")); // start slot
+    fireEvent.click(slotTab("End"));
+    fireEvent.click(presetCard("Logo Sting")); // end slot
+    const startInput = document.getElementById(
+      "preset-start-logosting-text"
+    ) as HTMLInputElement | null;
+    const endInput = document.getElementById(
+      "preset-end-logosting-text"
+    ) as HTMLInputElement | null;
+    if (!startInput || !endInput) throw new Error("both slot editors should render inputs");
+    expect(startInput.id).not.toBe(endInput.id);
+    // Each label points at its own slot's input.
+    const startLabel = document.querySelector(
+      'label[for="preset-start-logosting-text"]'
+    );
+    const endLabel = document.querySelector(
+      'label[for="preset-end-logosting-text"]'
+    );
+    expect(startLabel && endLabel).toBeTruthy();
+  });
+
   it("edits field values through onFieldChange", () => {
     const onFieldChange = vi.fn();
     render(<Harness onFieldChange={onFieldChange} />);
