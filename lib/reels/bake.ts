@@ -14,8 +14,9 @@ import {
  * canvas — first the cover-cropped footage (scaled by any active camera
  * preset), then each slot attachment's overlay at the current time — so what
  * gets recorded is already the composited reel. The canvas stream is recorded
- * together with the video's audio into a WebM, which /api/reels/prepare
- * transcodes to H.264 MP4.
+ * together with the video's audio into H.264 MP4 when the browser can record
+ * it (WebM otherwise); finalizeBakedVideo (browser-normalize.ts) then turns
+ * the recording into the progressive MP4 the publish route needs.
  */
 
 const CANVAS_W = 1080;
@@ -26,6 +27,13 @@ const DESIGN_H = 1920;
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === 'undefined') return undefined;
   const candidates = [
+    // MP4/H.264 first: the baked reel can then publish straight to Facebook.
+    // A WebM bake depends on /api/reels/prepare to transcode, which answers
+    // 503 on Vercel — leaving no way to turn the WebM into the MP4 the
+    // publish route requires.
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4;codecs=avc1.4d002a,mp4a.40.2',
+    'video/mp4',
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
     'video/webm',
@@ -157,7 +165,10 @@ export async function bakeReelAnimation(options: BakeOptions): Promise<Blob> {
 
   const finished = new Promise<Blob>((resolve, reject) => {
     recorder.onstop = () => {
-      resolve(new Blob(chunks, { type: 'video/webm' }));
+      // Tag the blob with the container we asked the recorder for — callers
+      // branch on it (MP4 publishes straight, WebM needs a transcode).
+      const container = mimeType.startsWith('video/mp4') ? 'video/mp4' : 'video/webm';
+      resolve(new Blob(chunks, { type: container }));
     };
     recorder.onerror = () => reject(new Error('Recording failed.'));
   });

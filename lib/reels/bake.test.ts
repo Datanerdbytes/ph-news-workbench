@@ -83,8 +83,13 @@ let captureStreamMock: Mock;
 /**
  * Loaded-metadata resolves lazily the way a sniffed local blob does; `play`
  * may end the bake itself by firing `onended` once the loop has attached it.
+ * `mimeSupport` narrows MediaRecorder.isTypeSupported: 'all' (default) lets
+ * the MP4-first candidates win, 'webm-only' exercises the fallback container.
  */
-function installBrowserStubs(play: (video: FakeVideo) => Promise<void>) {
+function installBrowserStubs(
+  play: (video: FakeVideo) => Promise<void>,
+  mimeSupport: "all" | "webm-only" | "mp4-only" = "all"
+) {
   video = {
     src: "",
     playsInline: false,
@@ -148,7 +153,9 @@ function installBrowserStubs(play: (video: FakeVideo) => Promise<void>) {
     onerror: null,
   };
   class MediaRecorderStub {
-    static isTypeSupported() {
+    static isTypeSupported(mime: string) {
+      if (mimeSupport === "webm-only") return mime.includes("webm");
+      if (mimeSupport === "mp4-only") return mime.includes("mp4");
       return true;
     }
     constructor() {
@@ -244,7 +251,7 @@ describe("bakeReelAnimation", () => {
     expect(captureStreamMock).toHaveBeenCalledWith(30);
   });
 
-  it("records the composited reel at the reel's native 1080×1920", async () => {
+  it("records the composited reel at the reel's native 1080×1920, as MP4", async () => {
     installBrowserStubs((element) => {
       setTimeout(() => element.onended?.(new Event("ended")), 0);
       return Promise.resolve();
@@ -256,7 +263,9 @@ describe("bakeReelAnimation", () => {
       values: { headline: { text: "Big news today" } },
     });
 
-    expect(blob.type).toBe("video/webm");
+    // MP4/H.264 recording wins when the browser supports it: the bake then
+    // publishes without a transcode step (which Vercel cannot perform).
+    expect(blob.type).toBe("video/mp4");
     expect(blob.size).toBeGreaterThan(0);
     expect(canvas.width).toBe(1080);
     expect(canvas.height).toBe(1920);
@@ -264,6 +273,25 @@ describe("bakeReelAnimation", () => {
     expect(captureStreamMock).toHaveBeenCalledWith(30);
     expect(recorder.start).toHaveBeenCalledWith(250);
     expect(video.src).toBe("");
+  });
+
+  it("falls back to WebM when the browser cannot record MP4", async () => {
+    installBrowserStubs(
+      (element) => {
+        setTimeout(() => element.onended?.(new Event("ended")), 0);
+        return Promise.resolve();
+      },
+      "webm-only"
+    );
+
+    const blob = await bakeReelAnimation({
+      videoUrl: "blob:x",
+      attachments: [{ presetId: "headline", slot: "start", loop: false }],
+      values: {},
+    });
+
+    expect(blob.type).toBe("video/webm");
+    expect(blob.size).toBeGreaterThan(0);
   });
 
   it("bakes every attached slot effect into one recording", async () => {
@@ -282,7 +310,7 @@ describe("bakeReelAnimation", () => {
     });
 
     // One composited recording at native resolution covering both effects.
-    expect(blob.type).toBe("video/webm");
+    expect(blob.type).toBe("video/mp4");
     expect(blob.size).toBeGreaterThan(0);
     expect(canvas.width).toBe(1080);
     expect(recorder.start).toHaveBeenCalledWith(250);

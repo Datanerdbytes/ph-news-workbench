@@ -24,7 +24,10 @@ import {
   type PublishResult,
 } from '@/components/publishing/publish-page';
 import { bakeReelAnimation } from '@/lib/reels/bake';
-import { normalizeVideo } from '@/lib/reels/browser-normalize';
+import {
+  finalizeBakedVideo,
+  normalizeVideo,
+} from '@/lib/reels/browser-normalize';
 import { fetchDownloadedVideo, parseVideoParam } from '@/lib/reels/import-download';
 import {
   attachmentsFromSlots,
@@ -197,9 +200,9 @@ export default function ReelsPage() {
     try {
       let uploadFile = file;
       // Bake the attached animations into the footage first: record the video
-      // + slot overlays to WebM in the browser, then normalize back to MP4.
+      // + slot overlays in the browser, then make the result publishable MP4.
       if (attachments.length && fileUrl) {
-        const webm = await bakeReelAnimation({
+        const baked = await bakeReelAnimation({
           videoUrl: fileUrl,
           attachments,
           values: presetValues,
@@ -213,13 +216,23 @@ export default function ReelsPage() {
           });
           return null;
         });
-        if (webm) {
-          const baked = await normalizeVideo(webm, 'baked-reel.webm');
-          if (baked.normalized) uploadFile = baked.file;
-          else
+        if (baked) {
+          // MediaRecorder emits fragmented MP4 (Chrome et al.) or WebM
+          // (fallback). Facebook needs a progressive H.264 MP4, and the old
+          // path through /api/reels/prepare 503s on Vercel — which silently
+          // dropped the bake and posted the reel without its animation.
+          // Finalize fully in the browser instead: MP4 remuxes losslessly
+          // (seconds), WebM transcodes (slower).
+          try {
+            uploadFile = await finalizeBakedVideo(baked, setRenderPct);
+          } catch (error) {
             toast.warning('Posting without the animation', {
-              description: baked.error ?? 'The baked reel could not be normalized.',
+              description:
+                error instanceof Error
+                  ? error.message
+                  : 'The baked reel could not be finalized.',
             });
+          }
         }
       }
       setRenderPct(null);
