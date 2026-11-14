@@ -211,20 +211,30 @@ export function ComposerCard({
   icon,
   title,
   badge,
+  headerRight,
   aside,
   asideWidth,
+  className,
   children,
 }: {
   icon: React.ReactNode;
   title: string;
   badge?: string;
+  /** Right-aligned slot in the card header (links, toggles, counters). */
+  headerRight?: React.ReactNode;
   aside?: React.ReactNode;
   /** Grid template for the aside column; defaults to the shared 240px rail. */
   asideWidth?: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-border/80 bg-card paper-shadow-sm">
+    <section
+      className={cn(
+        'overflow-hidden rounded-xl border border-border/80 bg-card paper-shadow-sm',
+        className
+      )}
+    >
       <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3">
         <span className="text-brand" aria-hidden>
           {icon}
@@ -235,6 +245,7 @@ export function ComposerCard({
             {badge}
           </span>
         )}
+        {headerRight && <div className="ml-auto flex items-center gap-2">{headerRight}</div>}
       </div>
       <div
         className={cn(

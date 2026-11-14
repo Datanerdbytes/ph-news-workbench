@@ -17,6 +17,10 @@ import {
   inputClass,
   textareaClass,
 } from '@/components/publishing/publish-page';
+import {
+  MediaPreviewCard,
+  MediaPreviewMedia,
+} from '@/components/publishing/media-preview-card';
 
 type Stream = {
   id: number;
@@ -122,27 +126,32 @@ export default function LivePage() {
 
   const hasTitle = Boolean(title.trim());
 
-  const liveAside = (
-    <div className="relative isolate flex flex-col overflow-hidden rounded-xl bg-ink p-4 text-white shadow-[0_12px_34px_-22px_rgba(16,24,40,.5)]">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-16 -top-20 -z-10 size-[220px] rounded-full bg-[radial-gradient(circle,rgba(154,161,171,.25),transparent_68%)]"
-      />
-      <div className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-[0.13em] text-white/65">
-          <span
-            className={
-              hasTitle
-                ? 'size-1.5 rounded-full bg-success-bright'
-                : 'size-1.5 rounded-full bg-white/70'
-            }
-          />
-          {hasTitle ? 'Ready to create' : 'Live preview'}
-        </span>
-        <span className="font-mono text-[9px] uppercase text-white/60">Live</span>
-      </div>
-
-      <div className="relative mt-4 flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
+  const livePreview = (
+    <MediaPreviewCard
+      statusLabel={hasTitle ? 'Ready to create' : 'Live preview'}
+      ready={hasTitle}
+      label="Live"
+      footer={
+        <>
+          <p className="min-w-0 truncate font-mono text-[9px] text-muted-foreground">
+            Title {title.length}/200 · Description {description.length}/5,000
+          </p>
+          <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-2 p-3">
+            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface-3 text-muted-foreground">
+              <Radio className="size-3.5" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold">Streaming endpoint</p>
+              <p className="mt-0.5 text-[9px] leading-relaxed text-muted-foreground">
+                Facebook returns an RTMPS server URL and stream key — paste both
+                into OBS or any RTMP encoder.
+              </p>
+            </div>
+          </div>
+        </>
+      }
+    >
+      <MediaPreviewMedia className="aspect-video">
         {hasTitle ? (
           <>
             <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded bg-black/50 px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.12em] text-white/85">
@@ -183,173 +192,145 @@ export default function LivePage() {
             </p>
           </div>
         )}
-      </div>
-
-      <div className="mt-3 min-w-0">
-        <p className="truncate font-mono text-[9px] text-white/60">
-          Title {title.length}/200 · Description {description.length}/5,000
-        </p>
-      </div>
-
-      <div className="mt-auto pt-3">
-        <div className="rounded-xl border border-white/10 bg-white/[0.045] p-3">
-          <div className="flex items-center gap-2.5">
-            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.07] text-white/70">
-              <Radio className="size-3.5" aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-white/85">
-                Streaming endpoint
-              </p>
-              <p className="mt-0.5 text-[9px] leading-relaxed text-white/60">
-                Facebook returns an RTMPS server URL and stream key — paste both
-                into OBS or any RTMP encoder.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      </MediaPreviewMedia>
+    </MediaPreviewCard>
   );
 
   return (
     <PublishPage eyebrow="Publishing" title="Live video">
-      <div className="space-y-4">
-        <ComposerCard
-          icon={<Radio className="size-4" />}
-          title="Create live stream"
-          aside={liveAside}
-          asideWidth="lg:grid-cols-[minmax(0,1fr)_320px]"
-        >
-          <div>
-            <FieldLabel htmlFor="live-title" hint={`${title.length}/200`}>
-              Title
-            </FieldLabel>
-            <input
-              id="live-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              maxLength={200}
-              placeholder="e.g. Afternoon news briefing"
-              className={inputClass}
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+        <div className="min-w-0 space-y-5">
+          <ComposerCard icon={<Radio className="size-4" />} title="Create live stream">
+            <div>
+              <FieldLabel htmlFor="live-title" hint={`${title.length}/200`}>
+                Title
+              </FieldLabel>
+              <input
+                id="live-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                maxLength={200}
+                placeholder="e.g. Afternoon news briefing"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <FieldLabel htmlFor="live-description" hint={`${description.length}/5000`}>
+                Description
+              </FieldLabel>
+              <textarea
+                id="live-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={3}
+                maxLength={5000}
+                placeholder="What is this broadcast about?"
+                className={textareaClass}
+              />
+            </div>
+            <ScheduleField
+              enabled={scheduleOn}
+              onEnabled={setScheduleOn}
+              value={scheduledFor}
+              onChange={setScheduledFor}
             />
-          </div>
-          <div>
-            <FieldLabel htmlFor="live-description" hint={`${description.length}/5000`}>
-              Description
-            </FieldLabel>
-            <textarea
-              id="live-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={3}
-              maxLength={5000}
-              placeholder="What is this broadcast about?"
-              className={textareaClass}
-            />
-          </div>
-          <ScheduleField
-            enabled={scheduleOn}
-            onEnabled={setScheduleOn}
-            value={scheduledFor}
-            onChange={setScheduledFor}
-          />
-          <Button
-            variant="brand"
-            size="sm"
-            onClick={create}
-            disabled={!title.trim() || busy}
-          >
-            <Radio className="size-3.5" aria-hidden />
-            {busy ? 'Creating…' : scheduleOn ? 'Schedule stream' : 'Create stream'}
-          </Button>
+            <Button
+              variant="brand"
+              size="sm"
+              onClick={create}
+              disabled={!title.trim() || busy}
+            >
+              <Radio className="size-3.5" aria-hidden />
+              {busy ? 'Creating…' : scheduleOn ? 'Schedule stream' : 'Create stream'}
+            </Button>
 
-          {fresh && (
-            <div className="space-y-2 rounded-lg border border-border bg-surface-2 p-3">
-              <p className="text-xs font-semibold">{fresh.title}</p>
-              <div className="space-y-1.5 text-[11px]">
-                <div className="flex items-center gap-2">
-                  <span className="w-16 shrink-0 text-muted-foreground">Server</span>
-                  <code className="min-w-0 flex-1 truncate rounded bg-background px-1.5 py-0.5 font-mono">
-                    {fresh.secureStreamUrl ?? '—'}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      fresh.secureStreamUrl &&
-                      void copy(fresh.secureStreamUrl, 'Server URL')
-                    }
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="Copy server URL"
-                  >
-                    <Copy className="size-3.5" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-16 shrink-0 text-muted-foreground">Key</span>
-                  <code className="min-w-0 flex-1 truncate rounded bg-background px-1.5 py-0.5 font-mono">
-                    {fresh.streamKey ?? 'Read from Facebook — see the stream below'}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => fresh.streamKey && void copy(fresh.streamKey, 'Stream key')}
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="Copy stream key"
-                  >
-                    <Copy className="size-3.5" />
-                  </button>
+            {fresh && (
+              <div className="space-y-2 rounded-lg border border-border bg-surface-2 p-3">
+                <p className="text-xs font-semibold">{fresh.title}</p>
+                <div className="space-y-1.5 text-[11px]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-16 shrink-0 text-muted-foreground">Server</span>
+                    <code className="min-w-0 flex-1 truncate rounded bg-background px-1.5 py-0.5 font-mono">
+                      {fresh.secureStreamUrl ?? '—'}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        fresh.secureStreamUrl &&
+                        void copy(fresh.secureStreamUrl, 'Server URL')
+                      }
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Copy server URL"
+                    >
+                      <Copy className="size-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-16 shrink-0 text-muted-foreground">Key</span>
+                    <code className="min-w-0 flex-1 truncate rounded bg-background px-1.5 py-0.5 font-mono">
+                      {fresh.streamKey ?? 'Read from Facebook — see the stream below'}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => fresh.streamKey && void copy(fresh.streamKey, 'Stream key')}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Copy stream key"
+                    >
+                      <Copy className="size-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </ComposerCard>
+            )}
+          </ComposerCard>
 
-        <section className="overflow-hidden rounded-xl border border-border/80 bg-card paper-shadow-sm">
-          <div className="flex items-center justify-between gap-3 border-b border-border/60 px-5 py-3">
-            <div className="flex items-center gap-2">
-              <Radio className="size-4 text-brand" aria-hidden />
-              <span className="text-sm font-semibold">Live streams</span>
+          <ComposerCard
+            icon={<Radio className="size-4" />}
+            title="Live streams"
+            headerRight={
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void load(true)}
+                disabled={loading}
+              >
+                <RefreshCw
+                  className={cn('size-3.5', loading && 'animate-spin')}
+                  aria-hidden
+                />
+                Refresh from Facebook
+              </Button>
+            }
+          >
+            <div className="divide-y divide-border/60">
+              {loading && !streams.length && (
+                <p className="py-6 text-xs text-muted-foreground">
+                  Loading live streams…
+                </p>
+              )}
+              {!loading && !streams.length && loadError && (
+                <ErrorState
+                  compact
+                  title="Couldn't load live streams"
+                  onRetry={() => load()}
+                />
+              )}
+              {!loading && !streams.length && !loadError && (
+                <p className="py-6 text-xs text-muted-foreground">
+                  No live streams yet. Create one above to get an RTMPS server and key.
+                </p>
+              )}
+              {streams.map((stream) => (
+                <StreamCard
+                  key={stream.id}
+                  stream={stream}
+                  onChanged={() => void load()}
+                />
+              ))}
             </div>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => void load(true)}
-              disabled={loading}
-            >
-              <RefreshCw
-                className={cn('size-3.5', loading && 'animate-spin')}
-                aria-hidden
-              />
-              Refresh from Facebook
-            </Button>
-          </div>
-          <div className="divide-y divide-border/60">
-            {loading && !streams.length && (
-              <p className="px-5 py-6 text-xs text-muted-foreground">
-                Loading live streams…
-              </p>
-            )}
-            {!loading && !streams.length && loadError && (
-              <ErrorState
-                compact
-                title="Couldn't load live streams"
-                onRetry={() => load()}
-              />
-            )}
-            {!loading && !streams.length && !loadError && (
-              <p className="px-5 py-6 text-xs text-muted-foreground">
-                No live streams yet. Create one above to get an RTMPS server and key.
-              </p>
-            )}
-            {streams.map((stream) => (
-              <StreamCard
-                key={stream.id}
-                stream={stream}
-                onChanged={() => void load()}
-              />
-            ))}
-          </div>
-        </section>
+          </ComposerCard>
+        </div>
+        <aside className="self-start xl:sticky xl:top-[70px]">{livePreview}</aside>
       </div>
       <AssistantChat
         draft={description}
@@ -481,7 +462,7 @@ function StreamCard({
   }
 
   return (
-    <div className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+    <div className="grid gap-3 py-4 lg:grid-cols-[minmax(0,1fr)_240px]">
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <span
