@@ -41,7 +41,7 @@ describe("parseScheduledPublishTime", () => {
     const far = new Date(Date.now() + 76 * 24 * 60 * 60_000).toISOString();
     expect(parseScheduledPublishTime(far)).toEqual({
       unix: null,
-      error: "Facebook allows scheduling at most 75 days ahead.",
+      error: "Scheduling supports at most 75 days ahead.",
     });
   });
 

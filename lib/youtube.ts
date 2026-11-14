@@ -337,6 +337,9 @@ export type YouTubeMetadata = {
   privacyStatus: 'public' | 'unlisted' | 'private';
   madeForKids: boolean;
   tags?: string[];
+  /** RFC 3339 future time — YouTube keeps the video Private and
+   * auto-publishes it at this moment (requires privacyStatus 'private'). */
+  publishAt?: string;
 };
 
 export async function createYouTubeUploadSession({
@@ -373,6 +376,7 @@ export async function createYouTubeUploadSession({
         status: {
           privacyStatus: metadata.privacyStatus,
           selfDeclaredMadeForKids: metadata.madeForKids,
+          ...(metadata.publishAt ? { publishAt: metadata.publishAt } : {}),
         },
       }),
     });
@@ -427,22 +431,28 @@ export async function uploadYouTubeBytes(
 export async function fetchYouTubeVideoStatus(
   videoId: string,
   accessToken: string
-): Promise<{ uploadStatus: string | null; thumbnail: string | null }> {
+): Promise<{
+  uploadStatus: string | null;
+  thumbnail: string | null;
+  privacyStatus: string | null;
+}> {
   const url = new URL('https://www.googleapis.com/youtube/v3/videos');
   url.searchParams.set('part', 'status,snippet');
   url.searchParams.set('id', videoId);
   const response = await fetch(url, {
     headers: { authorization: `Bearer ${accessToken}` },
   });
-  if (!response.ok) return { uploadStatus: null, thumbnail: null };
+  if (!response.ok)
+    return { uploadStatus: null, thumbnail: null, privacyStatus: null };
   const body = (await response.json().catch(() => null)) as {
     items?: {
       snippet?: { thumbnails?: { high?: { url?: string } } };
-      status?: { uploadStatus?: string };
+      status?: { uploadStatus?: string; privacyStatus?: string };
     }[];
   };
   return {
     uploadStatus: body?.items?.[0]?.status?.uploadStatus ?? null,
     thumbnail: body?.items?.[0]?.snippet?.thumbnails?.high?.url ?? null,
+    privacyStatus: body?.items?.[0]?.status?.privacyStatus ?? null,
   };
 }

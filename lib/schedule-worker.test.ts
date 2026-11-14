@@ -17,6 +17,13 @@ vi.mock("@/lib/facebook", async (importOriginal) => {
     isFacebookStillScheduled: vi.fn(),
   };
 });
+vi.mock("@/lib/publishing/connection", () => ({
+  resolvePlatformAccount: vi.fn(),
+}));
+vi.mock("@/lib/youtube", () => ({
+  ensureFreshYouTubeToken: vi.fn(),
+  fetchYouTubeVideoStatus: vi.fn(),
+}));
 
 import { sql } from "@/lib/db";
 import {
@@ -28,6 +35,11 @@ import {
 } from "@/lib/facebook";
 import { getPrimaryPage, resolvePageToken } from "@/lib/facebook-page-token";
 import { recordScheduleEvent } from "@/lib/schedule-events";
+import { resolvePlatformAccount } from "@/lib/publishing/connection";
+import {
+  ensureFreshYouTubeToken,
+  fetchYouTubeVideoStatus,
+} from "@/lib/youtube";
 import { publishDuePosts, syncNativeSchedules } from "./schedule-worker";
 
 const sqlMock = sql as unknown as Mock;
@@ -48,7 +60,8 @@ function useDb(overrides: {
     const query = strings.join(" ");
     if (query.includes("WITH due AS")) return overrides.claim ?? [];
     if (query.includes("status = 'publishing'")) return overrides.stuck ?? [];
-    if (query.includes("source = 'facebook'")) return overrides.native ?? [];
+    if (query.includes("source IN ('facebook', 'youtube')"))
+      return overrides.native ?? [];
     return [];
   });
 }
@@ -76,6 +89,7 @@ function nativeRow(overrides: Record<string, unknown> = {}) {
     workspace_id: "ws1",
     news_item_id: null,
     kind: "post",
+    source: "facebook",
     facebook_post_id: "fb_1",
     facebook_post_ids: null,
     page_id: "pg1",
@@ -318,6 +332,110 @@ describe("syncNativeSchedules", () => {
     expect(events()[0]).toMatchObject({
       event: "failed",
       errorMessage: "Facebook did not return an id for this item.",
+    });
+  });
+
+  describe("YouTube-scheduled videos", () => {
+    function youtubeRow(overrides: Record<string, unknown> = {}) {
+      return nativeRow({
+        kind: "video",
+        source: "youtube",
+        facebook_post_id: "yt_video_1",
+        page_id: "UC1",
+        ...overrides,
+      });
+    }
+
+    const connectedAccount = {
+      platform: "youtube" as const,
+      platformUserId: "UC1",
+      username: "Neural-Verse",
+      accessToken: "cipher-token",
+      scopes: ["https://www.googleapis.com/auth/youtube.upload"],
+      expiresAt: null,
+    };
+
+    beforeEach(() => {
+      vi.mocked(resolvePlatformAccount).mockResolvedValue(connectedAccount);
+      vi.mocked(ensureFreshYouTubeToken).mockResolvedValue("fresh-token");
+    });
+
+    it("marks the video published once YouTube flips it public", async () => {
+      useDb({ native: [youtubeRow()] });
+      vi.mocked(fetchYouTubeVideoStatus).mockResolvedValue({
+        uploadStatus: "processed",
+        thumbnail: null,
+        privacyStatus: "public",
+      });
+
+      await expect(syncNativeSchedules()).resolves.toBe(1);
+      expect(ensureFreshYouTubeToken).toHaveBeenCalledWith(
+        connectedAccount,
+        "ws1"
+      );
+      expect(fetchYouTubeVideoStatus).toHaveBeenCalledWith(
+        "yt_video_1",
+        "fresh-token"
+      );
+      expect(events()[0]).toMatchObject({
+        event: "published",
+        facebookPostId: "yt_video_1",
+        metadata: { kind: "video", executor: "youtube" },
+      });
+    });
+
+    it("leaves the row scheduled while the video is still private", async () => {
+      useDb({ native: [youtubeRow()] });
+      vi.mocked(fetchYouTubeVideoStatus).mockResolvedValue({
+        uploadStatus: "processed",
+        thumbnail: null,
+        privacyStatus: "private",
+      });
+
+      await expect(syncNativeSchedules()).resolves.toBe(0);
+      expect(events()).toEqual([]);
+    });
+
+    it("fails the row once it stays private past the grace period", async () => {
+      useDb({
+        native: [youtubeRow({ scheduled_for: minutesAgo(90) })],
+      });
+      vi.mocked(fetchYouTubeVideoStatus).mockResolvedValue({
+        uploadStatus: "processed",
+        thumbnail: null,
+        privacyStatus: "private",
+      });
+
+      await expect(syncNativeSchedules()).resolves.toBe(1);
+      expect(events()[0]).toMatchObject({
+        event: "failed",
+        errorMessage:
+          "YouTube did not publish this video at its scheduled time.",
+        metadata: { kind: "video", executor: "youtube" },
+      });
+    });
+
+    it("fails the row when the YouTube connection is gone", async () => {
+      useDb({ native: [youtubeRow()] });
+      vi.mocked(resolvePlatformAccount).mockResolvedValue(null);
+
+      await expect(syncNativeSchedules()).resolves.toBe(1);
+      expect(fetchYouTubeVideoStatus).not.toHaveBeenCalled();
+      expect(events()[0]).toMatchObject({
+        event: "failed",
+        errorMessage: "The YouTube connection is gone. Reconnect YouTube.",
+      });
+    });
+
+    it("fails rows without a stored video id", async () => {
+      useDb({ native: [youtubeRow({ facebook_post_id: null })] });
+
+      await expect(syncNativeSchedules()).resolves.toBe(1);
+      expect(resolvePlatformAccount).not.toHaveBeenCalled();
+      expect(events()[0]).toMatchObject({
+        event: "failed",
+        errorMessage: "YouTube did not return an id for this upload.",
+      });
     });
   });
 });

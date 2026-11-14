@@ -25,7 +25,7 @@ export function parseScheduledPublishTime(value: unknown): {
   if (delta > MAX_SCHEDULE_MS) {
     return {
       unix: null,
-      error: 'Facebook allows scheduling at most 75 days ahead.',
+      error: 'Scheduling supports at most 75 days ahead.',
     };
   }
 

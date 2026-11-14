@@ -9,8 +9,14 @@ import { recordScheduleEvent } from '@/lib/schedule-events';
  *
  * The Story Queue does NOT use this module — it schedules locally and the
  * worker publishes it, so it writes `source='local'` rows directly.
+ * YouTube uploads mirror here too (`platform:'youtube'`, kind `'video'`):
+ * the upload happens immediately and YouTube auto-publishes via
+ * `status.publishAt`.
  */
 export type NativeScheduleKind = 'post' | 'photo' | 'video' | 'reel' | 'live';
+
+/** Platforms that schedule on their own (mirrored as `source` on the row). */
+export type NativeSchedulePlatform = 'facebook' | 'youtube';
 
 export type NativePublishResult = {
   page: { id: string; name: string };
@@ -31,19 +37,26 @@ export const NATIVE_KIND_LABELS: Record<NativeScheduleKind, string> = {
 /** Treat anything within this window as "publish now" rather than scheduled. */
 export const IMMEDIATE_PUBLISH_WINDOW_MS = 60_000;
 
+/** Row message when every target rejected the publish, per platform — the
+ * Facebook wording predates multi-platform mirroring and stays as-is. */
+const DEFAULT_REJECT_MESSAGES: Record<NativeSchedulePlatform, string> = {
+  facebook: "Facebook rejected the publish on every selected Page.",
+  youtube: "YouTube rejected the publish on every selected target.",
+};
+
 /**
- * Record a Facebook-native publish so the workspace has a local row for it.
+ * Record a platform-native publish so the workspace has a local row for it.
  *
  * - A scheduled publish becomes `status='scheduled'` and is later flipped to
  *   `published`/`failed` by the status sweep in lib/schedule-worker.ts, which
- *   asks Facebook whether it went live.
+ *   asks the platform whether it went live.
  * - An immediate publish becomes `status='published'` right away, so the
  *   Analytics totals count it.
- * - A publish that Facebook rejected on every Page becomes `status='failed'`
- *   so it is visible in the Calendar instead of vanishing.
+ * - A publish the platform rejected on every target becomes
+ *   `status='failed'` so it is visible in the Calendar instead of vanishing.
  *
  * A recording failure never fails the publish itself: the content is already
- * on Facebook either way.
+ * on the platform either way.
  */
 export async function recordNativeSchedule({
   workspaceId,
@@ -52,6 +65,7 @@ export async function recordNativeSchedule({
   text,
   scheduledFor,
   results,
+  platform = 'facebook',
   newsItemId = null,
   draftId = null,
 }: {
@@ -59,9 +73,10 @@ export async function recordNativeSchedule({
   userId: string;
   kind: NativeScheduleKind;
   text: string;
-  /** The moment Facebook will publish. `null` means it published immediately. */
+  /** The moment the platform will publish. `null` means it published immediately. */
   scheduledFor: Date | null;
   results: NativePublishResult[];
+  platform?: NativeSchedulePlatform;
   newsItemId?: number | null;
   draftId?: number | null;
 }): Promise<void> {
@@ -73,7 +88,7 @@ export async function recordNativeSchedule({
   const errorMessage = success
     ? null
     : (results.find((result) => result.error)?.error ??
-      'Facebook rejected the publish on every selected Page.');
+      DEFAULT_REJECT_MESSAGES[platform]);
 
   try {
     const rows = (await sql`
@@ -84,7 +99,7 @@ export async function recordNativeSchedule({
       VALUES
         (${workspaceId}, ${newsItemId}, ${draftId}, ${text || '(no caption)'},
          ${(scheduledFor ?? new Date()).toISOString()}, ${status},
-         ${kind}, 'facebook', ${success?.id ?? null},
+         ${kind}, ${platform}, ${success?.id ?? null},
          ${JSON.stringify(results)}::jsonb, ${success?.page.id ?? null},
          ${errorMessage}, ${userId})
       RETURNING id`) as unknown as { id: number }[];
@@ -100,7 +115,7 @@ export async function recordNativeSchedule({
       errorMessage,
       metadata: {
         kind,
-        executor: 'facebook',
+        executor: platform,
         scheduledFor: scheduledFor?.toISOString() ?? null,
         pages: results.length,
         published: results.filter((result) => result.ok).length,
