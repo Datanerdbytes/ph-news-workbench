@@ -10,11 +10,14 @@ const ffmpegState = vi.hoisted(() => ({
   execCode: 0,
   output: new Uint8Array([1, 2, 3]),
   loadCalls: [] as Array<{ coreURL?: string; wasmURL?: string }>,
+  loaderHangs: false,
 }));
 
 vi.mock("./ffmpeg-loader", () => ({
   loadFfmpegLibs: () =>
-    Promise.resolve({
+    ffmpegState.loaderHangs
+      ? new Promise(() => {})
+      : Promise.resolve({
       FFmpeg: class {
         handlers: Record<string, Array<(e: unknown) => void>> = {};
         lastArgs?: string[];
@@ -50,8 +53,10 @@ vi.mock("./ffmpeg-loader", () => ({
 }));
 
 import {
+  buildBakeRemuxArgs,
   buildBrowserTranscodeArgs,
   canBrowserPlay,
+  finalizeBakedVideo,
   normalizeVideo,
 } from "./browser-normalize";
 
@@ -107,6 +112,66 @@ describe("buildBrowserTranscodeArgs", () => {
     expect(args[0]).toBe("-i");
     expect(args[1]).toBe("input.mov");
     expect(args[args.length - 1]).toBe("output.mp4");
+  });
+});
+
+describe("buildBakeRemuxArgs", () => {
+  it("copies the bake losslessly into a progressive faststart MP4", () => {
+    const args = buildBakeRemuxArgs("input.mp4", "output.mp4");
+    expect(args).toEqual(["-i", "input.mp4", "-c", "copy", "-movflags", "+faststart", "output.mp4"]);
+    expect(args).not.toContain("libx264");
+  });
+});
+
+describe("finalizeBakedVideo", () => {
+  it("remuxes MP4 bakes losslessly — no re-encode", async () => {
+    const out = await finalizeBakedVideo(new Blob(["fmp4"], { type: "video/mp4" }));
+    expect(out.name).toBe("baked-reel.mp4");
+    expect(out.type).toBe("video/mp4");
+    const instance = ffmpegState.instances[0];
+    expect(instance.lastArgs).toContain("-c");
+    expect(instance.lastArgs).toContain("copy");
+    expect(instance.lastArgs).not.toContain("libx264");
+    expect(instance.terminated).toBe(true);
+  });
+
+  it("transcodes WebM bakes to H.264", async () => {
+    const out = await finalizeBakedVideo(new Blob(["webm"], { type: "video/webm" }));
+    expect(out.name).toBe("baked-reel.mp4");
+    expect(out.type).toBe("video/mp4");
+    const instance = ffmpegState.instances[0];
+    expect(instance.lastArgs).toContain("libx264");
+    expect(instance.terminated).toBe(true);
+  });
+
+  it("treats an untagged bake as WebM and transcodes it", async () => {
+    await finalizeBakedVideo(new Blob(["x"], { type: "" }));
+    const instance = ffmpegState.instances[0];
+    expect(instance.lastArgs).toContain("libx264");
+  });
+
+  it("propagates converter failures so the composer can warn", async () => {
+    ffmpegState.execCode = 1;
+    await expect(
+      finalizeBakedVideo(new Blob(["fmp4"], { type: "video/mp4" }))
+    ).rejects.toThrow("The browser video converter failed.");
+    ffmpegState.execCode = 0;
+  });
+
+  it("rejects when the converter libraries hang — the composer must not wait forever", async () => {
+    ffmpegState.loaderHangs = true;
+    vi.useFakeTimers();
+    try {
+      const pending = finalizeBakedVideo(new Blob(["fmp4"], { type: "video/mp4" }));
+      const assertion = expect(pending).rejects.toThrow(
+        "Loading the video converter libraries timed out."
+      );
+      await vi.advanceTimersByTimeAsync(60_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+      ffmpegState.loaderHangs = false;
+    }
   });
 });
 

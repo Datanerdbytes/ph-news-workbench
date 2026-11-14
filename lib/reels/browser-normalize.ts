@@ -63,17 +63,31 @@ export function canBrowserPlay(blob: Blob): Promise<boolean> {
   });
 }
 
-/**
- * Transcode to H.264 in the browser with ffmpeg.wasm (single-thread core, no
- * cross-origin isolation needed). Used only when server normalization is
- * unavailable and the browser cannot play the original.
- */
-export async function transcodeInBrowser(
+/** Lossless remux of an already-encoded MP4 into a progressive (faststart)
+ * MP4, `-c copy` — no re-encode, so it takes seconds. MediaRecorder emits
+ * fragmented MP4 (duration lives in the fragments, mvhd reads 0, which the
+ * publish route rejects); the remux produces the plain progressive file both
+ * the duration check and Facebook expect. */
+export function buildBakeRemuxArgs(
+  inputName: string,
+  outputName: string
+): string[] {
+  return ["-i", inputName, "-c", "copy", "-movflags", "+faststart", outputName];
+}
+
+async function runFfmpegInBrowser(
   blob: Blob,
   name: string,
+  buildArgs: (inputName: string, outputName: string) => string[],
   onProgress?: (ratio: number) => void
 ): Promise<File> {
-  const { FFmpeg, toBlobURL, fetchFile } = await loadFfmpegLibs();
+  // The loader's dynamic imports can stall on a bad network just like the
+  // CDN fetches below — bound them so the composer's fallback still runs.
+  const { FFmpeg, toBlobURL, fetchFile } = await withTimeout(
+    loadFfmpegLibs(),
+    60_000,
+    "Loading the video converter libraries"
+  );
   const ffmpeg = new FFmpeg();
   ffmpeg.on("progress", ({ progress }) => {
     onProgress?.(Math.max(0, Math.min(1, progress)));
@@ -99,7 +113,7 @@ export async function transcodeInBrowser(
     );
     await ffmpeg.writeFile(inputName, await fetchFile(blob));
     const code = await withTimeout(
-      ffmpeg.exec(buildBrowserTranscodeArgs(inputName, outputName)),
+      ffmpeg.exec(buildArgs(inputName, outputName)),
       180_000,
       "Converting the video"
     );
@@ -122,6 +136,39 @@ function withTimeout<T>(task: Promise<T>, ms: number, label: string): Promise<T>
       setTimeout(() => reject(new Error(`${label} timed out.`)), ms);
     }),
   ]);
+}
+
+/**
+ * Transcode to H.264 in the browser with ffmpeg.wasm (single-thread core, no
+ * cross-origin isolation needed). Used only when server normalization is
+ * unavailable and the browser cannot play the original.
+ */
+export async function transcodeInBrowser(
+  blob: Blob,
+  name: string,
+  onProgress?: (ratio: number) => void
+): Promise<File> {
+  return runFfmpegInBrowser(blob, name, buildBrowserTranscodeArgs, onProgress);
+}
+
+/**
+ * Turns a bake recording (lib/reels/bake.ts) into the publishable file, fully
+ * in the browser: MP4 bakes remux losslessly to progressive faststart MP4
+ * (seconds), WebM bakes transcode to H.264 (slower). Runs without the server
+ * so baked animations survive where /api/reels/prepare does not — Vercel has
+ * no ffmpeg, and the old flow silently dropped the bake there.
+ */
+export async function finalizeBakedVideo(
+  blob: Blob,
+  onProgress?: (ratio: number) => void
+): Promise<File> {
+  const isMp4 = blob.type.includes("mp4");
+  return runFfmpegInBrowser(
+    blob,
+    isMp4 ? "baked-reel.mp4" : "baked-reel.webm",
+    isMp4 ? buildBakeRemuxArgs : buildBrowserTranscodeArgs,
+    onProgress
+  );
 }
 
 /**
