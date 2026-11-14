@@ -24,7 +24,9 @@ import { FacebookMark } from '@/components/facebook-mark';
 import { useFacebookConnection } from '@/components/facebook-connection';
 import { FacebookPreview } from '@/components/facebook-preview';
 import {
+  ComposerCard,
   PageSelector,
+  defaultScheduleValue,
   resolveScheduledFor,
   scheduleBounds,
   useManagedPages,
@@ -76,13 +78,6 @@ const ALLOWED_IMAGE_TYPES = new Set([
   'image/png',
   'image/webp',
 ]);
-
-function defaultScheduleValue() {
-  const date = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  date.setHours(9, 0, 0, 0);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T09:00`;
-}
 
 function WorkspaceSkeleton() {
   return (
@@ -585,7 +580,7 @@ export default function Home() {
                   Editorial queue · {formatLongDate()}
                 </p>
                 <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <h1 className="font-heading text-[32px] leading-none tracking-[-0.02em]">
+                  <h1 className="font-heading text-2xl font-semibold tracking-tight">
                     Story Queue
                   </h1>
                   <p className="text-sm text-muted-foreground">
@@ -877,50 +872,51 @@ export default function Home() {
                   <EmptyWorkspace onRefresh={refresh} />
                 ) : (
                   <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-                    <section className="overflow-hidden rounded-xl border border-border/80 bg-card paper-shadow-sm xl:col-start-1 xl:row-start-1">
-                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <span className="eyebrow text-brand">Source story</span>
+                    <ComposerCard
+                      className="xl:col-start-1 xl:row-start-1"
+                      icon={<Newspaper className="size-4" />}
+                      title="Source story"
+                      headerRight={
+                        <>
                           <StatusPill status={selected.status} />
-                        </div>
-                        <a
-                          href={selected.link}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                          Read original
-                          <ArrowUpRight className="size-3.5" aria-hidden />
-                        </a>
-                      </div>
-                      <div className="px-5 py-4">
-                        <h2 className="text-balance font-heading text-[24px] leading-[1.2] tracking-[-0.015em]">
-                          {selected.title}
-                        </h2>
-                        {selected.summary && (
-                          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-                            {selected.summary}
-                          </p>
+                          <a
+                            href={selected.link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            Read original
+                            <ArrowUpRight className="size-3.5" aria-hidden />
+                          </a>
+                        </>
+                      }
+                    >
+                      <h2 className="text-balance font-heading text-[24px] leading-[1.2] tracking-[-0.015em]">
+                        {selected.title}
+                      </h2>
+                      {selected.summary && (
+                        <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                          {selected.summary}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                        <span className="font-medium text-foreground/70">
+                          {formatDomain(selected.link)}
+                        </span>
+                        <span aria-hidden>·</span>
+                        <span>
+                          {selected.created_at
+                            ? `Ingested ${timeAgo(selected.created_at)}`
+                            : 'Latest ingest'}
+                        </span>
+                        {selectedMeta && (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span>{selectedMeta.label}</span>
+                          </>
                         )}
-                        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                          <span className="font-medium text-foreground/70">
-                            {formatDomain(selected.link)}
-                          </span>
-                          <span aria-hidden>·</span>
-                          <span>
-                            {selected.created_at
-                              ? `Ingested ${timeAgo(selected.created_at)}`
-                              : 'Latest ingest'}
-                          </span>
-                          {selectedMeta && (
-                            <>
-                              <span aria-hidden>·</span>
-                              <span>{selectedMeta.label}</span>
-                            </>
-                          )}
-                        </div>
                       </div>
-                    </section>
+                    </ComposerCard>
 
                     <section className="overflow-hidden rounded-xl border border-border/80 bg-card paper-shadow-sm xl:col-start-1 xl:row-start-2">
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-5 py-3">
