@@ -5,8 +5,10 @@
 # `Authorization: Bearer $CRON_SECRET_RENDER` — the same contract the local
 # scheduler warns about in lib/local-scheduler.ts.
 #
-# Note GitHub's scheduler can lag a few minutes behind these times, and
-# scheduled workflows are auto-disabled after 60 days of repo inactivity.
+# Note GitHub's scheduler can lag behind these times, and scheduled workflows
+# are auto-disabled after 60 days of repo inactivity.
+# 2026-11-17: comment bump to force schedule re-registration (first tick was
+# stuck for hours after the workflow was created).
 name: Cron (Render)
 
 on:
