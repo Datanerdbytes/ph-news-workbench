@@ -13,6 +13,15 @@ on:
   schedule:
     - cron: "*/5 * * * *" # scheduling sweep — publish due posts, sync Facebook-native schedules
     - cron: "0 * * * *" # feed ingest — pull new items from RSS sources
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which job to run manually (schedule-run = sweep, ingest = feeds)"
+        type: choice
+        options:
+          - schedule-run
+          - ingest
+        default: schedule-run
 
 concurrency:
   group: cron-render-${{ github.event.schedule }}
@@ -20,7 +29,7 @@ concurrency:
 
 jobs:
   schedule-run:
-    if: github.event.schedule == '*/5 * * * *'
+    if: github.event.schedule == '*/5 * * * *' || (github.event_name == 'workflow_dispatch' && inputs.job == 'schedule-run')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -31,7 +40,7 @@ jobs:
             "${{ vars.RENDER_URL || 'https://ph-news-workbench.onrender.com' }}/api/schedule/run"
 
   ingest:
-    if: github.event.schedule == '0 * * * *'
+    if: github.event.schedule == '0 * * * *' || (github.event_name == 'workflow_dispatch' && inputs.job == 'ingest')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
