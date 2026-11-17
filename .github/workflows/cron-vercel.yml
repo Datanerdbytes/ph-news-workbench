@@ -1,0 +1,43 @@
+# Cron executors for the Vercel deployment — KEPT DISABLED while the project
+# is paused (402 DEPLOYMENT_DISABLED). Re-enable with:
+#
+#   gh workflow enable cron-vercel.yml --repo Datanerdbytes/ph-news-workbench
+#
+# ...once the Vercel project is unpaused. Also confirm CRON_SECRET on Vercel
+# still matches the repo secret. The Render twin lives in cron-render.yml.
+#
+# Note GitHub's scheduler can lag a few minutes behind these times, and
+# scheduled workflows are auto-disabled after 60 days of repo inactivity.
+name: Cron (Vercel)
+
+on:
+  schedule:
+    - cron: "*/5 * * * *" # scheduling sweep — publish due posts, sync Facebook-native schedules
+    - cron: "0 * * * *" # feed ingest — pull new items from RSS sources
+
+concurrency:
+  group: cron-vercel-${{ github.event.schedule }}
+  cancel-in-progress: false
+
+jobs:
+  schedule-run:
+    if: github.event.schedule == '*/5 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger the scheduling sweep
+        run: |
+          curl -fsS --max-time 300 -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_URL || 'https://ph-news-workbench.vercel.app' }}/api/schedule/run"
+
+  ingest:
+    if: github.event.schedule == '0 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger the feed ingest
+        run: |
+          curl -fsS --max-time 300 -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ vars.PRODUCTION_URL || 'https://ph-news-workbench.vercel.app' }}/api/ingest"
